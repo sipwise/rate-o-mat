@@ -7,6 +7,12 @@ use Data::Dumper;
 
 my $type = 'call';
 
+# if uuid == 0
+#   provider = carrier
+# else
+#   provider = reseller
+
+
 my $dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
 	or die "Error connecting do db: $DBI::errstr\n";
 
@@ -67,16 +73,34 @@ my $sth_unrated_cdrs = $dbh->prepare(
 	"source_user_id, source_provider_id, ".
 	"destination_user_id, destination_provider_id, destination_user, destination_domain, ".
 	"start_time, duration ".
-	"FROM accounting.cdr WHERE rated_at IS NULL AND call_status = 'ok' ".
+	"FROM accounting.cdr WHERE rating_status = 'unrated' AND call_status = 'ok' ".
 	"LIMIT 10000"
 ) or die "Error preparing unrated cdr statement: $dbh->errstr\n";
 
 my $sth_update_cdr = $dbh->prepare(
 	"UPDATE accounting.cdr SET ".
 	"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
-	"rated_at = now(), billing_fee_id = ? ".
+	"rated_at = now(), rating_status = ?, billing_fee_id = ? ".
 	"WHERE id = ?"
 ) or die "Error preparing update cdr statement: $dbh->errstr\n";
+
+my $sth_provider_info = $dbh->prepare(
+	"SELECT p.class, bm.billing_profile_id ".
+	"FROM billing.products p, billing.billing_mappings bm ".
+	"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
+	"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
+	"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+) or die "Error preparing provider info statement: $dbh->errstr\n";
+
+my $sth_reseller_info = $dbh->prepare(
+	"SELECT bm.billing_profile_id ".
+	"FROM billing_mappings bm, voip_subscribers vs, contracts c ".
+	"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
+	"AND c.reseller_id = bm.contract_id ".
+	"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
+	"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+) or die "Error preparing reseller info statement: $dbh->errstr\n";
+
 
 
 sub get_billing_info
@@ -273,52 +297,93 @@ sub update_cdr
 
 	my $sth = $sth_update_cdr;
 	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
-		$cdr->{billing_fee_id}, $cdr->{id})
+		'ok', $cdr->{billing_fee_id}, $cdr->{id})
 		or die "Error executing update cdr statement: $dbh->errstr\n";
 	return 1;
 }
 
-sub rate_cdr
+sub update_failed_cdr
+{
+	my $cdr = shift;
+
+	my $sth = $sth_update_cdr;
+	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', $cdr->{id})
+		or die "Error executing update cdr statement: $dbh->errstr\n";
+	return 1;
+}
+
+sub get_provider_info
+{
+	my $pid = shift;
+	my $start = shift;
+	my $r_info = shift;
+
+	my $sth = $sth_provider_info;
+	$sth->execute($pid, $start, $start)
+		or die "Error executing provider info statement: $dbh->errstr\n";
+	my @res = $sth->fetchrow_array();
+	die "No provider info for provider id $pid found\n" 
+		unless(@res);
+
+	$r_info->{class} = $res[0];
+	$r_info->{profile_id} = $res[1];
+
+	return 1;
+}
+
+sub get_reseller_info
+{
+	my $uuid = shift;
+	my $start = shift;
+	my $r_info = shift;
+	
+	my $sth = $sth_reseller_info;
+	$sth->execute($uuid, $start, $start)
+		or die "Error executing reseller info statement: $dbh->errstr\n";
+	my @res = $sth->fetchrow_array();
+	die "No reseller info for user id $uuid found\n" 
+		unless(@res);
+
+	$r_info->{profile_id} = $res[0];
+	$r_info->{class} = 'reseller';
+
+	return 1;
+}
+
+sub get_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
+	my $destination_class;
+	my $profile_id = shift;
+	my $r_cost = shift;
+
 
 	my $start_unixtime;
 	set_start_unixtime($cdr->{start_time}, \$start_unixtime);
-
-	#print "unix-time=$start_unixtime\n";
-
-	# TODO: not only customer cost, also reseller and carrier cost!
 	
-	# TODO: distinguish between incoming and outgoing calls (no customer rating if
-	# source_user_id = 0
-
-	# TODO: onnet-calls must be rated differently, since it's mostly free
-
-	my %billing_info = ();
-	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
-		die "Error getting billing info\n";
-	#print Dumper \%billing_info;
+	# TODO: check for destination class and do postfix matching for
+	# sip peerings (always, or bill pstn fees although it's sip peering?)
 
 	my %profile_info = ();
-	get_profile_info($billing_info{profile_id}, $type, $cdr->{destination_user}, 
+	get_profile_info($profile_id, $type, $cdr->{destination_user}, 
 		\%profile_info) or
 		die "Error getting profile info\n";
 	#print Dumper \%profile_info;
 
 	my @offpeak_weekdays = ();
-	get_offpeak_weekdays($billing_info{profile_id}, $cdr->{start_time}, 
+	get_offpeak_weekdays($profile_id, $cdr->{start_time}, 
 		$cdr->{duration}, \@offpeak_weekdays) or
 		die "Error getting weekdays offpeak info\n";
 	#print Dumper \@offpeak_weekdays;
 
 	my @offpeak_special = ();
-	get_offpeak_special($billing_info{profile_id}, $cdr->{start_time}, 
+	get_offpeak_special($profile_id, $cdr->{start_time}, 
 		$cdr->{duration}, \@offpeak_special) or
 		die "Error getting special offpeak info\n";
 	#print Dumper \@offpeak_special;
 
-	my $cost = 0;
+	$$r_cost = 0;
 	my $interval = 0;
 	my $rate = 0;
 	my $offset = 0;
@@ -360,19 +425,149 @@ sub rate_cdr
 				$profile_info{on_follow_rate} : $profile_info{off_follow_rate};
 		}
 
-		$cost += $rate;
+		$$r_cost += $rate;
 		$duration -= $interval;
 		$offset += $interval;
-
-		#print "int=$interval, rate=$rate, cost=$cost\n";
 	}
 
-	# TODO: set proper costs here:
+	return 1;
+}
 
-	$cdr->{carrier_cost} = $cost;
-	$cdr->{reseller_cost} = $cost;
-	$cdr->{customer_cost} = $cost;
-	$cdr->{billing_fee_id} = $profile_info{fee_id};
+sub get_customer_call_cost
+{
+	my $cdr = shift;
+	my $type = shift;
+	my $destination_class = shift;
+	my $r_cost = shift;
+
+	my %billing_info = ();
+	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
+		die "Error getting billing info\n";
+	#print Dumper \%billing_info;
+
+	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, $r_cost)
+		or die "Error getting customer call cost\n";
+
+	return 1;
+}
+
+sub get_provider_call_cost
+{
+	my $cdr = shift;
+	my $type = shift;
+	my $r_info = shift;
+	my $r_cost = shift;
+	
+	get_call_cost($cdr, $type, $r_info->{class}, $r_info->{profile_id}, $r_cost)
+		or die "Error getting provider call cost\n";
+
+	return 1;
+}
+
+sub rate_cdr
+{
+	my $cdr = shift;
+	my $type = shift;
+
+	my $customer_cost = 0;
+	my $carrier_cost = 0;
+	my $reseller_cost = 0;
+
+
+	# TODO: onnet-calls must be rated differently, since it's mostly free
+
+
+	if($cdr->{source_user_id} eq "0")
+	{
+		# caller is not local
+
+		if($cdr->{source_provider_id} == 0)
+		{
+			print "WARNING: CDR id ".$cdr->{id}." has no source uid/pid!\n";
+			update_failed_cdr($cdr);
+			return 1;
+		}
+		if($cdr->{destination_user_id} eq "0")
+		{
+			# a relay? must not happen!
+			print "WARNING: CDR id ".$cdr->{id}." has wether source nor destination uid/pid!\n";
+			update_failed_cdr($cdr);
+			return 1;
+		}
+
+		# TODO: should there be an incoming profile to calculate termination fees?
+	
+		$customer_cost = 0;
+		$carrier_cost = 0;
+		$reseller_cost = 0;
+	}
+	else
+	{
+		# caller is local
+
+		if($cdr->{source_provider_id} == 0)
+		{
+			print "WARNING: CDR id ".$cdr->{id}." has no source provider id\n";
+			update_failed_cdr($cdr);
+			return 1;
+		}
+		if($cdr->{destination_provider_id} == 0)
+		{
+			print "WARNING: CDR id ".$cdr->{id}." has no destination provider id\n";
+			update_failed_cdr($cdr);
+			return 1;
+		}
+
+		my %provider_info = ();
+		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_date},
+			\%provider_info)
+			or die "Error getting destination provider info\n";
+
+
+		my $dst_class;
+
+		if($provider_info{class} eq "reseller")
+		{
+			$dst_class = 'reseller';
+
+			# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
+			get_provider_call_cost($cdr, $type, \%provider_info, \$reseller_cost)
+				or die "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+			$carrier_cost = 0;
+		}
+		elsif($provider_info{class} eq "sippeering" || $provider_info{class} eq "pstnpeering")
+		{
+			$dst_class = $provider_info{class};
+
+			# carrier cost can be calculated directly with available billing profile
+			get_provider_call_cost($cdr, $type, \%provider_info, \$carrier_cost)
+				or die "Error getting carrier cost for cdr ".$cdr->{id}."\n";
+	
+			# for reseller we first have to find the billing profile
+			%provider_info = ();
+			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
+				\%provider_info)
+				or die "Error getting source reseller info\n";
+			get_provider_call_cost($cdr, $type, \%provider_info, \$reseller_cost)
+				or die "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+		}
+		else
+		{
+			die "Destination provider id ".$cdr->{destination_provider_id}." has invalid ".
+				"class '".$provider_info{class}."' in cdr ".$cdr->{id}."\n";
+		}
+			
+		get_customer_call_cost($cdr, $type, \$customer_cost)
+			or die "Error getting customer cost for cdr ".$cdr->{id}."\n";
+	}
+
+
+	$cdr->{carrier_cost} = $carrier_cost;
+	$cdr->{reseller_cost} = $reseller_cost;
+	$cdr->{customer_cost} = $customer_cost;
+
+	# TODO: there should be an id for every of the three costs!?
+	$cdr->{billing_fee_id} = 0;
 
 	return 1;
 }
