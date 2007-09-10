@@ -1,107 +1,165 @@
 #!/usr/bin/perl -w
 use strict;
 use DBI;
-use POSIX;
-
+use POSIX qw(setsid mktime);
+use Fcntl qw(LOCK_EX LOCK_NB);
+use Sys::Syslog;
 use Data::Dumper;
 
+my $fork = 1;
+my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
+my $loop_interval = 10;
 
-# if uuid == 0
-#   provider = carrier
-# else
-#   provider = reseller
+my $log_ident = 'rate-o-mat';
+my $log_facility = 'daemon';
+my $log_opts = 'ndely,cons,pid,nowait';
 
+########################################################################
 
-my $dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
-	or die "Error connecting do db: $DBI::errstr\n";
+sub main;
 
-my $sth_billing_info = $dbh->prepare(
-	"SELECT a.contract_id, b.billing_profile_id, c.cash_balance, ".
-	"c.free_time_balance, d.prepaid ".
-	"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
-	"billing.contract_balances c, billing.billing_profiles d ".
-	"WHERE a.uuid = ?  AND a.contract_id = b.contract_id ".
-	"AND ( b.start_date IS NULL OR b.start_date <= ?) ".
-	"AND ( b.end_date IS NULL OR b.end_date >= ? ) ".
-	"AND a.contract_id = c.contract_id ".
-	"AND b.billing_profile_id = d.id ".
-	"ORDER BY b.start_date DESC ".
-	"LIMIT 1"
-) or die "Error preparing billing info statement: $dbh->errstr\n";
+my $shutdown = 0;
+
+my $dbh;
+my $sth_billing_info;
+my $sth_profile_info;
+my $sth_offpeak_weekdays;
+my $sth_offpeak_special;
+my $sth_unrated_cdrs;
+my $sth_update_cdr;
+my $sth_provider_info;
+my $sth_reseller_info;
+
+main;
+exit 0;
+
+########################################################################
+
+sub FATAL
+{
+	my $msg = shift;
+	chomp $msg;
+	syslog('crit', $msg);
+	closelog();
+	die "$msg\n";
+}
+
+sub DEBUG
+{
+	my $msg = shift;
+	chomp $msg;
+	syslog('debug', $msg);
+}
+
+sub INFO
+{
+	my $msg = shift;
+	chomp $msg;
+	syslog('info', $msg);
+}
+
+sub WARNING
+{
+	my $msg = shift;
+	chomp $msg;
+	syslog('warning', $msg);
+}
+
+sub init_db
+{
+	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
+		or FATAL "Error connecting do db: $DBI::errstr\n";
+
+	$sth_billing_info = $dbh->prepare(
+		"SELECT a.contract_id, b.billing_profile_id, c.cash_balance, ".
+		"c.free_time_balance, d.prepaid ".
+		"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
+		"billing.contract_balances c, billing.billing_profiles d ".
+		"WHERE a.uuid = ?  AND a.contract_id = b.contract_id ".
+		"AND ( b.start_date IS NULL OR b.start_date <= ?) ".
+		"AND ( b.end_date IS NULL OR b.end_date >= ? ) ".
+		"AND a.contract_id = c.contract_id ".
+		"AND b.billing_profile_id = d.id ".
+		"ORDER BY b.start_date DESC ".
+		"LIMIT 1"
+	) or FATAL "Error preparing billing info statement: $dbh->errstr\n";
 	
-my $sth_profile_info = $dbh->prepare(
-	"SELECT id, destination, ".
-	"onpeak_init_rate, onpeak_init_interval, ".
-	"onpeak_follow_rate, onpeak_follow_interval, ".
-	"offpeak_init_rate, offpeak_init_interval, ".
-	"offpeak_follow_rate, offpeak_follow_interval ".
-	"FROM billing.billing_fees WHERE billing_profile_id = ? ".
-	"AND type = ? AND ? REGEXP(destination) ".
-	"ORDER BY LENGTH(destination) DESC LIMIT 1"
-) or die "Error preparing profile info statement: $dbh->errstr\n";
+	$sth_profile_info = $dbh->prepare(
+		"SELECT id, destination, ".
+		"onpeak_init_rate, onpeak_init_interval, ".
+		"onpeak_follow_rate, onpeak_follow_interval, ".
+		"offpeak_init_rate, offpeak_init_interval, ".
+		"offpeak_follow_rate, offpeak_follow_interval ".
+		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
+		"AND type = ? AND ? REGEXP(destination) ".
+		"ORDER BY LENGTH(destination) DESC LIMIT 1"
+	) or FATAL "Error preparing profile info statement: $dbh->errstr\n";
 
-my $sth_offpeak_weekdays = $dbh->prepare(
-	"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
-	"FROM billing.billing_peaktime_weekdays ".
-	"WHERE billing_profile_id = ? ".
-	"AND WEEKDAY(?) <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
-	"AND weekday >= WEEKDAY(?) ".
-	"AND weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
-	"UNION ".
-	"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
-	"FROM billing.billing_peaktime_weekdays ".
-	"WHERE billing_profile_id = ? ".
-	"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
-	"AND (weekday >= WEEKDAY(?) ".
-	"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ?SECOND)))"
-) or die "Error preparing weekday offpeak statement: $dbh->errstr\n";
+	$sth_offpeak_weekdays = $dbh->prepare(
+		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
+		"FROM billing.billing_peaktime_weekdays ".
+		"WHERE billing_profile_id = ? ".
+		"AND WEEKDAY(?) <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
+		"AND weekday >= WEEKDAY(?) ".
+		"AND weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
+		"UNION ".
+		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
+		"FROM billing.billing_peaktime_weekdays ".
+		"WHERE billing_profile_id = ? ".
+		"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
+		"AND (weekday >= WEEKDAY(?) ".
+		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ?SECOND)))"
+	) or FATAL "Error preparing weekday offpeak statement: $dbh->errstr\n";
 
-my $sth_offpeak_special = $dbh->prepare(
-	"SELECT UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end) ".
-	"FROM billing.billing_peaktime_special ".
-	"WHERE billing_profile_id = ? ".
-	"AND ( ".
-	"start <= ? AND end >= ? ".
-	"OR start >= ? AND end <= DATE_ADD(?, INTERVAL ? SECOND) ".
-	"OR start <= DATE_ADD(?, INTERVAL ? SECOND) AND end >= DATE_ADD(?, INTERVAL ? SECOND) ".
-	")"
-) or die "Error preparing special offpeak statement: $dbh->errstr\n";
+	$sth_offpeak_special = $dbh->prepare(
+		"SELECT UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end) ".
+		"FROM billing.billing_peaktime_special ".
+		"WHERE billing_profile_id = ? ".
+		"AND ( ".
+		"start <= ? AND end >= ? ".
+		"OR start >= ? AND end <= DATE_ADD(?, INTERVAL ? SECOND) ".
+		"OR start <= DATE_ADD(?, INTERVAL ? SECOND) AND end >= DATE_ADD(?, INTERVAL ? SECOND) ".
+		")"
+	) or FATAL "Error preparing special offpeak statement: $dbh->errstr\n";
 
-my $sth_unrated_cdrs = $dbh->prepare(
-	"SELECT id, ".
-	"source_user_id, source_provider_id, ".
-	"destination_user_id, destination_provider_id, destination_user, destination_domain, ".
-	"start_time, duration ".
-	"FROM accounting.cdr WHERE rating_status = 'unrated' AND call_status = 'ok' ".
-	"LIMIT 10000"
-) or die "Error preparing unrated cdr statement: $dbh->errstr\n";
+	$sth_unrated_cdrs = $dbh->prepare(
+		"SELECT id, ".
+		"source_user_id, source_provider_id, ".
+		"destination_user_id, destination_provider_id, ".
+		"destination_user, destination_domain, ".
+		"destination_user_in, destination_domain_in, ".
+		"start_time, duration ".
+		"FROM accounting.cdr WHERE rating_status = 'unrated' AND call_status = 'ok' ".
+		"LIMIT 10000"
+	) or FATAL "Error preparing unrated cdr statement: $dbh->errstr\n";
 
-my $sth_update_cdr = $dbh->prepare(
-	"UPDATE accounting.cdr SET ".
-	"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
-	"rated_at = now(), rating_status = ?, billing_fee_id = ? ".
-	"WHERE id = ?"
-) or die "Error preparing update cdr statement: $dbh->errstr\n";
+	$sth_update_cdr = $dbh->prepare(
+		"UPDATE accounting.cdr SET ".
+		"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
+		"rated_at = now(), rating_status = ?, billing_fee_id = ? ".
+		"WHERE id = ?"
+	) or FATAL "Error preparing update cdr statement: $dbh->errstr\n";
 
-my $sth_provider_info = $dbh->prepare(
-	"SELECT p.class, bm.billing_profile_id ".
-	"FROM billing.products p, billing.billing_mappings bm ".
-	"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
-	"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-	"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-) or die "Error preparing provider info statement: $dbh->errstr\n";
+	$sth_provider_info = $dbh->prepare(
+		"SELECT p.class, bm.billing_profile_id ".
+		"FROM billing.products p, billing.billing_mappings bm ".
+		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
+		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+	) or FATAL "Error preparing provider info statement: $dbh->errstr\n";
 
-my $sth_reseller_info = $dbh->prepare(
-	"SELECT bm.billing_profile_id ".
-	"FROM billing_mappings bm, voip_subscribers vs, contracts c ".
-	"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
-	"AND c.reseller_id = bm.contract_id ".
-	"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-	"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-) or die "Error preparing reseller info statement: $dbh->errstr\n";
+	$sth_reseller_info = $dbh->prepare(
+		"SELECT bm.billing_profile_id ".
+		"FROM billing_mappings bm, voip_subscribers vs, contracts c ".
+		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
+		"AND c.reseller_id = bm.contract_id ".
+		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+	) or FATAL "Error preparing reseller info statement: $dbh->errstr\n";
 
-
+	return 1;
+}
 
 sub get_billing_info
 {
@@ -112,9 +170,9 @@ sub get_billing_info
 	my $sth = $sth_billing_info;
 
 	$sth->execute($uid, $start_str, $start_str) or
-		die "Error executing billing info statement: $dbh->errstr\n";
+		FATAL "Error executing billing info statement: $dbh->errstr\n";
 	my @res = $sth->fetchrow_array();
-	die "No billing info found for uuid '".$uid."'\n" unless @res;
+	FATAL "No billing info found for uuid '".$uid."'\n" unless @res;
 
 	$r_info->{contract_id} = $res[0];
 	$r_info->{profile_id} = $res[1];
@@ -131,28 +189,28 @@ sub get_profile_info
 {
 	my $bpid = shift;
 	my $type = shift;
+	my $destination_class = shift;
 	my $destination = shift;
 	my $b_info = shift;
 
 	my $sth = $sth_profile_info;
 
 	$sth->execute($bpid, $type, $destination)
-		or die "Error executing profile info statement: $dbh->errstr\n";
+		or FATAL "Error executing profile info statement: $dbh->errstr\n";
 	
 	my @res = $sth->fetchrow_array();
-	die "No profile info found for profile id '".$bpid."' and destination '".
-		$destination."' (".$type.")\n" unless @res;
+	return 0 unless @res;
 	
 	$b_info->{fee_id} = $res[0];
 	$b_info->{pattern} = $res[1];
 	$b_info->{on_init_rate} = $res[2];
-	$b_info->{on_init_interval} = $res[3];
+	$b_info->{on_init_interval} = $res[3] == 0 ? 1 : $res[3]; # prevent loops
 	$b_info->{on_follow_rate} = $res[4];
-	$b_info->{on_follow_interval} = $res[5];
+	$b_info->{on_follow_interval} = $res[5] == 0 ? 1 : $res[5];
 	$b_info->{off_init_rate} = $res[6];
-	$b_info->{off_init_interval} = $res[7];
+	$b_info->{off_init_interval} = $res[7] == 0 ? 1 : $res[7];;
 	$b_info->{off_follow_rate} = $res[8];
-	$b_info->{off_follow_interval} = $res[9];
+	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];;
 	
 	$sth->finish;
 
@@ -175,7 +233,7 @@ sub get_offpeak_weekdays
 		$bpid,
 		$start, $start, $duration,
 		$start, $start, $duration
-	) or die "Error executing weekday offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error executing weekday offpeak statement: $dbh->errstr\n";
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -203,7 +261,7 @@ sub get_offpeak_special
 		$start, $start,
 		$start, $start, $duration,
 		$start, $duration, $start, $duration
-	) or die "Error executing special offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error executing special offpeak statement: $dbh->errstr\n";
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -270,7 +328,7 @@ sub get_unrated_cdrs
 
 	my $sth = $sth_unrated_cdrs;
 	$sth->execute
-		or die "Error executing unrated cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing unrated cdr statement: $dbh->errstr\n";
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -282,8 +340,10 @@ sub get_unrated_cdrs
 		$cdr{destination_provider_id} = $res[4];
 		$cdr{destination_user} = $res[5];
 		$cdr{destination_domain} = $res[6];
-		$cdr{start_time} = $res[7];
-		$cdr{duration} = $res[8];
+		$cdr{destination_user_in} = $res[7];
+		$cdr{destination_domain_in} = $res[8];
+		$cdr{start_time} = $res[9];
+		$cdr{duration} = $res[10];
 
 		push @$r_cdrs, \%cdr;
 	}
@@ -298,7 +358,7 @@ sub update_cdr
 	my $sth = $sth_update_cdr;
 	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
 		'ok', $cdr->{billing_fee_id}, $cdr->{id})
-		or die "Error executing update cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing update cdr statement: $dbh->errstr\n";
 	return 1;
 }
 
@@ -308,7 +368,7 @@ sub update_failed_cdr
 
 	my $sth = $sth_update_cdr;
 	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', $cdr->{id})
-		or die "Error executing update cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing update cdr statement: $dbh->errstr\n";
 	return 1;
 }
 
@@ -320,9 +380,9 @@ sub get_provider_info
 
 	my $sth = $sth_provider_info;
 	$sth->execute($pid, $start, $start)
-		or die "Error executing provider info statement: $dbh->errstr\n";
+		or FATAL "Error executing provider info statement: $dbh->errstr\n";
 	my @res = $sth->fetchrow_array();
-	die "No provider info for provider id $pid found\n" 
+	FATAL "No provider info for provider id $pid found\n" 
 		unless(@res);
 
 	$r_info->{class} = $res[0];
@@ -339,9 +399,9 @@ sub get_reseller_info
 	
 	my $sth = $sth_reseller_info;
 	$sth->execute($uuid, $start, $start)
-		or die "Error executing reseller info statement: $dbh->errstr\n";
+		or FATAL "Error executing reseller info statement: $dbh->errstr\n";
 	my @res = $sth->fetchrow_array();
-	die "No reseller info for user id $uuid found\n" 
+	FATAL "No reseller info for user id $uuid found\n" 
 		unless(@res);
 
 	$r_info->{profile_id} = $res[0];
@@ -354,9 +414,38 @@ sub get_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
-	my $destination_class;
+	my $destination_class = shift;
 	my $profile_id = shift;
+	my $domain_first = shift;
 	my $r_cost = shift;
+
+	my $dst_user;
+	my $dst_domain;
+	my $first;
+	my $second;
+
+	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
+	{
+		$dst_user = $cdr->{destination_user};
+		$dst_domain = '@'.$cdr->{destination_domain};
+	}
+	else
+	{
+		$dst_user = $cdr->{destination_user_in};
+		$dst_domain = '@'.$cdr->{destination_domain_in};
+	}
+	
+	if($domain_first == 1)
+	{
+		$first = $dst_domain;
+		$second = $dst_user;
+	}
+	else
+	{
+		$first = $dst_user;
+		$second = $dst_domain;
+	}
+
 
 
 	my $start_unixtime;
@@ -366,21 +455,33 @@ sub get_call_cost
 	# sip peerings (always, or bill pstn fees although it's sip peering?)
 
 	my %profile_info = ();
-	get_profile_info($profile_id, $type, $cdr->{destination_user}, 
-		\%profile_info) or
-		die "Error getting profile info\n";
+
+	unless(get_profile_info($profile_id, $type, $destination_class, $first, 
+		\%profile_info))
+	{
+		unless(get_profile_info($profile_id, $type, $destination_class, $second, 
+			\%profile_info))
+		{
+			WARNING "No fee info for profile $profile_id and user '$dst_user' ".
+				"or domain '$dst_domain' found\n";
+			$$r_cost = 0;
+			return 1;
+		}
+	}
+
+
 	#print Dumper \%profile_info;
 
 	my @offpeak_weekdays = ();
 	get_offpeak_weekdays($profile_id, $cdr->{start_time}, 
 		$cdr->{duration}, \@offpeak_weekdays) or
-		die "Error getting weekdays offpeak info\n";
+		FATAL "Error getting weekdays offpeak info\n";
 	#print Dumper \@offpeak_weekdays;
 
 	my @offpeak_special = ();
 	get_offpeak_special($profile_id, $cdr->{start_time}, 
 		$cdr->{duration}, \@offpeak_special) or
-		die "Error getting special offpeak info\n";
+		FATAL "Error getting special offpeak info\n";
 	#print Dumper \@offpeak_special;
 
 	$$r_cost = 0;
@@ -438,15 +539,17 @@ sub get_customer_call_cost
 	my $cdr = shift;
 	my $type = shift;
 	my $destination_class = shift;
+	my $domain_first = shift;
 	my $r_cost = shift;
 
 	my %billing_info = ();
 	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
-		die "Error getting billing info\n";
+		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
-	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, $r_cost)
-		or die "Error getting customer call cost\n";
+	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
+		$domain_first, $r_cost)
+		or FATAL "Error getting customer call cost\n";
 
 	return 1;
 }
@@ -455,11 +558,13 @@ sub get_provider_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
+	my $domain_first = shift;
 	my $r_info = shift;
 	my $r_cost = shift;
-	
-	get_call_cost($cdr, $type, $r_info->{class}, $r_info->{profile_id}, $r_cost)
-		or die "Error getting provider call cost\n";
+
+	get_call_cost($cdr, $type, $r_info->{class}, 
+		$r_info->{profile_id}, $domain_first, $r_cost)
+		or FATAL "Error getting provider call cost\n";
 
 	return 1;
 }
@@ -473,24 +578,20 @@ sub rate_cdr
 	my $carrier_cost = 0;
 	my $reseller_cost = 0;
 
-
-	# TODO: onnet-calls must be rated differently, since it's mostly free
-
-
 	if($cdr->{source_user_id} eq "0")
 	{
 		# caller is not local
 
 		if($cdr->{source_provider_id} == 0)
 		{
-			print "WARNING: CDR id ".$cdr->{id}." has no source uid/pid!\n";
+			WARNING "CDR id ".$cdr->{id}." has no source uid/pid!\n";
 			update_failed_cdr($cdr);
 			return 1;
 		}
 		if($cdr->{destination_user_id} eq "0")
 		{
 			# a relay? must not happen!
-			print "WARNING: CDR id ".$cdr->{id}." has wether source nor destination uid/pid!\n";
+			WARNING "CDR id ".$cdr->{id}." has wether source nor destination uid/pid!\n";
 			update_failed_cdr($cdr);
 			return 1;
 		}
@@ -507,13 +608,13 @@ sub rate_cdr
 
 		if($cdr->{source_provider_id} == 0)
 		{
-			print "WARNING: CDR id ".$cdr->{id}." has no source provider id\n";
+			WARNING "CDR id ".$cdr->{id}." has no source provider id\n";
 			update_failed_cdr($cdr);
 			return 1;
 		}
 		if($cdr->{destination_provider_id} == 0)
 		{
-			print "WARNING: CDR id ".$cdr->{id}." has no destination provider id\n";
+			WARNING "CDR id ".$cdr->{id}." has no destination provider id\n";
 			update_failed_cdr($cdr);
 			return 1;
 		}
@@ -521,44 +622,47 @@ sub rate_cdr
 		my %provider_info = ();
 		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_date},
 			\%provider_info)
-			or die "Error getting destination provider info\n";
+			or FATAL "Error getting destination provider info\n";
 
 
 		my $dst_class;
+		my $domain_first = 0;
 
 		if($provider_info{class} eq "reseller")
 		{
 			$dst_class = 'reseller';
+			$domain_first = 1; # priorize domain over user to correctly rate onnet-calls
 
 			# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
-			get_provider_call_cost($cdr, $type, \%provider_info, \$reseller_cost)
-				or die "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost)
+				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
 			$carrier_cost = 0;
 		}
 		elsif($provider_info{class} eq "sippeering" || $provider_info{class} eq "pstnpeering")
 		{
 			$dst_class = $provider_info{class};
+			$domain_first = 0; # for calls leaving our system, priorize user over domain
 
 			# carrier cost can be calculated directly with available billing profile
-			get_provider_call_cost($cdr, $type, \%provider_info, \$carrier_cost)
-				or die "Error getting carrier cost for cdr ".$cdr->{id}."\n";
+			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost)
+				or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
 	
 			# for reseller we first have to find the billing profile
 			%provider_info = ();
 			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
 				\%provider_info)
-				or die "Error getting source reseller info\n";
-			get_provider_call_cost($cdr, $type, \%provider_info, \$reseller_cost)
-				or die "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+				or FATAL "Error getting source reseller info\n";
+			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost)
+				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
 		}
 		else
 		{
-			die "Destination provider id ".$cdr->{destination_provider_id}." has invalid ".
+			FATAL "Destination provider id ".$cdr->{destination_provider_id}." has invalid ".
 				"class '".$provider_info{class}."' in cdr ".$cdr->{id}."\n";
 		}
 			
-		get_customer_call_cost($cdr, $type, \$customer_cost)
-			or die "Error getting customer cost for cdr ".$cdr->{id}."\n";
+		get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost)
+			or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
 	}
 
 
@@ -572,33 +676,78 @@ sub rate_cdr
 	return 1;
 }
 
-
-my $shutdown = 0;
-my $loop_interval = 10;
-my $rated = 0;
-
-while(!$shutdown)
+sub daemonize 
 {
-	my @cdrs = ();
-	get_unrated_cdrs(\@cdrs)
-		or die "Error getting next bunch of CDRs\n";
-	unless(@cdrs)
-	{
-		sleep($loop_interval);
-		next;
-	}
+	my $pidfile = shift;
 
-	foreach my $cdr(@cdrs)
-	{
-		print "rate cdr #".$cdr->{id}."\n";
-		rate_cdr($cdr, $type)
-			or die "Error rating CDR id ".$cdr->{id}."\n";
-		update_cdr($cdr)
-			or die "Error updating CDR id ".$cdr->{id}."\n";
-		$rated++;
-	}
-
-	print "$rated CDRs rated so far.\n";
+	chdir '/' or FATAL "Can't chdir to /: $!\n";
+	open STDIN, '/dev/null' or FATAL "Can't read /dev/null: $!\n";
+	#open STDOUT, "|-", "logger -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
+	#open STDOUT, '>/dev/null' or FATAL "Can't write to /dev/null: $!\n";
+	defined(my $pid = fork) or FATAL "Can't fork: $!\n";
+	exit if $pid;
+	setsid or FATAL "Can't start a new session: $!\n";
+	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
+	open PID, ">$pidfile" or FATAL "Can't write to pidfile '$pidfile': $!\n";
+	flock(PID, LOCK_EX | LOCK_NB) || FATAL "Unable to lock pidfile '$pidfile': $!\n";
+	print PID "$$\n";
+	close PID;
 }
 
-$dbh->disconnect;
+sub signal_handler
+{
+	$shutdown = 1;
+}
+
+
+sub main
+{
+	openlog($log_ident, $log_opts, $log_facility)
+		or die "Error opening syslog: $!\n";
+
+	daemonize($pidfile)
+		if($fork == 1);
+
+	$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = \&signal_handler;
+
+	init_db or FATAL "Error initializing database handlers\n";
+	my $rated = 0;
+
+	INFO "Up and running.\n";
+	while(!$shutdown)
+	{
+		my @cdrs = ();
+		get_unrated_cdrs(\@cdrs)
+			or FATAL "Error getting next bunch of CDRs\n";
+		unless(@cdrs)
+		{
+			sleep($loop_interval);
+			next;
+		}
+
+		foreach my $cdr(@cdrs)
+		{
+			DEBUG "rate cdr #".$cdr->{id}."\n";
+			rate_cdr($cdr, $type)
+				or FATAL "Error rating CDR id ".$cdr->{id}."\n";
+			update_cdr($cdr)
+				or FATAL "Error updating CDR id ".$cdr->{id}."\n";
+			$rated++;
+		}
+
+		DEBUG "$rated CDRs rated so far.\n";
+	}
+
+	INFO "Shutting down.\n";
+
+	$sth_billing_info->finish;
+	$sth_profile_info->finish;
+	$sth_offpeak_weekdays->finish;
+	$sth_offpeak_special->finish;
+	$sth_unrated_cdrs->finish;
+	$sth_update_cdr->finish;
+	$sth_provider_info->finish;
+	$sth_reseller_info->finish;
+	$dbh->disconnect;
+	closelog;
+}
