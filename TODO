@@ -1,0 +1,7 @@
+Critical:
+=========
+
+	- Locking doesn't seem to work (can start 2 procs although pid-file is LOCK_EX).
+	- Take into consideration free-minutes etc.
+	- Update interval chunk for this user.
+
