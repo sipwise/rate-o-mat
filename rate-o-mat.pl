@@ -6,7 +6,7 @@ use Fcntl qw(LOCK_EX LOCK_NB);
 use Sys::Syslog;
 use Data::Dumper;
 
-my $fork = 1;
+my $fork = 0;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = 10;
@@ -30,6 +30,11 @@ my $sth_unrated_cdrs;
 my $sth_update_cdr;
 my $sth_provider_info;
 my $sth_reseller_info;
+my $sth_get_cbalance;
+my $sth_update_cbalance;
+my $sth_new_cbalance_week;
+my $sth_new_cbalance_month;
+my $sth_get_last_cbalance;
 
 main;
 exit 0;
@@ -40,6 +45,7 @@ sub FATAL
 {
 	my $msg = shift;
 	chomp $msg;
+	print "FATAL: $msg\n" if($fork != 1);
 	syslog('crit', $msg);
 	closelog();
 	die "$msg\n";
@@ -49,6 +55,7 @@ sub DEBUG
 {
 	my $msg = shift;
 	chomp $msg;
+	print "DEBUG: $msg\n" if($fork != 1);
 	syslog('debug', $msg);
 }
 
@@ -56,6 +63,7 @@ sub INFO
 {
 	my $msg = shift;
 	chomp $msg;
+	print "INFO: $msg\n" if($fork != 1);
 	syslog('info', $msg);
 }
 
@@ -63,27 +71,28 @@ sub WARNING
 {
 	my $msg = shift;
 	chomp $msg;
+	print "WARNING: $msg\n" if($fork != 1);
 	syslog('warning', $msg);
 }
 
 sub init_db
 {
 	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
-		or FATAL "Error connecting do db: $DBI::errstr\n";
+		or FATAL "Error connecting do db: ".$DBI::errstr;
 
 	$sth_billing_info = $dbh->prepare(
-		"SELECT a.contract_id, b.billing_profile_id, c.cash_balance, ".
-		"c.free_time_balance, d.prepaid ".
+		"SELECT a.contract_id, b.billing_profile_id, ".
+		"d.prepaid, d.interval_charge, d.interval_free_time, d.interval_free_cash, ".
+		"d.interval_unit, d.interval_count ".
 		"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
-		"billing.contract_balances c, billing.billing_profiles d ".
+		"billing.billing_profiles d ".
 		"WHERE a.uuid = ?  AND a.contract_id = b.contract_id ".
 		"AND ( b.start_date IS NULL OR b.start_date <= ?) ".
 		"AND ( b.end_date IS NULL OR b.end_date >= ? ) ".
-		"AND a.contract_id = c.contract_id ".
 		"AND b.billing_profile_id = d.id ".
 		"ORDER BY b.start_date DESC ".
 		"LIMIT 1"
-	) or FATAL "Error preparing billing info statement: $dbh->errstr\n";
+	) or FATAL "Error preparing billing info statement: ".$dbh->errstr;
 	
 	$sth_profile_info = $dbh->prepare(
 		"SELECT id, destination, ".
@@ -94,7 +103,7 @@ sub init_db
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
-	) or FATAL "Error preparing profile info statement: $dbh->errstr\n";
+	) or FATAL "Error preparing profile info statement: ".$dbh->errstr;
 
 	$sth_offpeak_weekdays = $dbh->prepare(
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
@@ -110,7 +119,7 @@ sub init_db
 		"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
 		"AND (weekday >= WEEKDAY(?) ".
 		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ?SECOND)))"
-	) or FATAL "Error preparing weekday offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error preparing weekday offpeak statement: ".$dbh->errstr;
 
 	$sth_offpeak_special = $dbh->prepare(
 		"SELECT UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end) ".
@@ -121,7 +130,7 @@ sub init_db
 		"OR start >= ? AND end <= DATE_ADD(?, INTERVAL ? SECOND) ".
 		"OR start <= DATE_ADD(?, INTERVAL ? SECOND) AND end >= DATE_ADD(?, INTERVAL ? SECOND) ".
 		")"
-	) or FATAL "Error preparing special offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error preparing special offpeak statement: ".$dbh->errstr;
 
 	$sth_unrated_cdrs = $dbh->prepare(
 		"SELECT id, ".
@@ -129,17 +138,17 @@ sub init_db
 		"destination_user_id, destination_provider_id, ".
 		"destination_user, destination_domain, ".
 		"destination_user_in, destination_domain_in, ".
-		"start_time, duration ".
-		"FROM accounting.cdr WHERE rating_status = 'unrated' AND call_status = 'ok' ".
+		"start_time, duration, call_status ".
+		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"LIMIT 10000"
-	) or FATAL "Error preparing unrated cdr statement: $dbh->errstr\n";
+	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
 
 	$sth_update_cdr = $dbh->prepare(
 		"UPDATE accounting.cdr SET ".
 		"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
 		"rated_at = now(), rating_status = ?, billing_fee_id = ? ".
 		"WHERE id = ?"
-	) or FATAL "Error preparing update cdr statement: $dbh->errstr\n";
+	) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
 
 	$sth_provider_info = $dbh->prepare(
 		"SELECT p.class, bm.billing_profile_id ".
@@ -147,16 +156,183 @@ sub init_db
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-	) or FATAL "Error preparing provider info statement: $dbh->errstr\n";
+	) or FATAL "Error preparing provider info statement: ".$dbh->errstr;
 
 	$sth_reseller_info = $dbh->prepare(
 		"SELECT bm.billing_profile_id ".
-		"FROM billing_mappings bm, voip_subscribers vs, contracts c ".
+		"FROM billing.billing_mappings bm, billing.voip_subscribers vs, ".
+		"billing.contracts c ".
 		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
 		"AND c.reseller_id = bm.contract_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-	) or FATAL "Error preparing reseller info statement: $dbh->errstr\n";
+	) or FATAL "Error preparing reseller info statement: ".$dbh->errstr;
+	
+	$sth_get_cbalance = $dbh->prepare(
+		"SELECT id, cash_balance, cash_balance_interval, ".
+		"free_time_balance, free_time_balance_interval ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ? AND ".
+		"start <= ? AND end >= ? ".
+		"UNION ALL ".
+		"SELECT id, cash_balance, cash_balance_interval, ".
+		"free_time_balance, free_time_balance_interval ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ? AND ".
+		"start > ?"
+
+	) or FATAL "Error preparing get contract balance statement: ".$dbh->errstr;
+	
+	$sth_get_last_cbalance = $dbh->prepare(
+		"SELECT end, cash_balance, cash_balance_interval, ".
+		"free_time_balance, free_time_balance_interval ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ? AND ".
+		"start <= ? AND end <= ? ORDER BY end DESC LIMIT 1"
+	) or FATAL "Error preparing get last contract balance statement: ".$dbh->errstr;
+	
+	$sth_new_cbalance_week = $dbh->prepare(
+		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
+		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? WEEK) )"
+	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
+
+	WARNING "sth_new_cbalance_month doesn't wrap to next month if it has more days than the last month!";
+	$sth_new_cbalance_month = $dbh->prepare(
+		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
+		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? MONTH) )"
+	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
+	
+	$sth_update_cbalance = $dbh->prepare(
+		"SELECT 1"
+	) or FATAL "Error preparing update contract balance statement: ".$dbh->errstr;
+
+	return 1;
+}
+
+sub create_contract_balance
+{
+	my $latest_end = shift;
+	my $cdr = shift;
+	my $binfo = shift;
+	my $r_res = shift;
+
+	my $sth = $sth_get_last_cbalance;
+	$sth->execute($binfo->{contract_id}, $cdr->{start_time}, $cdr->{start_time})
+		or FATAL "Error executing get contract balance statement: ".$dbh->errstr;
+	my @res = $sth->fetchrow_array();
+
+	# TODO: we could just create a new one, we just have to know when to start
+	FATAL "No contract balance for contract id ".$binfo->{contract_id}." starting earlier than '".
+		$cdr->{start_time}."' found\n"
+		unless(@res);
+	
+	my $last_end = $res[0];
+	my $last_cash_balance = $res[1];
+	my $last_cash_balance_int = $res[2];
+	my $last_free_balance = $res[3];
+	my $last_free_balance_int = $res[4];
+
+	# break recursion if we got the last result as last time
+	return 1 if($latest_end eq $last_end);
+
+	# TODO: fill this vars
+	WARNING "TODO: shift values of last balance when creating a new one!\n";
+
+	my $new_cash_balance = $last_cash_balance;
+	my $new_cash_balance_int = 0;
+
+	my $new_free_balance = 0;
+	my $new_free_balance_int = 0;
+
+	print Dumper $binfo;
+
+	if($binfo->{int_unit} eq "week")
+	{
+		$sth = $sth_new_cbalance_week;
+	}
+	elsif($binfo->{int_unit} eq "month")
+	{
+		$sth = $sth_new_cbalance_month;
+	}
+	else
+	{
+		FATAL "Invalid interval unit '".$binfo->{int_unit}."' in profile id ".
+			$binfo->{profile_id};
+	}
+
+	$sth->execute($binfo->{contract_id}, $new_cash_balance, $new_cash_balance_int,
+		$new_free_balance, $new_free_balance_int, 
+		$last_end, 
+		$last_end, $binfo->{int_count})
+		or FATAL "Error executing new contract balance statement: ".$dbh->errstr;
+
+	$r_res->{cash_balance} = $new_cash_balance;
+	$r_res->{cash_balance_interval} = $new_cash_balance_int;
+	$r_res->{free_time_balance} = $new_free_balance;
+	$r_res->{free_time_balance_interval} = $new_free_balance_int;
+
+	return create_contract_balance($last_end, $cdr, $binfo, $r_res);
+}
+
+sub get_contract_balance
+{
+	my $cdr = shift;
+	my $binfo = shift;
+	my $r_balances = shift;
+
+	my $sth = $sth_get_cbalance;
+	$sth->execute(
+		$binfo->{contract_id}, $cdr->{start_time}, $cdr->{start_time},
+		$binfo->{contract_id}, $cdr->{start_time})
+		or FATAL "Error executing get contract balance statement: ".$dbh->errstr;
+	my $res = $sth->fetchall_arrayref({});
+
+	unless(@$res)
+	{
+		my %new_row = ();
+		create_contract_balance('invalid', $cdr, $binfo, \%new_row)
+			or FATAL "Failed to create new contract balance\n";
+		push @$res, \%new_row;
+	}
+
+	# TODO: we have to update the last balance with our cdr values!
+	WARNING "TODO: update last balance with cdr values!\n";
+
+	print Dumper $res;
+
+	for(my $i = 0; $i < @$res; ++$i)
+	{
+		my $row = $res->[$i];
+
+		my %balance = ();
+		$balance{cash_balance} = $row->{cash_balance};
+		$balance{cash_balance_interval} = $row->{cash_balance_interval};
+		$balance{free_time_balance} = $row->{free_time_balance};
+		$balance{free_time_balance_interval} = $row->{free_time_balance_interval};
+
+		print "contract balance:\n";
+		print Dumper \%balance;
+
+		push @$r_balances, \%balance;
+	}
+
+
+	return 1;
+}
+
+sub update_contract_balance
+{
+	my $cdr = shift;
+	my $binfo = shift;
+	my $cost = shift;
+
+	my @balances = ();
+
+	get_contract_balance($cdr, $binfo, \@balances)
+		or FATAL "Error getting contract balances\n";
+	
+	# TODO: update list of balances
+	WARNING "TODO: update list of balances - set (and shift if in middle)!\n";
 
 	return 1;
 }
@@ -170,15 +346,18 @@ sub get_billing_info
 	my $sth = $sth_billing_info;
 
 	$sth->execute($uid, $start_str, $start_str) or
-		FATAL "Error executing billing info statement: $dbh->errstr\n";
+		FATAL "Error executing billing info statement: ".$dbh->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No billing info found for uuid '".$uid."'\n" unless @res;
 
 	$r_info->{contract_id} = $res[0];
 	$r_info->{profile_id} = $res[1];
-	$r_info->{cash_balance} = $res[2];
-	$r_info->{free_time} = $res[3];
-	$r_info->{prepaid} = $res[4];
+	$r_info->{prepaid} = $res[2];
+	$r_info->{int_charge} = $res[3];
+	$r_info->{int_free_time} = $res[4];
+	$r_info->{int_free_cash} = $res[5];
+	$r_info->{int_unit} = $res[6];
+	$r_info->{int_count} = $res[7];
 	
 	$sth->finish;
 	
@@ -196,7 +375,7 @@ sub get_profile_info
 	my $sth = $sth_profile_info;
 
 	$sth->execute($bpid, $type, $destination)
-		or FATAL "Error executing profile info statement: $dbh->errstr\n";
+		or FATAL "Error executing profile info statement: ".$dbh->errstr;
 	
 	my @res = $sth->fetchrow_array();
 	return 0 unless @res;
@@ -233,7 +412,7 @@ sub get_offpeak_weekdays
 		$bpid,
 		$start, $start, $duration,
 		$start, $start, $duration
-	) or FATAL "Error executing weekday offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error executing weekday offpeak statement: ".$dbh->errstr;
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -261,7 +440,7 @@ sub get_offpeak_special
 		$start, $start,
 		$start, $start, $duration,
 		$start, $duration, $start, $duration
-	) or FATAL "Error executing special offpeak statement: $dbh->errstr\n";
+	) or FATAL "Error executing special offpeak statement: ".$dbh->errstr;
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -328,7 +507,7 @@ sub get_unrated_cdrs
 
 	my $sth = $sth_unrated_cdrs;
 	$sth->execute
-		or FATAL "Error executing unrated cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing unrated cdr statement: ".$dbh->errstr;
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -344,6 +523,7 @@ sub get_unrated_cdrs
 		$cdr{destination_domain_in} = $res[8];
 		$cdr{start_time} = $res[9];
 		$cdr{duration} = $res[10];
+		$cdr{call_status} = $res[11];
 
 		push @$r_cdrs, \%cdr;
 	}
@@ -358,7 +538,7 @@ sub update_cdr
 	my $sth = $sth_update_cdr;
 	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
 		'ok', $cdr->{billing_fee_id}, $cdr->{id})
-		or FATAL "Error executing update cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	return 1;
 }
 
@@ -368,7 +548,7 @@ sub update_failed_cdr
 
 	my $sth = $sth_update_cdr;
 	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', $cdr->{id})
-		or FATAL "Error executing update cdr statement: $dbh->errstr\n";
+		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	return 1;
 }
 
@@ -380,7 +560,7 @@ sub get_provider_info
 
 	my $sth = $sth_provider_info;
 	$sth->execute($pid, $start, $start)
-		or FATAL "Error executing provider info statement: $dbh->errstr\n";
+		or FATAL "Error executing provider info statement: ".$dbh->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No provider info for provider id $pid found\n" 
 		unless(@res);
@@ -399,7 +579,7 @@ sub get_reseller_info
 	
 	my $sth = $sth_reseller_info;
 	$sth->execute($uuid, $start, $start)
-		or FATAL "Error executing reseller info statement: $dbh->errstr\n";
+		or FATAL "Error executing reseller info statement: ".$dbh->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No reseller info for user id $uuid found\n" 
 		unless(@res);
@@ -551,6 +731,12 @@ sub get_customer_call_cost
 		$domain_first, $r_cost)
 		or FATAL "Error getting customer call cost\n";
 
+	update_contract_balance($cdr, \%billing_info, $$r_cost)
+		or FATAL "Error updating customer contract balance\n";
+
+	# TODO: also update carrier/reseller balance where appropriate (in other subs)
+	
+
 	return 1;
 }
 
@@ -577,6 +763,14 @@ sub rate_cdr
 	my $customer_cost = 0;
 	my $carrier_cost = 0;
 	my $reseller_cost = 0;
+	
+	unless($cdr->{call_status} eq "ok")
+	{
+		$cdr->{carrier_cost} = $carrier_cost;
+		$cdr->{reseller_cost} = $reseller_cost;
+		$cdr->{customer_cost} = $customer_cost;
+		return 1;
+	}
 
 	if($cdr->{source_user_id} eq "0")
 	{
@@ -748,6 +942,13 @@ sub main
 	$sth_update_cdr->finish;
 	$sth_provider_info->finish;
 	$sth_reseller_info->finish;
+	$sth_get_cbalance->finish;
+	$sth_update_cbalance->finish;
+	$sth_new_cbalance_week->finish;
+	$sth_new_cbalance_month->finish;
+	$sth_get_last_cbalance->finish;
+
+
 	$dbh->disconnect;
 	closelog;
 }
