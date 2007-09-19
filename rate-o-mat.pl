@@ -35,6 +35,7 @@ my $sth_update_cbalance;
 my $sth_new_cbalance_week;
 my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
+my $sth_is_freetime;
 
 main;
 exit 0;
@@ -140,7 +141,7 @@ sub init_db
 		"destination_user_in, destination_domain_in, ".
 		"start_time, duration, call_status ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
-		"LIMIT 10000"
+		"ORDER BY start_time ASC LIMIT 10000"
 	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
 
 	$sth_update_cdr = $dbh->prepare(
@@ -170,21 +171,21 @@ sub init_db
 	
 	$sth_get_cbalance = $dbh->prepare(
 		"SELECT id, cash_balance, cash_balance_interval, ".
-		"free_time_balance, free_time_balance_interval ".
+		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
 		"start <= ? AND end >= ? ".
 		"UNION ALL ".
 		"SELECT id, cash_balance, cash_balance_interval, ".
-		"free_time_balance, free_time_balance_interval ".
+		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"start > ?"
+		"start > ? ORDER BY start ASC"
 
 	) or FATAL "Error preparing get contract balance statement: ".$dbh->errstr;
 	
 	$sth_get_last_cbalance = $dbh->prepare(
-		"SELECT end, cash_balance, cash_balance_interval, ".
+		"SELECT id, end, cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
@@ -203,8 +204,16 @@ sub init_db
 	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
 	
 	$sth_update_cbalance = $dbh->prepare(
-		"SELECT 1"
+		"UPDATE billing.contract_balances SET ".
+		"cash_balance = ?, cash_balance_interval = ?, ".
+		"free_time_balance = ?, free_time_balance_interval = ? ".
+		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$dbh->errstr;
+
+	$sth_is_freetime = $dbh->prepare(
+		"SELECT id FROM billing.billing_free_time_destinations ".
+		"WHERE billing_profile_id = ? AND billing_fee_id = ?"
+	) or FATAL "Error preparing freetime statement: ".$dbh->errstr;
 
 	return 1;
 }
@@ -226,23 +235,28 @@ sub create_contract_balance
 		$cdr->{start_time}."' found\n"
 		unless(@res);
 	
-	my $last_end = $res[0];
-	my $last_cash_balance = $res[1];
-	my $last_cash_balance_int = $res[2];
-	my $last_free_balance = $res[3];
-	my $last_free_balance_int = $res[4];
+	my $last_id = $res[0];
+	my $last_end = $res[1];
+	my $last_cash_balance = $res[2];
+	my $last_cash_balance_int = $res[3];
+	my $last_free_balance = $res[4];
+	my $last_free_balance_int = $res[5];
 
 	# break recursion if we got the last result as last time
 	return 1 if($latest_end eq $last_end);
 
-	# TODO: fill this vars
-	WARNING "TODO: shift values of last balance when creating a new one!\n";
+	# TODO: doesn't work if user changes from, say, 1000 free minutes to 2000: then he looses his 
+	# non-interval free minutes
+
+	my $new_free_balance = $last_free_balance + $last_free_balance_int > $binfo->{int_free_time} ?
+		$last_free_balance + $last_free_balance_int : $binfo->{int_free_time};
+	my $new_free_balance_int = 0;
+	
+	# TODO: what about interval free cash?
 
 	my $new_cash_balance = $last_cash_balance;
 	my $new_cash_balance_int = 0;
 
-	my $new_free_balance = 0;
-	my $new_free_balance_int = 0;
 
 	print Dumper $binfo;
 
@@ -266,6 +280,7 @@ sub create_contract_balance
 		$last_end, $binfo->{int_count})
 		or FATAL "Error executing new contract balance statement: ".$dbh->errstr;
 
+	$r_res->{id} = $dbh->last_insert_id(undef, undef, undef, undef);
 	$r_res->{cash_balance} = $new_cash_balance;
 	$r_res->{cash_balance_interval} = $new_cash_balance_int;
 	$r_res->{free_time_balance} = $new_free_balance;
@@ -278,6 +293,9 @@ sub get_contract_balance
 {
 	my $cdr = shift;
 	my $binfo = shift;
+	my $pinfo = shift;
+	my $cost = shift;
+	my $rduration = shift;
 	my $r_balances = shift;
 
 	my $sth = $sth_get_cbalance;
@@ -295,27 +313,63 @@ sub get_contract_balance
 		push @$res, \%new_row;
 	}
 
-	# TODO: we have to update the last balance with our cdr values!
-	WARNING "TODO: update last balance with cdr values!\n";
-
-	print Dumper $res;
-
 	for(my $i = 0; $i < @$res; ++$i)
 	{
 		my $row = $res->[$i];
 
 		my %balance = ();
+		$balance{id} = $row->{id};
 		$balance{cash_balance} = $row->{cash_balance};
 		$balance{cash_balance_interval} = $row->{cash_balance_interval};
 		$balance{free_time_balance} = $row->{free_time_balance};
 		$balance{free_time_balance_interval} = $row->{free_time_balance_interval};
 
+		if($i == 0)
+		{
+			$sth = $sth_is_freetime;
+			$sth->execute($binfo->{profile_id}, $pinfo->{fee_id})
+				or FATAL "Error executing freetime statement: ".$dbh->errstr;
+			my @r = $sth->fetchrow_array();
+
+			if($binfo->{prepaid} == 1)
+			{
+				WARNING "TODO: do we need to process prepaid balances here?";
+			}
+			else
+			{
+				if(@r && $balance{free_time_balance} >= $$rduration)
+				{
+					$balance{free_time_balance} -= $$rduration;
+					$balance{free_time_balance_interval} += $$rduration;
+					$$cost = 0;
+				}
+				else
+				{
+					# TODO: also decrement cash balance? Is this possible for post-paid?
+					$balance{cash_balance_interval} += $$cost;
+				}
+			}
+		}
+
+		if($i < @$res - 1)
+		{
+			# TODO: shift calculated values to next balance
+			# if call falls in an old balance
+		}
+
+
 		print "contract balance:\n";
 		print Dumper \%balance;
+	
+		$sth = $sth_update_cbalance;
+		$sth->execute(
+			$balance{cash_balance}, $balance{cash_balance_interval},
+			$balance{free_time_balance}, $balance{free_time_balance_interval},
+			$balance{id})
+			or FATAL "Error executing update contract balance statement: ".$dbh->errstr;
 
 		push @$r_balances, \%balance;
 	}
-
 
 	return 1;
 }
@@ -324,15 +378,17 @@ sub update_contract_balance
 {
 	my $cdr = shift;
 	my $binfo = shift;
+	my $pinfo = shift;
 	my $cost = shift;
+	my $rduration = shift;
 
 	my @balances = ();
 
-	get_contract_balance($cdr, $binfo, \@balances)
+	get_contract_balance($cdr, $binfo, $pinfo, $cost, $rduration, \@balances)
 		or FATAL "Error getting contract balances\n";
+
+	# the above does the update as well, so we're done here
 	
-	# TODO: update list of balances
-	WARNING "TODO: update list of balances - set (and shift if in middle)!\n";
 
 	return 1;
 }
@@ -597,7 +653,9 @@ sub get_call_cost
 	my $destination_class = shift;
 	my $profile_id = shift;
 	my $domain_first = shift;
+	my $r_profile_info = shift;
 	my $r_cost = shift;
+	my $r_rating_duration = shift;
 
 	my $dst_user;
 	my $dst_domain;
@@ -631,16 +689,11 @@ sub get_call_cost
 	my $start_unixtime;
 	set_start_unixtime($cdr->{start_time}, \$start_unixtime);
 	
-	# TODO: check for destination class and do postfix matching for
-	# sip peerings (always, or bill pstn fees although it's sip peering?)
-
-	my %profile_info = ();
-
 	unless(get_profile_info($profile_id, $type, $destination_class, $first, 
-		\%profile_info))
+		$r_profile_info))
 	{
 		unless(get_profile_info($profile_id, $type, $destination_class, $second, 
-			\%profile_info))
+			$r_profile_info))
 		{
 			WARNING "No fee info for profile $profile_id and user '$dst_user' ".
 				"or domain '$dst_domain' found\n";
@@ -650,7 +703,7 @@ sub get_call_cost
 	}
 
 
-	#print Dumper \%profile_info;
+	#print Dumper $r_profile_info;
 
 	my @offpeak_weekdays = ();
 	get_offpeak_weekdays($profile_id, $cdr->{start_time}, 
@@ -694,21 +747,22 @@ sub get_call_cost
 		{
 			$init = 1;
 			$interval = $onpeak == 1 ? 
-				$profile_info{on_init_interval} : $profile_info{off_init_interval};
+				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ? 
-				$profile_info{on_init_rate} : $profile_info{off_init_rate};
+				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
 		}
 		else
 		{
 			$interval = $onpeak == 1 ? 
-				$profile_info{on_follow_interval} : $profile_info{off_follow_interval};
+				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
 			$rate = $onpeak == 1 ? 
-				$profile_info{on_follow_rate} : $profile_info{off_follow_rate};
+				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
 		}
 
 		$$r_cost += $rate;
 		$duration -= $interval;
 		$offset += $interval;
+		$$r_rating_duration += $interval;
 	}
 
 	return 1;
@@ -721,21 +775,20 @@ sub get_customer_call_cost
 	my $destination_class = shift;
 	my $domain_first = shift;
 	my $r_cost = shift;
+	my $rating_duration = 0;
 
 	my %billing_info = ();
 	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
+	my %profile_info = ();
 	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
-		$domain_first, $r_cost)
+		$domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting customer call cost\n";
 
-	update_contract_balance($cdr, \%billing_info, $$r_cost)
+	update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error updating customer contract balance\n";
-
-	# TODO: also update carrier/reseller balance where appropriate (in other subs)
-	
 
 	return 1;
 }
@@ -747,10 +800,14 @@ sub get_provider_call_cost
 	my $domain_first = shift;
 	my $r_info = shift;
 	my $r_cost = shift;
+	my $rating_duration = 0;
 
+	my %profile_info = ();
 	get_call_cost($cdr, $type, $r_info->{class}, 
-		$r_info->{profile_id}, $domain_first, $r_cost)
+		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting provider call cost\n";
+	
+	# TODO: also update carrier/reseller balance (we're missing the billing_info, right?)
 
 	return 1;
 }
@@ -947,6 +1004,7 @@ sub main
 	$sth_new_cbalance_week->finish;
 	$sth_new_cbalance_month->finish;
 	$sth_get_last_cbalance->finish;
+	$sth_is_freetime->finish;
 
 
 	$dbh->disconnect;
