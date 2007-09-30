@@ -759,7 +759,7 @@ sub get_call_cost
 				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
 		}
 
-		$$r_cost += $rate;
+		$$r_cost += $rate * $interval;
 		$duration -= $interval;
 		$offset += $interval;
 		$$r_rating_duration += $interval;

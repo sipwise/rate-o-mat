@@ -59,6 +59,12 @@ sub FATAL
 	die $msg."\n";
 }
 
+sub round
+{
+	my $c = shift;
+	return sprintf("%.4f", $c);
+}
+
 
 while(<FH>)
 {
@@ -173,8 +179,8 @@ while(<FH>)
 			# in-freetime
 			@dset = (
 				'^'.$d.'.+$', $type, 
-				$on * 100, $init_interval, $on * 100, $follow_interval,
-				$off * 100, $init_interval, $off * 100, $follow_interval,
+				round($on*100/60), $init_interval, round($on*100/60), $follow_interval,
+				round($off*100/60), $init_interval, round($off*100/60), $follow_interval,
 				$free
 			);
 
@@ -187,8 +193,8 @@ while(<FH>)
 			# in-freetime
 			@dset = (
 				'^'.$d.'.+$', $type, 
-				$on * 100, 1, 0, 1,
-				$off * 100, 1, 0, 1,
+				round($on*100/60), 1, 0, 1,
+				round($off*100/60), 1, 0, 1,
 				$free
 			);
 		}
