@@ -76,6 +76,31 @@ sub WARNING
 	syslog('warning', $msg);
 }
 
+sub set_start_unixtime
+{
+	my $start = shift;
+	my $r_unix = shift;
+
+	my ($y, $m, $d, $H, $M, $S) = $start =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+	$$r_unix = mktime($S, $M, $H, $d, $m-1, $y-1900, 0, 0, -1);
+
+	return 0;
+}
+
+sub set_start_strtime
+{
+	my $start = shift;
+	my $r_str = shift;
+
+	my ($y, $m, $d, $H, $M, $S) = (localtime($start))[5,4,3,2,1,0];
+	$y += 1900;
+	$m += 1;
+
+	$$r_str = "$y-$m-$d $H:$M:$S";
+	return 0;
+}
+
+
 sub init_db
 {
 	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
@@ -246,20 +271,27 @@ sub create_contract_balance
 	# break recursion if we got the last result as last time
 	return 1 if($latest_end eq $last_end);
 
-	# TODO: doesn't work if user changes from, say, 1000 free minutes to 2000: then he looses his 
-	# non-interval free minutes
 
-	my $new_free_balance = $last_free_balance + $last_free_balance_int > $binfo->{int_free_time} ?
-		$last_free_balance + $last_free_balance_int : $binfo->{int_free_time};
+	my %last_profile = ();
+	get_billing_info($last_end, $cdr->{source_user_id}, \%last_profile) or
+		FATAL "Error getting billing info for date '".$last_end."' and uuid '".$cdr->{source_user_id}."'\n";
+
+	my %current_profile = ();
+	my $last_end_unix;
+	set_start_unixtime($last_end, \$last_end_unix);
+	$last_end_unix += 1;
+	my $current_date;
+	set_start_strtime($last_end_unix, \$current_date);
+	get_billing_info($current_date, $cdr->{source_user_id}, \%current_profile) or
+		FATAL "Error getting billing info for date '".$current_date."' and uuid '".$cdr->{source_user_id}."'\n";
+
+	my $new_free_balance = $last_free_balance + $current_profile{int_free_time} - 
+		($last_profile{int_free_time} - $last_free_balance_int);
 	my $new_free_balance_int = 0;
 	
-	# TODO: what about interval free cash?
-
-	my $new_cash_balance = $last_cash_balance;
+	my $new_cash_balance = $last_cash_balance + $current_profile{int_free_cash} - 
+		($last_profile{int_free_cash} - $last_cash_balance_int);
 	my $new_cash_balance_int = 0;
-
-
-	print Dumper $binfo;
 
 	if($binfo->{int_unit} eq "week")
 	{
@@ -547,17 +579,6 @@ sub is_offpeak_weekday
 	return 0;
 }
 
-sub set_start_unixtime
-{
-	my $start = shift;
-	my $r_unix = shift;
-
-	my ($y, $m, $d, $H, $M, $S) = $start =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
-	$$r_unix = mktime($S, $M, $H, $d, $m-1, $y-1900, 0, 0, -1);
-
-	return 0;
-}
-
 sub get_unrated_cdrs
 {
 	my $r_cdrs = shift;
@@ -788,8 +809,11 @@ sub get_customer_call_cost
 		$domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting customer call cost\n";
 
-	update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, \$rating_duration)
-		or FATAL "Error updating customer contract balance\n";
+	unless($billing_info{prepaid} == 1)
+	{
+		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, \$rating_duration)
+			or FATAL "Error updating customer contract balance\n";
+	}
 
 	return 1;
 }
