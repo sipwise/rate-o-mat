@@ -201,7 +201,7 @@ sub init_db
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"DATE_ADD(?, INTERVAL 1 SECOND), ".
 		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH))))".
-		)"
+		")"
 	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
 	
 	$sth_update_cbalance = $dbh->prepare(
