@@ -36,6 +36,9 @@ my $sth_new_cbalance_week;
 my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
 my $sth_is_freetime;
+my $sth_disable_autocommit;
+my $sth_commit;
+my $sth_rollback;
 
 main;
 exit 0;
@@ -47,6 +50,7 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
+	$sth_rollback->execute;
 	syslog('crit', $msg);
 	closelog();
 	die "$msg\n";
@@ -105,6 +109,18 @@ sub init_db
 {
 	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
 		or FATAL "Error connecting do db: ".$DBI::errstr;
+
+	$sth_disable_autocommit = $dbh->prepare(
+		"SET AUTOCOMMIT=0"
+	) or FATAL "Error preparing autocommit-off statement: ".$dbh->errstr;
+	
+	$sth_commit = $dbh->prepare(
+		"COMMIT"
+	) or FATAL "Error preparing commit statement: ".$dbh->errstr;
+	
+	$sth_rollback = $dbh->prepare(
+		"ROLLBACK"
+	) or FATAL "Error preparing rollback statement: ".$dbh->errstr;
 
 	$sth_billing_info = $dbh->prepare(
 		"SELECT a.contract_id, b.billing_profile_id, ".
@@ -166,7 +182,8 @@ sub init_db
 		"destination_user_in, destination_domain_in, ".
 		"start_time, duration, call_status ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
-		"ORDER BY start_time ASC LIMIT 10000"
+		"ORDER BY start_time ASC LIMIT 100 ".
+		"FOR UPDATE"
 	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
 
 	$sth_update_cdr = $dbh->prepare(
@@ -241,6 +258,7 @@ sub init_db
 		"WHERE billing_profile_id = ? AND billing_fee_id = ?"
 	) or FATAL "Error preparing freetime statement: ".$dbh->errstr;
 
+	$sth_disable_autocommit->execute;
 	return 1;
 }
 
@@ -1011,6 +1029,9 @@ sub main
 			$rated++;
 		}
 
+		$sth_commit->execute
+			or FATAL "Error committing cdrs: ".$dbh->errstr;
+
 		DEBUG "$rated CDRs rated so far.\n";
 	}
 
@@ -1030,6 +1051,9 @@ sub main
 	$sth_new_cbalance_month->finish;
 	$sth_get_last_cbalance->finish;
 	$sth_is_freetime->finish;
+	$sth_disable_autocommit->finish;
+	$sth_commit->finish;
+	$sth_rollback->finish;
 
 
 	$dbh->disconnect;
