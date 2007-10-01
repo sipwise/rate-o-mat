@@ -119,7 +119,7 @@ sub init_db
 		"WHERE billing_profile_id = ? ".
 		"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
 		"AND (weekday >= WEEKDAY(?) ".
-		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ?SECOND)))"
+		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)))"
 	) or FATAL "Error preparing weekday offpeak statement: ".$dbh->errstr;
 
 	$sth_offpeak_special = $dbh->prepare(
@@ -197,10 +197,11 @@ sub init_db
 		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? WEEK) )"
 	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
 
-	WARNING "sth_new_cbalance_month doesn't wrap to next month if it has more days than the last month!";
 	$sth_new_cbalance_month = $dbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? MONTH) )"
+		"DATE_ADD(?, INTERVAL 1 SECOND), ".
+		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH))))".
+		)"
 	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
 	
 	$sth_update_cbalance = $dbh->prepare(
