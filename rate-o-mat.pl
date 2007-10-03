@@ -216,14 +216,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"start <= ? AND end >= ? ".
-		"UNION ALL ".
-		"SELECT id, cash_balance, cash_balance_interval, ".
-		"free_time_balance, free_time_balance_interval, start ".
-		"FROM billing.contract_balances ".
-		"WHERE contract_id = ? AND ".
-		"start > ? ORDER BY start ASC"
-
+		"end >= ? ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$dbh->errstr;
 	
 	$sth_get_last_cbalance = $dbh->prepare(
@@ -351,7 +344,6 @@ sub get_contract_balance
 
 	my $sth = $sth_get_cbalance;
 	$sth->execute(
-		$binfo->{contract_id}, $cdr->{start_time}, $cdr->{start_time},
 		$binfo->{contract_id}, $cdr->{start_time})
 		or FATAL "Error executing get contract balance statement: ".$dbh->errstr;
 	my $res = $sth->fetchall_arrayref({});
