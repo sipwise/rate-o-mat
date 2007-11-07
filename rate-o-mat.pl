@@ -47,7 +47,7 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	$dbh->rollback;
+	$dbh->rollback if(defined $dbh);
 	syslog('crit', $msg);
 	closelog();
 	die "$msg\n";
@@ -969,7 +969,6 @@ sub daemonize
 	open PID, ">$pidfile" or FATAL "Can't write to pidfile '$pidfile': $!\n";
 	flock(PID, LOCK_EX | LOCK_NB) || FATAL "Unable to lock pidfile '$pidfile': $!\n";
 	print PID "$$\n";
-	close PID;
 }
 
 sub signal_handler
