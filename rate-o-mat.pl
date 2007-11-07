@@ -6,7 +6,7 @@ use Fcntl qw(LOCK_EX LOCK_NB);
 use Sys::Syslog;
 use Data::Dumper;
 
-my $fork = 0;
+my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = 10;
@@ -36,9 +36,6 @@ my $sth_new_cbalance_week;
 my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
 my $sth_is_freetime;
-my $sth_disable_autocommit;
-my $sth_commit;
-my $sth_rollback;
 
 main;
 exit 0;
@@ -50,7 +47,7 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	$sth_rollback->execute;
+	$dbh->rollback;
 	syslog('crit', $msg);
 	closelog();
 	die "$msg\n";
@@ -107,20 +104,8 @@ sub set_start_strtime
 
 sub init_db
 {
-	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si") 
+	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si", {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
-
-	$sth_disable_autocommit = $dbh->prepare(
-		"SET AUTOCOMMIT=0"
-	) or FATAL "Error preparing autocommit-off statement: ".$dbh->errstr;
-	
-	$sth_commit = $dbh->prepare(
-		"COMMIT"
-	) or FATAL "Error preparing commit statement: ".$dbh->errstr;
-	
-	$sth_rollback = $dbh->prepare(
-		"ROLLBACK"
-	) or FATAL "Error preparing rollback statement: ".$dbh->errstr;
 
 	$sth_billing_info = $dbh->prepare(
 		"SELECT a.contract_id, b.billing_profile_id, ".
@@ -141,7 +126,8 @@ sub init_db
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
-		"offpeak_follow_rate, offpeak_follow_interval ".
+		"offpeak_follow_rate, offpeak_follow_interval, ".
+    "billing_zone_id ".
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
@@ -182,14 +168,15 @@ sub init_db
 		"destination_user_in, destination_domain_in, ".
 		"start_time, duration, call_status ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
-		"ORDER BY start_time ASC LIMIT 100 ".
-		"FOR UPDATE"
+		"ORDER BY start_time ASC LIMIT 100 " # ."FOR UPDATE"
 	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
 
 	$sth_update_cdr = $dbh->prepare(
 		"UPDATE accounting.cdr SET ".
 		"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
-		"rated_at = now(), rating_status = ?, billing_fee_id = ? ".
+		"rated_at = now(), rating_status = ?, ".
+    "carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
+    "carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
 
@@ -251,7 +238,6 @@ sub init_db
 		"WHERE billing_profile_id = ? AND billing_fee_id = ?"
 	) or FATAL "Error preparing freetime statement: ".$dbh->errstr;
 
-	$sth_disable_autocommit->execute;
 	return 1;
 }
 
@@ -401,8 +387,8 @@ sub get_contract_balance
 		}
 
 
-		print "contract balance:\n";
-		print Dumper \%balance;
+		#print "contract balance:\n";
+		#print Dumper \%balance;
 	
 		$sth = $sth_update_cbalance;
 		$sth->execute(
@@ -486,9 +472,10 @@ sub get_profile_info
 	$b_info->{on_follow_rate} = $res[4];
 	$b_info->{on_follow_interval} = $res[5] == 0 ? 1 : $res[5];
 	$b_info->{off_init_rate} = $res[6];
-	$b_info->{off_init_interval} = $res[7] == 0 ? 1 : $res[7];;
+	$b_info->{off_init_interval} = $res[7] == 0 ? 1 : $res[7];
 	$b_info->{off_follow_rate} = $res[8];
-	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];;
+	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];
+	$b_info->{zone_id} = $res[10];
 	
 	$sth->finish;
 
@@ -597,24 +584,16 @@ sub get_unrated_cdrs
 	$sth->execute
 		or FATAL "Error executing unrated cdr statement: ".$dbh->errstr;
 
-	while(my @res = $sth->fetchrow_array())
+	while(my $res = $sth->fetchrow_hashref())
 	{
-		my %cdr = ();
-		$cdr{id} = $res[0];
-		$cdr{source_user_id} = $res[1];
-		$cdr{source_provider_id} = $res[2];
-		$cdr{destination_user_id} = $res[3];
-		$cdr{destination_provider_id} = $res[4];
-		$cdr{destination_user} = $res[5];
-		$cdr{destination_domain} = $res[6];
-		$cdr{destination_user_in} = $res[7];
-		$cdr{destination_domain_in} = $res[8];
-		$cdr{start_time} = $res[9];
-		$cdr{duration} = $res[10];
-		$cdr{call_status} = $res[11];
-
-		push @$r_cdrs, \%cdr;
+		push @$r_cdrs, $res;
 	}
+
+	# the while above may have been interupted because there is no
+	# data left, or because there was an error. To decide what
+	# happened, we have to query $sth->err()
+	FATAL "Error fetching unrated cdr's: ". $sth->errstr
+		if $sth->err;
 
 	return 1;
 }
@@ -625,7 +604,10 @@ sub update_cdr
 
 	my $sth = $sth_update_cdr;
 	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
-		'ok', $cdr->{billing_fee_id}, $cdr->{id})
+		'ok', 
+    $cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
+    $cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
+    $cdr->{id})
 		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	return 1;
 }
@@ -635,7 +617,7 @@ sub update_failed_cdr
 	my $cdr = shift;
 
 	my $sth = $sth_update_cdr;
-	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', $cdr->{id})
+	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', $cdr->{id})
 		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	return 1;
 }
@@ -697,12 +679,12 @@ sub get_call_cost
 	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
 	{
 		$dst_user = $cdr->{destination_user};
-		$dst_domain = '@'.$cdr->{destination_domain};
+		$dst_domain =  $cdr->{destination_user}.'@'.$cdr->{destination_domain};
 	}
 	else
 	{
 		$dst_user = $cdr->{destination_user_in};
-		$dst_domain = '@'.$cdr->{destination_domain_in};
+		$dst_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain_in};
 	}
 	
 	if($domain_first == 1)
@@ -733,7 +715,6 @@ sub get_call_cost
 			return 1;
 		}
 	}
-
 
 	#print Dumper $r_profile_info;
 
@@ -819,6 +800,9 @@ sub get_customer_call_cost
 		$domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting customer call cost\n";
 
+  $cdr->{customer_billing_fee_id} = $profile_info{fee_id};
+  $cdr->{customer_billing_zone_id} = $profile_info{zone_id};
+
 	unless($billing_info{prepaid} == 1)
 	{
 		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, \$rating_duration)
@@ -841,6 +825,17 @@ sub get_provider_call_cost
 	get_call_cost($cdr, $type, $r_info->{class}, 
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting provider call cost\n";
+ 
+  if($r_info->{class} eq "reseller")
+  {
+    $cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
+    $cdr->{reseller_billing_zone_id} = $profile_info{zone_id};
+  }
+  else
+  {
+    $cdr->{carrier_billing_fee_id} = $profile_info{fee_id};
+    $cdr->{carrier_billing_zone_id} = $profile_info{zone_id};
+  }
 	
 	# TODO: also update carrier/reseller balance (we're missing the billing_info, right?)
 
@@ -956,9 +951,6 @@ sub rate_cdr
 	$cdr->{reseller_cost} = $reseller_cost;
 	$cdr->{customer_cost} = $customer_cost;
 
-	# TODO: there should be an id for every of the three costs!?
-	$cdr->{billing_fee_id} = 0;
-
 	return 1;
 }
 
@@ -1007,9 +999,12 @@ sub main
 			or FATAL "Error getting next bunch of CDRs\n";
 		unless(@cdrs)
 		{
+			#DEBUG "No new CDRs to rate, sleep $loop_interval";
 			sleep($loop_interval);
 			next;
 		}
+
+		$dbh->begin_work or FATAL "Error starting transaction: ".$dbh->errstr;
 
 		foreach my $cdr(@cdrs)
 		{
@@ -1021,8 +1016,7 @@ sub main
 			$rated++;
 		}
 
-		$sth_commit->execute
-			or FATAL "Error committing cdrs: ".$dbh->errstr;
+		$dbh->commit or FATAL "Error committing cdrs: ".$dbh->errstr;
 
 		DEBUG "$rated CDRs rated so far.\n";
 	}
@@ -1043,9 +1037,6 @@ sub main
 	$sth_new_cbalance_month->finish;
 	$sth_get_last_cbalance->finish;
 	$sth_is_freetime->finish;
-	$sth_disable_autocommit->finish;
-	$sth_commit->finish;
-	$sth_rollback->finish;
 
 
 	$dbh->disconnect;
