@@ -863,7 +863,7 @@ sub rate_cdr
 	{
 		# caller is not local
 
-		if($cdr->{source_provider_id} == 0)
+		if($cdr->{source_provider_id} eq "0")
 		{
 			WARNING "CDR id ".$cdr->{id}." has no source uid/pid!\n";
 			update_failed_cdr($cdr);
@@ -887,13 +887,13 @@ sub rate_cdr
 	{
 		# caller is local
 
-		if($cdr->{source_provider_id} == 0)
+		if($cdr->{source_provider_id} eq "0")
 		{
 			WARNING "CDR id ".$cdr->{id}." has no source provider id\n";
 			update_failed_cdr($cdr);
 			return 1;
 		}
-		if($cdr->{destination_provider_id} == 0)
+		if($cdr->{destination_provider_id} eq "0")
 		{
 			WARNING "CDR id ".$cdr->{id}." has no destination provider id\n";
 			update_failed_cdr($cdr);
