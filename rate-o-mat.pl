@@ -35,7 +35,6 @@ my $sth_update_cbalance;
 my $sth_new_cbalance_week;
 my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
-my $sth_is_freetime;
 
 main;
 exit 0;
@@ -127,7 +126,7 @@ sub init_db
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-    "billing_zone_id ".
+		"billing_zone_id, use_free_time ".
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
@@ -232,11 +231,6 @@ sub init_db
 		"free_time_balance = ?, free_time_balance_interval = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$dbh->errstr;
-
-	$sth_is_freetime = $dbh->prepare(
-		"SELECT id FROM billing.billing_free_time_destinations ".
-		"WHERE billing_profile_id = ? AND billing_fee_id = ?"
-	) or FATAL "Error preparing freetime statement: ".$dbh->errstr;
 
 	return 1;
 }
@@ -355,18 +349,13 @@ sub get_contract_balance
 
 		if($i == 0)
 		{
-			$sth = $sth_is_freetime;
-			$sth->execute($binfo->{profile_id}, $pinfo->{fee_id})
-				or FATAL "Error executing freetime statement: ".$dbh->errstr;
-			my @r = $sth->fetchrow_array();
-
 			if($binfo->{prepaid} == 1)
 			{
 				WARNING "TODO: do we need to process prepaid balances here?";
 			}
 			else
 			{
-				if(@r && $balance{free_time_balance} >= $$rduration)
+				if($pinfo->{use_free_time} && $balance{free_time_balance} >= $$rduration)
 				{
 					$balance{free_time_balance} -= $$rduration;
 					$balance{free_time_balance_interval} += $$rduration;
@@ -476,6 +465,7 @@ sub get_profile_info
 	$b_info->{off_follow_rate} = $res[8];
 	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];
 	$b_info->{zone_id} = $res[10];
+	$b_info->{use_free_time} = $res[11];
 	
 	$sth->finish;
 
@@ -1035,7 +1025,6 @@ sub main
 	$sth_new_cbalance_week->finish;
 	$sth_new_cbalance_month->finish;
 	$sth_get_last_cbalance->finish;
-	$sth_is_freetime->finish;
 
 
 	$dbh->disconnect;
