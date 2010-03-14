@@ -35,6 +35,8 @@ my $sth_update_cbalance;
 my $sth_new_cbalance_week;
 my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
+my $sth_lnp_number;
+my $sth_lnp_profile_info;
 
 main;
 exit 0;
@@ -120,6 +122,14 @@ sub init_db
 		"LIMIT 1"
 	) or FATAL "Error preparing billing info statement: ".$dbh->errstr;
 	
+	$sth_lnp_number = $dbh->prepare("
+		SELECT lnp_provider_id
+		  FROM lnp_numbers
+		 WHERE ? LIKE CONCAT(number,'%')
+		   AND start <= ?
+		   AND end > ?
+	") or FATAL "Error preparing LNP number statement: ".$dbh->errstr;
+
 	$sth_profile_info = $dbh->prepare(
 		"SELECT id, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
@@ -130,6 +140,18 @@ sub init_db
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
+	) or FATAL "Error preparing profile info statement: ".$dbh->errstr;
+
+	$sth_lnp_profile_info = $dbh->prepare(
+		"SELECT id, destination, ".
+		"onpeak_init_rate, onpeak_init_interval, ".
+		"onpeak_follow_rate, onpeak_follow_interval, ".
+		"offpeak_init_rate, offpeak_init_interval, ".
+		"offpeak_follow_rate, offpeak_follow_interval, ".
+		"billing_zone_id, use_free_time ".
+		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
+		"AND type = ? AND destination = ? ".
+		"LIMIT 1"
 	) or FATAL "Error preparing profile info statement: ".$dbh->errstr;
 
 	$sth_offpeak_weekdays = $dbh->prepare(
@@ -221,8 +243,8 @@ sub init_db
 	$sth_new_cbalance_month = $dbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"DATE_ADD(?, INTERVAL 1 SECOND), ".
-		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH))))".
-		")"
+		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH)))), ".
+		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
 	
 	$sth_update_cbalance = $dbh->prepare(
@@ -445,13 +467,34 @@ sub get_profile_info
 	my $destination_class = shift;
 	my $destination = shift;
 	my $b_info = shift;
+	my $start_time = shift;
+
+	my @res;
+
+	if($destination =~ /^\d+$/) {
+		# let's see if we find the number in our LNP database
+		$sth_lnp_number->execute($destination, $start_time, $start_time)
+			or FATAL "Error executing LNP number statement: ".$sth_lnp_number->errstr;
+		my ($lnppid) = $sth_lnp_number->fetchrow_array();
+
+		if($lnppid =~ /^\d+$/) {
+			# let's see if we have a billing fee entry for the LNP provider ID
+			$sth_lnp_profile_info->execute($bpid, $type, 'lnp:'.$lnppid)
+				or FATAL "Error executing LNP profile info statement: ".$sth_lnp_profile_info->errstr;
+			@res = $sth_lnp_profile_info->fetchrow_array();
+			FATAL "Error fetching LNP profile info: ".$sth_lnp_profile_info->errstr
+				if $sth_lnp_profile_info->err;
+		}
+	}
 
 	my $sth = $sth_profile_info;
 
-	$sth->execute($bpid, $type, $destination)
-		or FATAL "Error executing profile info statement: ".$dbh->errstr;
-	
-	my @res = $sth->fetchrow_array();
+	unless(@res) {
+		$sth->execute($bpid, $type, $destination)
+			or FATAL "Error executing profile info statement: ".$dbh->errstr;
+		@res = $sth->fetchrow_array();
+	}
+
 	return 0 unless @res;
 	
 	$b_info->{fee_id} = $res[0];
@@ -694,10 +737,10 @@ sub get_call_cost
 	set_start_unixtime($cdr->{start_time}, \$start_unixtime);
 	
 	unless(get_profile_info($profile_id, $type, $destination_class, $first, 
-		$r_profile_info))
+		$r_profile_info, $cdr->{start_time}))
 	{
 		unless(get_profile_info($profile_id, $type, $destination_class, $second, 
-			$r_profile_info))
+			$r_profile_info, $cdr->{start_time}))
 		{
 			WARNING "No fee info for profile $profile_id and user '$dst_user' ".
 				"or domain '$dst_domain' found\n";
