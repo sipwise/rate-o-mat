@@ -126,8 +126,8 @@ sub init_db
 		SELECT lnp_provider_id
 		  FROM lnp_numbers
 		 WHERE ? LIKE CONCAT(number,'%')
-		   AND start <= ?
-		   AND end > ?
+		   AND (start <= ? OR start IS NULL)
+		   AND (end > ? OR end IS NULL)
 	") or FATAL "Error preparing LNP number statement: ".$dbh->errstr;
 
 	$sth_profile_info = $dbh->prepare(
