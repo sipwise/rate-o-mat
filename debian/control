@@ -1,0 +1,15 @@
+Source: rate-o-mat
+Section: utils
+Priority: extra
+Maintainer: Michael Prokop <mprokop@sipwise.com>
+Build-Depends: debhelper (>= 5)
+Standards-Version: 3.8.4
+Homepage: http://sipwise.com/
+Vcs-svn: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
+Vcs-Browser: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
+
+Package: rate-o-mat
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libclass-dbi-mysql-perl
+Description: scripts rate-o-mat.pl and import-rates.pl
+ Scripts for the Sipwise platform.
