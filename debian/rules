@@ -29,10 +29,10 @@ install: build
 	dh_clean -k
 	dh_installdirs usr/sbin
 
-	install -m 755 rate-o-mat.pl   debian/rate-o-mat/usr/sbin/rate-o-mat
-	install -m 755 import-rates.pl debian/rate-o-mat/usr/sbin/import-rates
+	install -m 755 rate-o-mat.pl   debian/sipwise-rate-o-mat/usr/sbin/rate-o-mat
+	install -m 755 import-rates.pl debian/sipwise-rate-o-mat/usr/sbin/import-rates
 	# drop svn files:
-	find debian/rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
+	find debian/sipwise-rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
 
 # Build architecture-dependent files here.
 binary-arch: build install
@@ -49,8 +49,8 @@ binary-indep: build install
 	dh_installinit
 	dh_link
 	dh_strip
-	#mkdir -p $(CURDIR)/debian/rate-o-mat/usr/share/lintian/overrides/
-	#cp -av debian/overrides $(CURDIR)/debian/rate-o-mat/usr/share/lintian/overrides/rate-o-mat
+	#mkdir -p $(CURDIR)/debian/sipwise-rate-o-mat/usr/share/lintian/overrides/
+	#cp -av debian/overrides $(CURDIR)/debian/sipwise-rate-o-mat/usr/share/lintian/overrides/sipwise-rate-o-mat
 	dh_compress
 	dh_fixperms
 	dh_installdeb
