@@ -114,7 +114,7 @@ sub init_db
 		"d.interval_unit, d.interval_count ".
 		"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
 		"billing.billing_profiles d ".
-		"WHERE a.uuid = ?  AND a.contract_id = b.contract_id ".
+		"WHERE a.uuid = ? AND a.contract_id = b.contract_id ".
 		"AND ( b.start_date IS NULL OR b.start_date <= ?) ".
 		"AND ( b.end_date IS NULL OR b.end_date >= ? ) ".
 		"AND b.billing_profile_id = d.id ".
@@ -196,8 +196,8 @@ sub init_db
 		"UPDATE accounting.cdr SET ".
 		"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
 		"rated_at = now(), rating_status = ?, ".
-    "carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
-    "carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ? ".
+		"carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
+		"carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
 
@@ -638,9 +638,9 @@ sub update_cdr
 	my $sth = $sth_update_cdr;
 	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
 		'ok', 
-    $cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
-    $cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
-    $cdr->{id})
+		$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
+		$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
+		$cdr->{id})
 		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	return 1;
 }
@@ -712,7 +712,7 @@ sub get_call_cost
 	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
 	{
 		$dst_user = $cdr->{destination_user};
-		$dst_domain =  $cdr->{destination_user}.'@'.$cdr->{destination_domain};
+		$dst_domain = $cdr->{destination_user}.'@'.$cdr->{destination_domain};
 	}
 	else
 	{
@@ -833,8 +833,8 @@ sub get_customer_call_cost
 		$domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting customer call cost\n";
 
-  $cdr->{customer_billing_fee_id} = $profile_info{fee_id};
-  $cdr->{customer_billing_zone_id} = $profile_info{zone_id};
+	$cdr->{customer_billing_fee_id} = $profile_info{fee_id};
+	$cdr->{customer_billing_zone_id} = $profile_info{zone_id};
 
 	unless($billing_info{prepaid} == 1)
 	{
@@ -859,16 +859,16 @@ sub get_provider_call_cost
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, \$rating_duration)
 		or FATAL "Error getting provider call cost\n";
  
-  if($r_info->{class} eq "reseller")
-  {
-    $cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
-    $cdr->{reseller_billing_zone_id} = $profile_info{zone_id};
-  }
-  else
-  {
-    $cdr->{carrier_billing_fee_id} = $profile_info{fee_id};
-    $cdr->{carrier_billing_zone_id} = $profile_info{zone_id};
-  }
+	if($r_info->{class} eq "reseller")
+	{
+		$cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
+		$cdr->{reseller_billing_zone_id} = $profile_info{zone_id};
+	}
+	else
+	{
+		$cdr->{carrier_billing_fee_id} = $profile_info{fee_id};
+		$cdr->{carrier_billing_zone_id} = $profile_info{zone_id};
+	}
 	
 	# TODO: also update carrier/reseller balance (we're missing the billing_info, right?)
 
