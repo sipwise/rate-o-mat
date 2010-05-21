@@ -15,6 +15,11 @@ my $log_ident = 'rate-o-mat';
 my $log_facility = 'daemon';
 my $log_opts = 'ndely,cons,pid,nowait';
 
+# if split_peak_parts is set to true, rate-o-mat will create a separate
+# CDR every time a peak time border is crossed for either the customer,
+# the reseller or the carrier billing profile.
+my $split_peak_parts = 0;
+
 ########################################################################
 
 sub main;
@@ -28,6 +33,8 @@ my $sth_offpeak_weekdays;
 my $sth_offpeak_special;
 my $sth_unrated_cdrs;
 my $sth_update_cdr;
+my $sth_update_cdr_split;
+my $sth_create_cdr_fragment;
 my $sth_provider_info;
 my $sth_reseller_info;
 my $sth_get_cbalance;
@@ -187,7 +194,7 @@ sub init_db
 		"destination_user_id, destination_provider_id, ".
 		"destination_user, destination_domain, ".
 		"destination_user_in, destination_domain_in, ".
-		"start_time, duration, call_status ".
+		"start_time, duration, call_status, is_fragmented ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"ORDER BY start_time ASC LIMIT 100 " # ."FOR UPDATE"
 	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
@@ -200,6 +207,35 @@ sub init_db
 		"carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
+
+	if($split_peak_parts) {
+		$sth_update_cdr_split = $dbh->prepare(
+			"UPDATE accounting.cdr SET ".
+			"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
+			"rated_at = now(), rating_status = ?, ".
+			"carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
+			"carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ?, ".
+			"carrier_onpeak = ?, reseller_onpeak = ?, customer_onpeak = ?, is_fragmented = ?, ".
+			"duration = ? ".
+			"WHERE id = ?"
+		) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
+
+		$sth_create_cdr_fragment = $dbh->prepare(
+			"INSERT INTO accounting.cdr
+			            (source_user_id,source_provider_id,source_user,source_domain,
+			             source_cli,source_clir,destination_user_id,destination_provider_id,
+			             destination_user,destination_domain,destination_user_dialed,
+			             destination_user_in,destination_domain_in,call_type,call_status,call_code,
+			             start_time,duration,call_id,is_fragmented)
+			      SELECT source_user_id,source_provider_id,source_user,source_domain,
+			             source_cli,source_clir,destination_user_id,destination_provider_id,
+			             destination_user,destination_domain,destination_user_dialed,
+			             destination_user_in,destination_domain_in,call_type,call_status,call_code,
+			             start_time + INTERVAL ? SECOND,duration - ?,call_id,is_fragmented
+			        FROM accounting.cdr
+			       WHERE id = ?
+			") or FATAL "Error preparing create cdr fragment statement: ".$dbh->errstr;
+	}
 
 	$sth_provider_info = $dbh->prepare(
 		"SELECT p.class, bm.billing_profile_id ".
@@ -635,13 +671,26 @@ sub update_cdr
 {
 	my $cdr = shift;
 
-	my $sth = $sth_update_cdr;
-	$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost},
-		'ok', 
-		$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
-		$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
-		$cdr->{id})
-		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+	if($split_peak_parts) {
+
+		my $sth = $sth_update_cdr_split;
+		$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost}, 'ok',
+			$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
+			$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
+			$cdr->{carrier_onpeak}, $cdr->{reseller_onpeak}, $cdr->{customer_onpeak}, $cdr->{is_fragmented}, $cdr->{duration},
+			$cdr->{id})
+			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+
+	} else {
+
+		my $sth = $sth_update_cdr;
+		$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost}, 'ok', 
+			$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
+			$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
+			$cdr->{id})
+			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+	}
+
 	return 1;
 }
 
@@ -649,9 +698,16 @@ sub update_failed_cdr
 {
 	my $cdr = shift;
 
-	my $sth = $sth_update_cdr;
-	$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', $cdr->{id})
-		or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+	if($split_peak_parts) {
+		my $sth = $sth_update_cdr_split;
+		$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL',
+		              'NULL', 'NULL', 'NULL', $cdr->{is_fragmented}, $cdr->{duration}, $cdr->{id})
+			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+	} else {
+		my $sth = $sth_update_cdr;
+		$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', $cdr->{id})
+			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+	}
 	return 1;
 }
 
@@ -703,6 +759,7 @@ sub get_call_cost
 	my $r_profile_info = shift;
 	my $r_cost = shift;
 	my $r_rating_duration = shift;
+	my $r_onpeak;
 
 	my $dst_user;
 	my $dst_domain;
@@ -796,9 +853,12 @@ sub get_call_cost
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
+			$r_onpeak = $onpeak;
 		}
 		else
 		{
+			last if $split_peak_parts and $r_onpeak != $onpeak;
+
 			$interval = $onpeak == 1 ? 
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
 			$rate = $onpeak == 1 ? 
@@ -821,7 +881,8 @@ sub get_customer_call_cost
 	my $destination_class = shift;
 	my $domain_first = shift;
 	my $r_cost = shift;
-	my $rating_duration = 0;
+	my $r_rating_duration = shift;
+	my $onpeak;
 
 	my %billing_info = ();
 	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
@@ -830,15 +891,16 @@ sub get_customer_call_cost
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
-		$domain_first, \%profile_info, $r_cost, \$rating_duration)
+		$domain_first, \%profile_info, $r_cost, $r_rating_duration, \$onpeak)
 		or FATAL "Error getting customer call cost\n";
 
 	$cdr->{customer_billing_fee_id} = $profile_info{fee_id};
 	$cdr->{customer_billing_zone_id} = $profile_info{zone_id};
+	$cdr->{frag_customer_onpeak} = $onpeak if $split_peak_parts;
 
 	unless($billing_info{prepaid} == 1)
 	{
-		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, \$rating_duration)
+		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, $r_rating_duration)
 			or FATAL "Error updating customer contract balance\n";
 	}
 
@@ -852,22 +914,25 @@ sub get_provider_call_cost
 	my $domain_first = shift;
 	my $r_info = shift;
 	my $r_cost = shift;
-	my $rating_duration = 0;
+	my $r_rating_duration = shift;
+	my $onpeak;
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $r_info->{class}, 
-		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, \$rating_duration)
+		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_rating_duration, \$onpeak)
 		or FATAL "Error getting provider call cost\n";
  
 	if($r_info->{class} eq "reseller")
 	{
 		$cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
 		$cdr->{reseller_billing_zone_id} = $profile_info{zone_id};
+		$cdr->{frag_reseller_onpeak} = $onpeak if $split_peak_parts;
 	}
 	else
 	{
 		$cdr->{carrier_billing_fee_id} = $profile_info{fee_id};
 		$cdr->{carrier_billing_zone_id} = $profile_info{zone_id};
+		$cdr->{frag_carrier_onpeak} = $onpeak if $split_peak_parts;
 	}
 	
 	# TODO: also update carrier/reseller balance (we're missing the billing_info, right?)
@@ -938,9 +1003,11 @@ sub rate_cdr
 			\%provider_info)
 			or FATAL "Error getting destination provider info\n";
 
-
+		my %reseller_info = ();
 		my $dst_class;
 		my $domain_first = 0;
+		my $rating_duration;
+		my $fragmentation = 0;
 
 		if($provider_info{class} eq "reseller")
 		{
@@ -948,8 +1015,13 @@ sub rate_cdr
 			$domain_first = 1; # priorize domain over user to correctly rate onnet-calls
 
 			# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
-			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost)
+			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
 				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+				$cdr->{duration} = $rating_duration;
+				$cdr->{is_fragmented} = 1;
+				$fragmentation = 1;
+			}
 			$carrier_cost = 0;
 		}
 		elsif($provider_info{class} eq "sippeering" || $provider_info{class} eq "pstnpeering")
@@ -958,16 +1030,34 @@ sub rate_cdr
 			$domain_first = 0; # for calls leaving our system, priorize user over domain
 
 			# carrier cost can be calculated directly with available billing profile
-			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost)
+			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
 				or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
+			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+				$cdr->{duration} = $rating_duration;
+				$cdr->{is_fragmented} = 1;
+				$fragmentation = 1;
+			}
 	
 			# for reseller we first have to find the billing profile
-			%provider_info = ();
+			%reseller_info = ();
 			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
-				\%provider_info)
+				\%reseller_info)
 				or FATAL "Error getting source reseller info\n";
-			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost)
+			get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
 				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+
+			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+				$cdr->{duration} = $rating_duration;
+				$cdr->{is_fragmented} = 1;
+				$fragmentation = 1;
+				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
+					or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
+				if($cdr->{duration} != $rating_duration) {
+					FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Carrier and reseller profiles don't match.\n";
+				}
+			} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
+				FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Reseller and carrier profiles don't match.\n";
+			}
 		}
 		else
 		{
@@ -975,8 +1065,39 @@ sub rate_cdr
 				"class '".$provider_info{class}."' in cdr ".$cdr->{id}."\n";
 		}
 			
-		get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost)
+		get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost, \$rating_duration)
 			or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
+
+		if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+			$cdr->{duration} = $rating_duration;
+			$cdr->{is_fragmented} = 1;
+			if($dst_class eq 'reseller') {
+				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
+					or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
+			} else {
+				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
+					or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
+				if($cdr->{duration} != $rating_duration) {
+					FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
+					      ". Customer and carrier profiles don't match.\n";
+				}
+				get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
+					or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
+			}
+			if($cdr->{duration} != $rating_duration) {
+				FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
+				      ". Customer and reseller profiles don't match.\n";
+			}
+		} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
+			FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
+			      ". Customer and reseller/carrier profiles don't match.\n";
+		}
+
+		if($split_peak_parts and $fragmentation) {
+			my $sth = $sth_create_cdr_fragment;
+			$sth->execute($rating_duration, $rating_duration, $cdr->{id})
+				or FATAL "Error executing create cdr fragment statement: ".$sth->errstr;
+		}
 	}
 
 
@@ -1061,6 +1182,8 @@ sub main
 	$sth_offpeak_special->finish;
 	$sth_unrated_cdrs->finish;
 	$sth_update_cdr->finish;
+	$sth_update_cdr_split->finish;
+	$sth_create_cdr_fragment->finish;
 	$sth_provider_info->finish;
 	$sth_reseller_info->finish;
 	$sth_get_cbalance->finish;
