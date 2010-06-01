@@ -194,7 +194,7 @@ sub init_db
 		"destination_user_id, destination_provider_id, ".
 		"destination_user, destination_domain, ".
 		"destination_user_in, destination_domain_in, ".
-		"start_time, duration, call_status, is_fragmented ".
+		"start_time, duration, call_status, IF(is_fragmented IS NULL, 0, is_fragmented) AS is_fragmented ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"ORDER BY start_time ASC LIMIT 100 " # ."FOR UPDATE"
 	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
@@ -215,7 +215,7 @@ sub init_db
 			"rated_at = now(), rating_status = ?, ".
 			"carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
 			"carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ?, ".
-			"carrier_onpeak = ?, reseller_onpeak = ?, customer_onpeak = ?, is_fragmented = ?, ".
+			"frag_carrier_onpeak = ?, frag_reseller_onpeak = ?, frag_customer_onpeak = ?, is_fragmented = ?, ".
 			"duration = ? ".
 			"WHERE id = ?"
 		) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
@@ -677,7 +677,7 @@ sub update_cdr
 		$sth->execute($cdr->{carrier_cost}, $cdr->{reseller_cost}, $cdr->{customer_cost}, 'ok',
 			$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
 			$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
-			$cdr->{carrier_onpeak}, $cdr->{reseller_onpeak}, $cdr->{customer_onpeak}, $cdr->{is_fragmented}, $cdr->{duration},
+			$cdr->{frag_carrier_onpeak}, $cdr->{frag_reseller_onpeak}, $cdr->{frag_customer_onpeak}, $cdr->{is_fragmented}, $cdr->{duration},
 			$cdr->{id})
 			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 
@@ -759,7 +759,7 @@ sub get_call_cost
 	my $r_profile_info = shift;
 	my $r_cost = shift;
 	my $r_rating_duration = shift;
-	my $r_onpeak;
+	my $r_onpeak = shift;
 
 	my $dst_user;
 	my $dst_domain;
@@ -853,11 +853,11 @@ sub get_call_cost
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
-			$r_onpeak = $onpeak;
+			$$r_onpeak = $onpeak;
 		}
 		else
 		{
-			last if $split_peak_parts and $r_onpeak != $onpeak;
+			last if $split_peak_parts and $$r_onpeak != $onpeak;
 
 			$interval = $onpeak == 1 ? 
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
