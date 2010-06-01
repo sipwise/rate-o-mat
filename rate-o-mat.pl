@@ -513,7 +513,7 @@ sub get_profile_info
 			or FATAL "Error executing LNP number statement: ".$sth_lnp_number->errstr;
 		my ($lnppid) = $sth_lnp_number->fetchrow_array();
 
-		if($lnppid =~ /^\d+$/) {
+		if(defined $lnppid and $lnppid =~ /^\d+$/) {
 			# let's see if we have a billing fee entry for the LNP provider ID
 			$sth_lnp_profile_info->execute($bpid, $type, 'lnp:'.$lnppid)
 				or FATAL "Error executing LNP profile info statement: ".$sth_lnp_profile_info->errstr;
@@ -1044,7 +1044,8 @@ sub rate_cdr
 				\%reseller_info)
 				or FATAL "Error getting source reseller info\n";
 			get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
-				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n"
+					if $reseller_info{profile_id};
 
 			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
 				$cdr->{duration} = $rating_duration;
@@ -1182,8 +1183,10 @@ sub main
 	$sth_offpeak_special->finish;
 	$sth_unrated_cdrs->finish;
 	$sth_update_cdr->finish;
-	$sth_update_cdr_split->finish;
-	$sth_create_cdr_fragment->finish;
+	if($split_peak_parts) {
+		$sth_update_cdr_split->finish;
+		$sth_create_cdr_fragment->finish;
+	}
 	$sth_provider_info->finish;
 	$sth_reseller_info->finish;
 	$sth_get_cbalance->finish;
@@ -1191,6 +1194,8 @@ sub main
 	$sth_new_cbalance_week->finish;
 	$sth_new_cbalance_month->finish;
 	$sth_get_last_cbalance->finish;
+	$sth_lnp_number->finish;
+	$sth_lnp_profile_info->finish;
 
 
 	$dbh->disconnect;
