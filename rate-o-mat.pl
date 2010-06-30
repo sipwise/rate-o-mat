@@ -761,6 +761,8 @@ sub get_call_cost
 	my $r_rating_duration = shift;
 	my $r_onpeak = shift;
 
+	$$r_rating_duration = 0; # ensure we start with zero length
+
 	my $dst_user;
 	my $dst_domain;
 	my $first;
