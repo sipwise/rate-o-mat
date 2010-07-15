@@ -30,7 +30,6 @@ install: build
 	dh_installdirs usr/sbin
 
 	install -m 755 rate-o-mat.pl   debian/sipwise-rate-o-mat/usr/sbin/rate-o-mat
-	install -m 755 import-rates.pl debian/sipwise-rate-o-mat/usr/sbin/import-rates
 	# drop svn files:
 	find debian/sipwise-rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
 
