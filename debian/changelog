@@ -1,3 +1,18 @@
+sipwise-rate-o-mat (0.2.0-1) unstable; urgency=low
+
+  * ignoring customer/reseller/provider if no billing_profile is found
+  * added some debuging messages for cdr splitting
+  * fixed rating duration initialization
+  * fixed some warnings on uninitialized values and unfinished sth's
+  * fixed some frag_* column names
+  * fixed is_fragmented handling for uninitialized CDRs
+  * fixed onpeak return parameter passing
+  * initial implementation of cdr peaktime splitting
+  * fixed indentation
+  * dropped import-rates, should be handled in www_admin and/or per project
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Fri, 16 Apr 2010 12:03:01 +0200
+
 sipwise-rate-o-mat (0.1.1) unstable; urgency=low
 
   * Initial release.
