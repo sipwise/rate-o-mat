@@ -891,6 +891,11 @@ sub get_customer_call_cost
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
+	unless($billing_info{profile_id}) {
+		$$r_rating_duration = $cdr->{duration};
+		return -1;
+	}
+
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
 		$domain_first, \%profile_info, $r_cost, $r_rating_duration, \$onpeak)
@@ -1016,28 +1021,33 @@ sub rate_cdr
 			$dst_class = 'reseller';
 			$domain_first = 1; # priorize domain over user to correctly rate onnet-calls
 
-			# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
-			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
-				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
-			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
-				$cdr->{duration} = $rating_duration;
-				$cdr->{is_fragmented} = 1;
-				$fragmentation = 1;
+			if($provider_info{profile_id}) {
+				# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
+				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
+					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+					DEBUG "reseller rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
+					$cdr->{duration} = $rating_duration;
+					$cdr->{is_fragmented} = 1;
+					$fragmentation = 1;
+				}
 			}
-			$carrier_cost = 0;
 		}
 		elsif($provider_info{class} eq "sippeering" || $provider_info{class} eq "pstnpeering")
 		{
 			$dst_class = $provider_info{class};
 			$domain_first = 0; # for calls leaving our system, priorize user over domain
 
-			# carrier cost can be calculated directly with available billing profile
-			get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
-				or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
-			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
-				$cdr->{duration} = $rating_duration;
-				$cdr->{is_fragmented} = 1;
-				$fragmentation = 1;
+			if($provider_info{profile_id}) {
+				# carrier cost can be calculated directly with available billing profile
+				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
+					or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
+				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+					DEBUG "carrier rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
+					$cdr->{duration} = $rating_duration;
+					$cdr->{is_fragmented} = 1;
+					$fragmentation = 1;
+				}
 			}
 	
 			# for reseller we first have to find the billing profile
@@ -1045,21 +1055,24 @@ sub rate_cdr
 			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
 				\%reseller_info)
 				or FATAL "Error getting source reseller info\n";
-			get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
-				or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n"
-					if $reseller_info{profile_id};
 
-			if($split_peak_parts and $cdr->{duration} > $rating_duration) {
-				$cdr->{duration} = $rating_duration;
-				$cdr->{is_fragmented} = 1;
-				$fragmentation = 1;
-				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
-					or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
-				if($cdr->{duration} != $rating_duration) {
-					FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Carrier and reseller profiles don't match.\n";
+			if($reseller_info{profile_id}) {
+				get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
+					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+
+				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+					DEBUG "reseller rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
+					$cdr->{duration} = $rating_duration;
+					$cdr->{is_fragmented} = 1;
+					$fragmentation = 1;
+					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
+						or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
+					if($cdr->{duration} != $rating_duration) {
+						FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Carrier and reseller profiles don't match.\n";
+					}
+				} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
+					FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Reseller and carrier profiles don't match.\n";
 				}
-			} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
-				FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Reseller and carrier profiles don't match.\n";
 			}
 		}
 		else
@@ -1072,26 +1085,34 @@ sub rate_cdr
 			or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
 
 		if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+			DEBUG "customer rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
 			$cdr->{duration} = $rating_duration;
 			$cdr->{is_fragmented} = 1;
 			if($dst_class eq 'reseller') {
-				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
-					or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
-			} else {
-				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
-					or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
-				if($cdr->{duration} != $rating_duration) {
-					FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
-					      ". Customer and carrier profiles don't match.\n";
+				if($provider_info{profile_id}) {
+					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
+						or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
 				}
-				get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
-					or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
+			} else {
+				if($provider_info{profile_id}) {
+					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$rating_duration)
+						or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
+					if($cdr->{duration} != $rating_duration) {
+						FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
+					      	". Customer and carrier profiles don't match.\n";
+					}
+				}
+				if($reseller_info{profile_id}) {
+					get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$rating_duration)
+						or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
+				}
 			}
 			if($cdr->{duration} != $rating_duration) {
 				FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
 				      ". Customer and reseller profiles don't match.\n";
 			}
 		} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
+			DEBUG "rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
 			FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
 			      ". Customer and reseller/carrier profiles don't match.\n";
 		}
