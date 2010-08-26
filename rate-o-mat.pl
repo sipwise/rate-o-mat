@@ -20,6 +20,13 @@ my $log_opts = 'ndely,cons,pid,nowait';
 # the reseller or the carrier billing profile.
 my $split_peak_parts = 0;
 
+# if the LNP database is used not just for LNP, but also for on-net
+# billing, special routing or similar things, this should be set to
+# better guess the correct LNP provider ID when selecting ported numbers
+# e.g.:
+# my @lnp_order_by = ("lnp_provider_id ASC");
+my @lnp_order_by = ();
+
 ########################################################################
 
 sub main;
@@ -135,6 +142,8 @@ sub init_db
 		 WHERE ? LIKE CONCAT(number,'%')
 		   AND (start <= ? OR start IS NULL)
 		   AND (end > ? OR end IS NULL)
+	".       join(", ", "ORDER BY length(number) DESC", @lnp_order_by) ."
+                 LIMIT 1
 	") or FATAL "Error preparing LNP number statement: ".$dbh->errstr;
 
 	$sth_profile_info = $dbh->prepare(
