@@ -3,6 +3,7 @@ use strict;
 use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB);
+use IO::Handle;
 use Sys::Syslog;
 use Data::Dumper;
 
@@ -1155,7 +1156,7 @@ sub daemonize
 	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
 	open PID, ">$pidfile" or FATAL "Can't write to pidfile '$pidfile': $!\n";
 	flock(PID, LOCK_EX | LOCK_NB) || FATAL "Unable to lock pidfile '$pidfile': $!\n";
-	print PID "$$\n";
+	printflush PID "$$\n";
 }
 
 sub signal_handler
