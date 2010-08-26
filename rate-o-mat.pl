@@ -811,8 +811,8 @@ sub get_call_cost
 		unless(get_profile_info($profile_id, $type, $destination_class, $second, 
 			$r_profile_info, $cdr->{start_time}))
 		{
-			WARNING "No fee info for profile $profile_id and user '$dst_user' ".
-				"or domain '$dst_domain' found\n";
+			FATAL "No fee info for profile $profile_id and user '$dst_user' ".
+			      "or domain '$dst_domain' found\n";
 			$$r_cost = 0;
 			return 1;
 		}
