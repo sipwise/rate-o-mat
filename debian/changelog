@@ -1,4 +1,4 @@
-sipwise-rate-o-mat (0.2.0-1) unstable; urgency=low
+ngcp-rate-o-mat (0.2.0-1) unstable; urgency=low
 
   * ignoring customer/reseller/provider if no billing_profile is found
   * added some debuging messages for cdr splitting
@@ -13,7 +13,7 @@ sipwise-rate-o-mat (0.2.0-1) unstable; urgency=low
 
  -- Jon Bonilla <jbonilla@sipwise.com>  Fri, 16 Apr 2010 12:03:01 +0200
 
-sipwise-rate-o-mat (0.1.1) unstable; urgency=low
+ngcp-rate-o-mat (0.1.1) unstable; urgency=low
 
   * Initial release.
 

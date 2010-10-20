@@ -1,4 +1,4 @@
-Source: sipwise-rate-o-mat
+Source: ngcp-rate-o-mat
 Section: utils
 Priority: extra
 Maintainer: Michael Prokop <mprokop@sipwise.com>
@@ -8,7 +8,7 @@ Homepage: http://sipwise.com/
 Vcs-svn: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
 Vcs-Browser: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
 
-Package: sipwise-rate-o-mat
+Package: ngcp-rate-o-mat
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libclass-dbi-mysql-perl
 Description: scripts rate-o-mat.pl and import-rates.pl
