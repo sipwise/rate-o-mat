@@ -11,5 +11,5 @@ Vcs-Browser: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
 Package: ngcp-rate-o-mat
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libclass-dbi-mysql-perl
-Description: scripts rate-o-mat.pl and import-rates.pl
- Scripts for the Sipwise platform.
+Description: Rate import/export scripts for NGCP platform
+ Scripts for import/export rates in a NGCP platform.
