@@ -710,12 +710,12 @@ sub update_failed_cdr
 
 	if($split_peak_parts) {
 		my $sth = $sth_update_cdr_split;
-		$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL',
-		              'NULL', 'NULL', 'NULL', $cdr->{is_fragmented}, $cdr->{duration}, $cdr->{id})
+		$sth->execute(undef, undef, undef, 'failed', undef, undef, undef, undef, undef, undef,
+		              undef, undef, undef, $cdr->{is_fragmented}, $cdr->{duration}, $cdr->{id})
 			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	} else {
 		my $sth = $sth_update_cdr;
-		$sth->execute('NULL', 'NULL', 'NULL', 'failed', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NULL', $cdr->{id})
+		$sth->execute(undef, undef, undef, 'failed', undef, undef, undef, undef, undef, undef, $cdr->{id})
 			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
 	}
 	return 1;
