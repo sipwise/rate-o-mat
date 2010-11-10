@@ -10,7 +10,7 @@ use Data::Dumper;
 my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
-my $loop_interval = int $ENV{RATEOMAT_LOOP_INTERVAL} || 10;
+my $loop_interval = $ENV{RATEOMAT_LOOP_INTERVAL} ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10;
 
 my $log_ident = 'rate-o-mat';
 my $log_facility = 'daemon';
@@ -31,15 +31,15 @@ my @lnp_order_by = ();
 # billing database
 my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
 my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
-my $BillDB_Port = int $ENV{RATEOMAT_BILLING_DB_PORT} || 3306;
-my $BillDB_User = $ENV{RATEOMAT_BILLING_DB_USER};
-my $BillDB_Pass = $ENV{RATEOMAT_BILLING_DB_PASS};
+my $BillDB_Port = $ENV{RATEOMAT_BILLING_DB_PORT} ? int $ENV{RATEOMAT_BILLING_DB_PORT} : 3306;
+my $BillDB_User = $ENV{RATEOMAT_BILLING_DB_USER} || die "Missing billing DB user setting.";
+my $BillDB_Pass = $ENV{RATEOMAT_BILLING_DB_PASS} || die "Missing billing DB password setting.";
 # accounting database
 my $AcctDB_Name = $ENV{RATEOMAT_ACCOUNTING_DB_NAME} || 'accounting';
 my $AcctDB_Host = $ENV{RATEOMAT_ACCOUNTING_DB_HOST} || 'localhost';
-my $AcctDB_Port = int $ENV{RATEOMAT_ACCOUNTING_DB_PORT} || 3306;
-my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER};
-my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS};
+my $AcctDB_Port = $ENV{RATEOMAT_ACCOUNTING_DB_PORT} ? int $ENV{RATEOMAT_ACCOUNTING_DB_PORT} : 3306;
+my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER} || die "Missing accounting DB user setting.";
+my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS} || die "Missing accounting DB password setting.";
 
 ########################################################################
 
