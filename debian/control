@@ -24,6 +24,6 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libdbd-mysql-perl
+Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libdbd-mysql-perl, ngcp-templates-rate-o-mat
 Description: Rating daemon for the NGCP
  Perl daemon to rate CDRs in an NGCP.
