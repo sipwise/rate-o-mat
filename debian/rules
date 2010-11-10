@@ -27,9 +27,10 @@ install: build
 	dh_testdir
 	dh_testroot
 	dh_clean -k
-	dh_installdirs usr/sbin
+	dh_installdirs usr/sbin etc/ngcp-config/templates/etc/default
 
 	install -m 755 rate-o-mat.pl   debian/ngcp-rate-o-mat/usr/sbin/rate-o-mat
+	install -m 644 ngcp-rate-o-mat.default.tt2   debian/ngcp-rate-o-mat/etc/ngcp-config/templates/etc/default/ngcp-rate-o-mat.tt2
 	# drop svn files:
 	find debian/ngcp-rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
 

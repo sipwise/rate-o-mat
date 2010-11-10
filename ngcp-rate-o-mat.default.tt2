@@ -1,0 +1,25 @@
+[% TAGS [- -] %]
+# Options for the NGCP rate-o-mat
+
+# how long we shall sleep before looking for unrated CDRs again
+RATEOMAT_LOOP_INTERVAL=[% rateomat.loopinterval %]
+
+# whether we should split CDRs on peaktime borders
+RATEOMAT_SPLIT_PEAK_PARTS=[% rateomat.splitpeakparts %]
+
+# billing database
+RATEOMAT_BILLING_DB_HOST='[% database.dbhost %]'
+RATEOMAT_BILLING_DB_PORT='[% database.dbport %]'
+RATEOMAT_BILLING_DB_NAME='[% rateomat.billingdb.name %]'
+RATEOMAT_BILLING_DB_USER='[% rateomat.billingdb.user %]'
+RATEOMAT_BILLING_DB_PASS='[% rateomat.billingdb.pass %]'
+
+# accounting database
+RATEOMAT_ACCOUNTING_DB_HOST='[% database.dbhost %]'
+RATEOMAT_ACCOUNTING_DB_PORT='[% database.dbport %]'
+RATEOMAT_ACCOUNTING_DB_NAME='[% rateomat.accountingdb.name %]'
+RATEOMAT_ACCOUNTING_DB_USER='[% rateomat.accountingdb.user %]'
+RATEOMAT_ACCOUNTING_DB_PASS='[% rateomat.accountingdb.pass %]'
+
+# export all settings to rate-o-mat's environment
+export RATEOMAT_LOOP_INTERVAL RATEOMAT_SPLIT_PEAK_PARTS RATEOMAT_BILLING_DB_NAME RATEOMAT_BILLING_DB_HOST RATEOMAT_BILLING_DB_PORT RATEOMAT_BILLING_DB_USER RATEOMAT_BILLING_DB_PASS RATEOMAT_ACCOUNTING_DB_NAME RATEOMAT_ACCOUNTING_DB_HOST RATEOMAT_ACCOUNTING_DB_PORT RATEOMAT_ACCOUNTING_DB_USER RATEOMAT_ACCOUNTING_DB_PASS

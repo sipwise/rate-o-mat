@@ -10,7 +10,7 @@ use Data::Dumper;
 my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
-my $loop_interval = 10;
+my $loop_interval = int $ENV{RATEOMAT_LOOP_INTERVAL} || 10;
 
 my $log_ident = 'rate-o-mat';
 my $log_facility = 'daemon';
@@ -19,7 +19,7 @@ my $log_opts = 'ndely,cons,pid,nowait';
 # if split_peak_parts is set to true, rate-o-mat will create a separate
 # CDR every time a peak time border is crossed for either the customer,
 # the reseller or the carrier billing profile.
-my $split_peak_parts = 0;
+my $split_peak_parts = int $ENV{RATEOMAT_SPLIT_PEAK_PARTS};
 
 # if the LNP database is used not just for LNP, but also for on-net
 # billing, special routing or similar things, this should be set to
@@ -28,13 +28,27 @@ my $split_peak_parts = 0;
 # my @lnp_order_by = ("lnp_provider_id ASC");
 my @lnp_order_by = ();
 
+# billing database
+my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
+my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
+my $BillDB_Port = int $ENV{RATEOMAT_BILLING_DB_PORT} || 3306;
+my $BillDB_User = $ENV{RATEOMAT_BILLING_DB_USER};
+my $BillDB_Pass = $ENV{RATEOMAT_BILLING_DB_PASS};
+# accounting database
+my $AcctDB_Name = $ENV{RATEOMAT_ACCOUNTING_DB_NAME} || 'accounting';
+my $AcctDB_Host = $ENV{RATEOMAT_ACCOUNTING_DB_HOST} || 'localhost';
+my $AcctDB_Port = int $ENV{RATEOMAT_ACCOUNTING_DB_PORT} || 3306;
+my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER};
+my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS};
+
 ########################################################################
 
 sub main;
 
 my $shutdown = 0;
 
-my $dbh;
+my $billdbh;
+my $acctdbh;
 my $sth_billing_info;
 my $sth_profile_info;
 my $sth_offpeak_weekdays;
@@ -63,7 +77,8 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	$dbh->rollback if(defined $dbh);
+	$billdbh->rollback if defined $billdbh;
+	$acctdbh->rollback if defined $acctdbh;
 	syslog('crit', $msg);
 	closelog();
 	die "$msg\n";
@@ -120,10 +135,12 @@ sub set_start_strtime
 
 sub init_db
 {
-	$dbh = DBI->connect("dbi:mysql:database=billing;host=localhost", "soap", "s:wMP4Si", {AutoCommit => 1})
+	$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1})
+		or FATAL "Error connecting do db: ".$DBI::errstr;
+	$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
 
-	$sth_billing_info = $dbh->prepare(
+	$sth_billing_info = $billdbh->prepare(
 		"SELECT a.contract_id, b.billing_profile_id, ".
 		"d.prepaid, d.interval_charge, d.interval_free_time, d.interval_free_cash, ".
 		"d.interval_unit, d.interval_count ".
@@ -135,9 +152,9 @@ sub init_db
 		"AND b.billing_profile_id = d.id ".
 		"ORDER BY b.start_date DESC ".
 		"LIMIT 1"
-	) or FATAL "Error preparing billing info statement: ".$dbh->errstr;
+	) or FATAL "Error preparing billing info statement: ".$billdbh->errstr;
 	
-	$sth_lnp_number = $dbh->prepare("
+	$sth_lnp_number = $billdbh->prepare("
 		SELECT lnp_provider_id
 		  FROM lnp_numbers
 		 WHERE ? LIKE CONCAT(number,'%')
@@ -145,9 +162,9 @@ sub init_db
 		   AND (end > ? OR end IS NULL)
 	".       join(", ", "ORDER BY length(number) DESC", @lnp_order_by) ."
                  LIMIT 1
-	") or FATAL "Error preparing LNP number statement: ".$dbh->errstr;
+	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
-	$sth_profile_info = $dbh->prepare(
+	$sth_profile_info = $billdbh->prepare(
 		"SELECT id, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
@@ -157,9 +174,9 @@ sub init_db
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
-	) or FATAL "Error preparing profile info statement: ".$dbh->errstr;
+	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
-	$sth_lnp_profile_info = $dbh->prepare(
+	$sth_lnp_profile_info = $billdbh->prepare(
 		"SELECT id, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
@@ -169,9 +186,9 @@ sub init_db
 		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
 		"AND type = ? AND destination = ? ".
 		"LIMIT 1"
-	) or FATAL "Error preparing profile info statement: ".$dbh->errstr;
+	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
-	$sth_offpeak_weekdays = $dbh->prepare(
+	$sth_offpeak_weekdays = $billdbh->prepare(
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
 		"WHERE billing_profile_id = ? ".
@@ -185,9 +202,9 @@ sub init_db
 		"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
 		"AND (weekday >= WEEKDAY(?) ".
 		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)))"
-	) or FATAL "Error preparing weekday offpeak statement: ".$dbh->errstr;
+	) or FATAL "Error preparing weekday offpeak statement: ".$billdbh->errstr;
 
-	$sth_offpeak_special = $dbh->prepare(
+	$sth_offpeak_special = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end) ".
 		"FROM billing.billing_peaktime_special ".
 		"WHERE billing_profile_id = ? ".
@@ -196,9 +213,9 @@ sub init_db
 		"OR start >= ? AND end <= DATE_ADD(?, INTERVAL ? SECOND) ".
 		"OR start <= DATE_ADD(?, INTERVAL ? SECOND) AND end >= DATE_ADD(?, INTERVAL ? SECOND) ".
 		")"
-	) or FATAL "Error preparing special offpeak statement: ".$dbh->errstr;
+	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
 
-	$sth_unrated_cdrs = $dbh->prepare(
+	$sth_unrated_cdrs = $acctdbh->prepare(
 		"SELECT id, ".
 		"source_user_id, source_provider_id, ".
 		"destination_user_id, destination_provider_id, ".
@@ -207,19 +224,19 @@ sub init_db
 		"start_time, duration, call_status, IF(is_fragmented IS NULL, 0, is_fragmented) AS is_fragmented ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"ORDER BY start_time ASC LIMIT 100 " # ."FOR UPDATE"
-	) or FATAL "Error preparing unrated cdr statement: ".$dbh->errstr;
+	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
 
-	$sth_update_cdr = $dbh->prepare(
+	$sth_update_cdr = $acctdbh->prepare(
 		"UPDATE accounting.cdr SET ".
 		"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
 		"rated_at = now(), rating_status = ?, ".
 		"carrier_billing_fee_id = ?, reseller_billing_fee_id = ?, customer_billing_fee_id = ?, ".
 		"carrier_billing_zone_id = ?, reseller_billing_zone_id = ?, customer_billing_zone_id = ? ".
 		"WHERE id = ?"
-	) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
+	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
 	if($split_peak_parts) {
-		$sth_update_cdr_split = $dbh->prepare(
+		$sth_update_cdr_split = $acctdbh->prepare(
 			"UPDATE accounting.cdr SET ".
 			"carrier_cost = ?, reseller_cost = ?, customer_cost = ?, ".
 			"rated_at = now(), rating_status = ?, ".
@@ -228,9 +245,9 @@ sub init_db
 			"frag_carrier_onpeak = ?, frag_reseller_onpeak = ?, frag_customer_onpeak = ?, is_fragmented = ?, ".
 			"duration = ? ".
 			"WHERE id = ?"
-		) or FATAL "Error preparing update cdr statement: ".$dbh->errstr;
+		) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
-		$sth_create_cdr_fragment = $dbh->prepare(
+		$sth_create_cdr_fragment = $acctdbh->prepare(
 			"INSERT INTO accounting.cdr
 			            (source_user_id,source_provider_id,source_user,source_domain,
 			             source_cli,source_clir,destination_user_id,destination_provider_id,
@@ -244,18 +261,18 @@ sub init_db
 			             start_time + INTERVAL ? SECOND,duration - ?,call_id,is_fragmented
 			        FROM accounting.cdr
 			       WHERE id = ?
-			") or FATAL "Error preparing create cdr fragment statement: ".$dbh->errstr;
+			") or FATAL "Error preparing create cdr fragment statement: ".$acctdbh->errstr;
 	}
 
-	$sth_provider_info = $dbh->prepare(
+	$sth_provider_info = $billdbh->prepare(
 		"SELECT p.class, bm.billing_profile_id ".
 		"FROM billing.products p, billing.billing_mappings bm ".
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-	) or FATAL "Error preparing provider info statement: ".$dbh->errstr;
+	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
-	$sth_reseller_info = $dbh->prepare(
+	$sth_reseller_info = $billdbh->prepare(
 		"SELECT bm.billing_profile_id ".
 		"FROM billing.billing_mappings bm, billing.voip_subscribers vs, ".
 		"billing.contracts c ".
@@ -263,42 +280,42 @@ sub init_db
 		"AND c.reseller_id = bm.contract_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
-	) or FATAL "Error preparing reseller info statement: ".$dbh->errstr;
+	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
 	
-	$sth_get_cbalance = $dbh->prepare(
+	$sth_get_cbalance = $billdbh->prepare(
 		"SELECT id, cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
 		"end >= ? ORDER BY start ASC"
-	) or FATAL "Error preparing get contract balance statement: ".$dbh->errstr;
+	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 	
-	$sth_get_last_cbalance = $dbh->prepare(
+	$sth_get_last_cbalance = $billdbh->prepare(
 		"SELECT id, end, cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
 		"start <= ? AND end <= ? ORDER BY end DESC LIMIT 1"
-	) or FATAL "Error preparing get last contract balance statement: ".$dbh->errstr;
+	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
-	$sth_new_cbalance_week = $dbh->prepare(
+	$sth_new_cbalance_week = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? WEEK) )"
-	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
+	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
-	$sth_new_cbalance_month = $dbh->prepare(
+	$sth_new_cbalance_month = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"DATE_ADD(?, INTERVAL 1 SECOND), ".
 		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH)))), ".
 		"NULL)"
-	) or FATAL "Error preparing create contract balance statement: ".$dbh->errstr;
+	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 	
-	$sth_update_cbalance = $dbh->prepare(
+	$sth_update_cbalance = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
 		"cash_balance = ?, cash_balance_interval = ?, ".
 		"free_time_balance = ?, free_time_balance_interval = ? ".
 		"WHERE id = ?"
-	) or FATAL "Error preparing update contract balance statement: ".$dbh->errstr;
+	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
 	return 1;
 }
@@ -312,7 +329,7 @@ sub create_contract_balance
 
 	my $sth = $sth_get_last_cbalance;
 	$sth->execute($binfo->{contract_id}, $cdr->{start_time}, $cdr->{start_time})
-		or FATAL "Error executing get contract balance statement: ".$dbh->errstr;
+		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 
 	# TODO: we could just create a new one, we just have to know when to start
@@ -370,9 +387,9 @@ sub create_contract_balance
 		$new_free_balance, $new_free_balance_int, 
 		$last_end, 
 		$last_end, $binfo->{int_count})
-		or FATAL "Error executing new contract balance statement: ".$dbh->errstr;
+		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
 
-	$r_res->{id} = $dbh->last_insert_id(undef, undef, undef, undef);
+	$r_res->{id} = $billdbh->last_insert_id(undef, undef, undef, undef);
 	$r_res->{cash_balance} = $new_cash_balance;
 	$r_res->{cash_balance_interval} = $new_cash_balance_int;
 	$r_res->{free_time_balance} = $new_free_balance;
@@ -393,7 +410,7 @@ sub get_contract_balance
 	my $sth = $sth_get_cbalance;
 	$sth->execute(
 		$binfo->{contract_id}, $cdr->{start_time})
-		or FATAL "Error executing get contract balance statement: ".$dbh->errstr;
+		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 
 	unless(@$res)
@@ -452,7 +469,7 @@ sub get_contract_balance
 			$balance{cash_balance}, $balance{cash_balance_interval},
 			$balance{free_time_balance}, $balance{free_time_balance_interval},
 			$balance{id})
-			or FATAL "Error executing update contract balance statement: ".$dbh->errstr;
+			or FATAL "Error executing update contract balance statement: ".$sth->errstr;
 
 		push @$r_balances, \%balance;
 	}
@@ -488,7 +505,7 @@ sub get_billing_info
 	my $sth = $sth_billing_info;
 
 	$sth->execute($uid, $start_str, $start_str) or
-		FATAL "Error executing billing info statement: ".$dbh->errstr;
+		FATAL "Error executing billing info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No billing info found for uuid '".$uid."'\n" unless @res;
 
@@ -537,7 +554,7 @@ sub get_profile_info
 
 	unless(@res) {
 		$sth->execute($bpid, $type, $destination)
-			or FATAL "Error executing profile info statement: ".$dbh->errstr;
+			or FATAL "Error executing profile info statement: ".$sth->errstr;
 		@res = $sth->fetchrow_array();
 	}
 
@@ -577,7 +594,7 @@ sub get_offpeak_weekdays
 		$bpid,
 		$start, $start, $duration,
 		$start, $start, $duration
-	) or FATAL "Error executing weekday offpeak statement: ".$dbh->errstr;
+	) or FATAL "Error executing weekday offpeak statement: ".$sth->errstr;
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -605,7 +622,7 @@ sub get_offpeak_special
 		$start, $start,
 		$start, $start, $duration,
 		$start, $duration, $start, $duration
-	) or FATAL "Error executing special offpeak statement: ".$dbh->errstr;
+	) or FATAL "Error executing special offpeak statement: ".$sth->errstr;
 
 	while(my @res = $sth->fetchrow_array())
 	{
@@ -661,7 +678,7 @@ sub get_unrated_cdrs
 
 	my $sth = $sth_unrated_cdrs;
 	$sth->execute
-		or FATAL "Error executing unrated cdr statement: ".$dbh->errstr;
+		or FATAL "Error executing unrated cdr statement: ".$sth->errstr;
 
 	while(my $res = $sth->fetchrow_hashref())
 	{
@@ -689,7 +706,7 @@ sub update_cdr
 			$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
 			$cdr->{frag_carrier_onpeak}, $cdr->{frag_reseller_onpeak}, $cdr->{frag_customer_onpeak}, $cdr->{is_fragmented}, $cdr->{duration},
 			$cdr->{id})
-			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+			or FATAL "Error executing update cdr statement: ".$sth->errstr;
 
 	} else {
 
@@ -698,7 +715,7 @@ sub update_cdr
 			$cdr->{carrier_billing_fee_id}, $cdr->{reseller_billing_fee_id}, $cdr->{customer_billing_fee_id},
 			$cdr->{carrier_billing_zone_id}, $cdr->{reseller_billing_zone_id}, $cdr->{customer_billing_zone_id},
 			$cdr->{id})
-			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+			or FATAL "Error executing update cdr statement: ".$sth->errstr;
 	}
 
 	return 1;
@@ -712,11 +729,11 @@ sub update_failed_cdr
 		my $sth = $sth_update_cdr_split;
 		$sth->execute(undef, undef, undef, 'failed', undef, undef, undef, undef, undef, undef,
 		              undef, undef, undef, $cdr->{is_fragmented}, $cdr->{duration}, $cdr->{id})
-			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+			or FATAL "Error executing update cdr statement: ".$sth->errstr;
 	} else {
 		my $sth = $sth_update_cdr;
 		$sth->execute(undef, undef, undef, 'failed', undef, undef, undef, undef, undef, undef, $cdr->{id})
-			or FATAL "Error executing update cdr statement: ".$dbh->errstr;
+			or FATAL "Error executing update cdr statement: ".$sth->errstr;
 	}
 	return 1;
 }
@@ -729,7 +746,7 @@ sub get_provider_info
 
 	my $sth = $sth_provider_info;
 	$sth->execute($pid, $start, $start)
-		or FATAL "Error executing provider info statement: ".$dbh->errstr;
+		or FATAL "Error executing provider info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No provider info for provider id $pid found\n" 
 		unless(@res);
@@ -748,7 +765,7 @@ sub get_reseller_info
 	
 	my $sth = $sth_reseller_info;
 	$sth->execute($uuid, $start, $start)
-		or FATAL "Error executing reseller info statement: ".$dbh->errstr;
+		or FATAL "Error executing reseller info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No reseller info for user id $uuid found\n" 
 		unless(@res);
@@ -1191,7 +1208,8 @@ sub main
 			next;
 		}
 
-		$dbh->begin_work or FATAL "Error starting transaction: ".$dbh->errstr;
+		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
+		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
 
 		foreach my $cdr(@cdrs)
 		{
@@ -1203,7 +1221,8 @@ sub main
 			$rated++;
 		}
 
-		$dbh->commit or FATAL "Error committing cdrs: ".$dbh->errstr;
+		$billdbh->commit or FATAL "Error committing cdrs: ".$billdbh->errstr;
+		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
 
 		DEBUG "$rated CDRs rated so far.\n";
 	}
@@ -1231,6 +1250,7 @@ sub main
 	$sth_lnp_profile_info->finish;
 
 
-	$dbh->disconnect;
+	$billdbh->disconnect;
+	$acctdbh->disconnect;
 	closelog;
 }
