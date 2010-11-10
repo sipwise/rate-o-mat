@@ -19,8 +19,8 @@ build-stamp:
 	mkdir -p ce/etc/default
 	tpage --define PRO=true   ngcp-rate-o-mat.default.tt2 >pro/etc/default/ngcp-rate-o-mat.tt2
 	tpage                     ngcp-rate-o-mat.default.tt2 >ce/etc/default/ngcp-rate-o-mat.tt2
-	install -m 644 ngcp-rate-o-mat.services   pro/etc/default/ngcp-rate-o-mat.services
-	install -m 644 ngcp-rate-o-mat.services   ce/etc/default/ngcp-rate-o-mat.services
+	tpage --define PRO=true   ngcp-rate-o-mat.services >pro/etc/default/ngcp-rate-o-mat.services
+	tpage                     ngcp-rate-o-mat.services >ce/etc/default/ngcp-rate-o-mat.services
 	touch $@
 
 clean:

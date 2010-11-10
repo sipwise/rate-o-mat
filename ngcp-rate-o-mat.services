@@ -1,2 +1,3 @@
+[% TAGS [- -] %]
 #!/bin/bash
 /etc/init.d/ngcp-rate-o-mat restart
