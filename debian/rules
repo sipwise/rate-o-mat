@@ -31,6 +31,7 @@ install: build
 
 	install -m 755 rate-o-mat.pl   debian/ngcp-rate-o-mat/usr/sbin/rate-o-mat
 	install -m 644 ngcp-rate-o-mat.default.tt2   debian/ngcp-rate-o-mat/etc/ngcp-config/templates/etc/default/ngcp-rate-o-mat.tt2
+	install -m 644 ngcp-rate-o-mat.services   debian/ngcp-rate-o-mat/etc/ngcp-config/templates/etc/default/ngcp-rate-o-mat.services
 	# drop svn files:
 	find debian/ngcp-rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
 
