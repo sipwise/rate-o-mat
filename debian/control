@@ -1,15 +1,29 @@
 Source: ngcp-rate-o-mat
 Section: utils
 Priority: extra
-Maintainer: Michael Prokop <mprokop@sipwise.com>
-Build-Depends: debhelper (>= 5)
-Standards-Version: 3.8.4
+Maintainer: Daniel Tiefnig <dtiefnig@sipwise.com>
+Build-Depends: debhelper (>= 5), libtemplate-perl
+Standards-Version: 3.9.1
 Homepage: http://sipwise.com/
-Vcs-svn: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
-Vcs-Browser: https://dev.sipwise.com/svn/voip-tools/rate-o-mat
+
+Package: ngcp-templates-ce-rate-o-mat
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, ngcp-templates-ce-config
+Conflicts: ngcp-templates-pro-rate-o-mat
+Provides: ngcp-templates-rate-o-mat
+Description: Configuration templates for rate-o-mat
+ Config file templates for the rate-o-mat rating daemon.
+
+Package: ngcp-templates-pro-rate-o-mat
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, ngcp-templates-pro-config
+Conflicts: ngcp-templates-ce-rate-o-mat
+Provides: ngcp-templates-rate-o-mat
+Description: Configuration templates for rate-o-mat
+ Config file templates for the rate-o-mat rating daemon.
 
 Package: ngcp-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libclass-dbi-mysql-perl
-Description: Rate import/export scripts for NGCP platform
- Scripts for import/export rates in a NGCP platform.
+Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libdbd-mysql-perl
+Description: Rating daemon for the NGCP
+ Perl daemon to rate CDRs in an NGCP.

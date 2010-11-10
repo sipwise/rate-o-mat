@@ -1,3 +1,4 @@
+[% TAGS [- -] %]
 # Options for the NGCP rate-o-mat
 
 # how long we shall sleep before looking for unrated CDRs again

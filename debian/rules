@@ -7,58 +7,98 @@
 # This special exception was added by Craig Small in version 0.37 of dh-make.
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+# export DH_VERBOSE=1
+
+b=$(CURDIR)/debian/build
 
 build: build-stamp
 
 build-stamp:
 	dh_testdir
-	#cd docs && make && cd ..
+	mkdir -p pro/etc/default
+	mkdir -p ce/etc/default
+	tpage --define PRO=true   ngcp-rate-o-mat.default.tt2 >pro/etc/default/ngcp-rate-o-mat.tt2
+	tpage                     ngcp-rate-o-mat.default.tt2 >ce/etc/default/ngcp-rate-o-mat.tt2
+	install -m 644 ngcp-rate-o-mat.services   pro/etc/default/ngcp-rate-o-mat.services
+	install -m 644 ngcp-rate-o-mat.services   ce/etc/default/ngcp-rate-o-mat.services
 	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp
-	#cd docs && make clean && cd ..
+	rm -rf $(b) pro ce
 	dh_clean
 
 install: build
 	dh_testdir
 	dh_testroot
 	dh_clean -k
-	dh_installdirs usr/sbin etc/ngcp-config/templates/etc/default
+	dh_installdirs
 
-	install -m 755 rate-o-mat.pl   debian/ngcp-rate-o-mat/usr/sbin/rate-o-mat
-	install -m 644 ngcp-rate-o-mat.default.tt2   debian/ngcp-rate-o-mat/etc/ngcp-config/templates/etc/default/ngcp-rate-o-mat.tt2
-	install -m 644 ngcp-rate-o-mat.services   debian/ngcp-rate-o-mat/etc/ngcp-config/templates/etc/default/ngcp-rate-o-mat.services
-	# drop svn files:
-	find debian/ngcp-rate-o-mat -type d -name \.svn -print0 | xargs -0 rm -rf
+ngcp-rate-o-mat:
+	@echo "--- Building: $@"
+	dh_installdirs       -p$@ -P$(b)/$@
+	dh_installdocs       -p$@ -P$(b)/$@
+	dh_installchangelogs -p$@ -P$(b)/$@
+	dh_install           -p$@ -P$(b)/$@
+	# we have to do this manually, 'cause dh_install can't rename files
+	install -m 755 rate-o-mat.pl   $(b)/$@/usr/sbin/rate-o-mat
+	dh_installexamples   -p$@ -P$(b)/$@
+	dh_installman        -p$@ -P$(b)/$@
+	dh_link              -p$@ -P$(b)/$@
+	dh_strip             -p$@ -P$(b)/$@
+	dh_compress          -p$@ -P$(b)/$@
+	dh_fixperms          -p$@ -P$(b)/$@
+	#dh_perl              -p$@ -P$(b)/$@
+	dh_makeshlibs        -p$@ -P$(b)/$@ -V
+	dh_installdeb        -p$@ -P$(b)/$@
+	dh_shlibdeps         -p$@ -P$(b)/$@
+	dh_installdebconf    -p$@ -P$(b)/$@
+	dh_gencontrol        -p$@ -P$(b)/$@
+	dh_md5sums           -p$@ -P$(b)/$@
+	dh_builddeb          -p$@ -P$(b)/$@
 
-# Build architecture-dependent files here.
-binary-arch: build install
-# We have nothing to do by default.
+ngcp-templates-ce-rate-o-mat:
+	@echo "--- Building: $@"
+	dh_installdirs       -p$@ -P$(b)/$@
+	dh_link              -p$@ -P$(b)/$@
+	dh_installdocs       -p$@ -P$(b)/$@
+	dh_installchangelogs -p$@ -P$(b)/$@
+	dh_install           -p$@ -P$(b)/$@
+	dh_strip             -p$@ -P$(b)/$@
+	dh_compress          -p$@ -P$(b)/$@
+	dh_fixperms          -p$@ -P$(b)/$@
+	dh_makeshlibs        -p$@ -P$(b)/$@ -V
+	dh_installdeb        -p$@ -P$(b)/$@
+	dh_shlibdeps         -p$@ -P$(b)/$@
+	dh_installdebconf    -p$@ -P$(b)/$@
+	dh_gencontrol        -p$@ -P$(b)/$@
+	dh_md5sums           -p$@ -P$(b)/$@
+	dh_builddeb          -p$@ -P$(b)/$@
 
-# Build architecture-independent files here.
-binary-indep: build install
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs
-	dh_installdocs
-	dh_installexamples
-	#dh_installman docs/rate-o-mat.8
-	dh_installinit
-	dh_link
-	dh_strip
-	#mkdir -p $(CURDIR)/debian/ngcp-rate-o-mat/usr/share/lintian/overrides/
-	#cp -av debian/overrides $(CURDIR)/debian/ngcp-rate-o-mat/usr/share/lintian/overrides/ngcp-rate-o-mat
-	dh_compress
-	dh_fixperms
-	dh_installdeb
-	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
+ngcp-templates-pro-rate-o-mat:
+	@echo "--- Building: $@"
+	dh_installdirs       -p$@ -P$(b)/$@
+	dh_link              -p$@ -P$(b)/$@
+	dh_installdocs       -p$@ -P$(b)/$@
+	dh_installchangelogs -p$@ -P$(b)/$@
+	dh_install           -p$@ -P$(b)/$@
+	dh_strip             -p$@ -P$(b)/$@
+	dh_compress          -p$@ -P$(b)/$@
+	dh_fixperms          -p$@ -P$(b)/$@
+	dh_makeshlibs        -p$@ -P$(b)/$@ -V
+	dh_installdeb        -p$@ -P$(b)/$@
+	dh_shlibdeps         -p$@ -P$(b)/$@
+	dh_installdebconf    -p$@ -P$(b)/$@
+	dh_gencontrol        -p$@ -P$(b)/$@
+	dh_md5sums           -p$@ -P$(b)/$@
+	dh_builddeb          -p$@ -P$(b)/$@
+
+binary-all: build install
+
+binary-indep: build install ngcp-rate-o-mat \
+	ngcp-templates-ce-rate-o-mat ngcp-templates-pro-rate-o-mat
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install

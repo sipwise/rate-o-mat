@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (0.3.0) unstable; urgency=low
+
+  * created templates for centralized config
+  * created template packages
+  * couple of smaller packaging and installer bugfixes
+
+ -- Daniel Tiefnig <dtiefnig@sipwise.com>  Wed, 10 Nov 2010 16:14:10 +0100
+
 ngcp-rate-o-mat (0.2.0-1) unstable; urgency=low
 
   * ignoring customer/reseller/provider if no billing_profile is found
