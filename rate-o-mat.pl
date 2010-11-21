@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
+use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
-use DBI;
+use DBIx::RetryOverDisconnects;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB);
 use IO::Handle;
@@ -135,9 +136,9 @@ sub set_start_strtime
 
 sub init_db
 {
-	$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1})
+	$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
-	$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1})
+	$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
 
 	$sth_billing_info = $billdbh->prepare(
