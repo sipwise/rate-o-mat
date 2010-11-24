@@ -1,7 +1,8 @@
 #!/usr/bin/perl -w
 use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
-use DBIx::RetryOverDisconnects;
+#use DBIx::RetryOverDisconnects;
+use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB);
 use IO::Handle;
@@ -136,9 +137,11 @@ sub set_start_strtime
 
 sub init_db
 {
-	$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+	#$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+	$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
-	$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+	#$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+	$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1})
 		or FATAL "Error connecting do db: ".$DBI::errstr;
 
 	$sth_billing_info = $billdbh->prepare(
