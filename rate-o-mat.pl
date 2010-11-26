@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
-use DBIx::RetryOverDisconnects;
-#use DBI;
+#use DBIx::RetryOverDisconnects;
+use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB);
 use IO::Handle;
@@ -69,6 +69,8 @@ my $sth_get_last_cbalance;
 my $sth_lnp_number;
 my $sth_lnp_profile_info;
 
+my $connect_interval = 3;
+
 main;
 exit 0;
 
@@ -134,15 +136,39 @@ sub set_start_strtime
 	return 0;
 }
 
+sub connect_billdbh
+{
+	#$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+
+	do {
+		INFO "Trying to connect to billing db...";
+		$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0});
+	} while(!defined $billdbh && $DBI::err == 2002 && !$shutdown && sleep $connect_interval);
+	
+	FATAL "Error connecting to db: ".$DBI::errstr
+		unless defined($billdbh);
+	INFO "Successfully connected to billing db...";
+}
+
+sub connect_acctdbh
+{
+	#$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
+
+	do {
+		INFO "Trying to connect to accounting db...";
+		$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0});
+	} while(!defined $acctdbh && $DBI::err == 2002 && !$shutdown && sleep $connect_interval);
+
+	FATAL "Error connecting to db: ".$DBI::errstr
+		unless defined($acctdbh);
+	INFO "Successfully connected to accounting db...";
+}
+
 
 sub init_db
 {
-	$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
-	#$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1})
-		or FATAL "Error connecting do db: ".$DBI::errstr;
-	$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
-	#$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1})
-		or FATAL "Error connecting do db: ".$DBI::errstr;
+	connect_billdbh;
+	connect_acctdbh;
 
 	$sth_billing_info = $billdbh->prepare(
 		"SELECT a.contract_id, b.billing_profile_id, ".
@@ -1202,12 +1228,15 @@ sub main
 	INFO "Up and running.\n";
 	while(!$shutdown)
 	{
+		$billdbh->ping || init_db;
+		$acctdbh->ping || init_db;
+
 		my @cdrs = ();
 		get_unrated_cdrs(\@cdrs)
 			or FATAL "Error getting next bunch of CDRs\n";
 		unless(@cdrs)
 		{
-			#DEBUG "No new CDRs to rate, sleep $loop_interval";
+			DEBUG "No new CDRs to rate, sleep $loop_interval";
 			sleep($loop_interval);
 			next;
 		}
