@@ -44,7 +44,6 @@ ngcp-rate-o-mat:
 	dh_install           -p$@ -P$(b)/$@
 	# we have to do this manually, 'cause dh_install can't rename files
 	install -m 755 rate-o-mat.pl   $(b)/$@/usr/sbin/rate-o-mat
-	install -m 644 RetryOverDisconnects.pm   $(b)/$@/usr/share/ngcp-rate-o-mat/DBIx/RetryOverDisconnects.pm
 	dh_installexamples   -p$@ -P$(b)/$@
 	dh_installman        -p$@ -P$(b)/$@
 	dh_installinit        -p$@ -P$(b)/$@

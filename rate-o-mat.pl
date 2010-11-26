@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
-#use DBIx::RetryOverDisconnects;
 use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB);
@@ -81,10 +80,12 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	$billdbh->rollback if defined $billdbh;
-	$acctdbh->rollback if defined $acctdbh;
+	unless($DBI::err == 2006)
+	{
+		$billdbh->rollback if defined $billdbh;
+		$acctdbh->rollback if defined $acctdbh;
+	}
 	syslog('crit', $msg);
-	closelog();
 	die "$msg\n";
 }
 
@@ -138,12 +139,10 @@ sub set_start_strtime
 
 sub connect_billdbh
 {
-	#$billdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
-
 	do {
 		INFO "Trying to connect to billing db...";
-		$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0});
-	} while(!defined $billdbh && $DBI::err == 2002 && !$shutdown && sleep $connect_interval);
+		$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0, PrintWarn => 0});
+	} while(!defined $billdbh && ($DBI::err == 2002 || $DBI::err == 2003) && !$shutdown && sleep $connect_interval);
 	
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
@@ -152,12 +151,10 @@ sub connect_billdbh
 
 sub connect_acctdbh
 {
-	#$acctdbh = DBIx::RetryOverDisconnects->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, ReconnectRetries => $ENV{RATEOMAT_DB_RECONNECT_RETRIES}, ReconnectInterval => $ENV{RATEOMAT_DB_RECONNECT_INTERVAL}, ReconnectTimeout => $ENV{RATEOMAT_DB_RECONNECT_TIMEOUT}, TxnRetries => $ENV{RATEOMAT_DB_TNX_RETRIES}, PrintError => $ENV{RATEOMAT_DB_PRINT_ERROR}})
-
 	do {
 		INFO "Trying to connect to accounting db...";
-		$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0});
-	} while(!defined $acctdbh && $DBI::err == 2002 && !$shutdown && sleep $connect_interval);
+		$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0, PrintWarn => 0});
+	} while(!defined $acctdbh && ($DBI::err == 2002 || $DBI::err == 2003) && !$shutdown && sleep $connect_interval);
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
@@ -1232,8 +1229,17 @@ sub main
 		$acctdbh->ping || init_db;
 
 		my @cdrs = ();
-		get_unrated_cdrs(\@cdrs)
-			or FATAL "Error getting next bunch of CDRs\n";
+		eval { get_unrated_cdrs(\@cdrs); };
+		if($@) 
+		{
+			if($DBI::err == 2006)
+			{
+				INFO "DB connection gone, retrying...";
+				next;
+			}
+			FATAL "Error getting next bunch of CDRs: " . $@;
+		}
+
 		unless(@cdrs)
 		{
 			DEBUG "No new CDRs to rate, sleep $loop_interval";
@@ -1244,14 +1250,25 @@ sub main
 		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
 		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
 
-		foreach my $cdr(@cdrs)
+		eval 
 		{
-			DEBUG "rate cdr #".$cdr->{id}."\n";
-			rate_cdr($cdr, $type)
-				or FATAL "Error rating CDR id ".$cdr->{id}."\n";
-			update_cdr($cdr)
-				or FATAL "Error updating CDR id ".$cdr->{id}."\n";
-			$rated++;
+			foreach my $cdr(@cdrs)
+			{
+				DEBUG "rate cdr #".$cdr->{id}."\n";
+				rate_cdr($cdr, $type);
+				update_cdr($cdr);
+				$rated++;
+			}
+		};
+		if($@)
+		{
+			INFO "Caught DBI:err ".$DBI::err, "\n";
+			if($DBI::err == 2006)
+			{
+				INFO "DB connection gone, retrying...";
+				next;
+			}
+			FATAL "Error rating CDR batch: " . $@;
 		}
 
 		$billdbh->commit or FATAL "Error committing cdrs: ".$billdbh->errstr;
