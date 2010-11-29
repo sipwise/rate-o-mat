@@ -197,9 +197,9 @@ sub init_db
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zone_id, use_free_time ".
-		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
-		"AND type = ? AND ? REGEXP(destination) ".
+		"billing_zones_history_id, use_free_time ".
+		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
+		"AND bf_id IS NOT NULL AND type = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
@@ -209,11 +209,11 @@ sub init_db
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zone_id, use_free_time ".
-		"FROM billing.billing_fees WHERE billing_profile_id = ? ".
-		"AND type = ? AND destination = ? ".
+		"billing_zones_history_id, use_free_time ".
+		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
+		"AND bf_id IS NOT NULL AND type = ? AND destination = ? ".
 		"LIMIT 1"
-	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
+	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
 	$sth_offpeak_weekdays = $billdbh->prepare(
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
