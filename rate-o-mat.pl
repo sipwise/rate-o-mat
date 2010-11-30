@@ -1035,54 +1035,35 @@ sub rate_cdr
 	if($cdr->{source_user_id} eq "0")
 	{
 		# caller is not local
-
-		if($cdr->{source_provider_id} eq "0")
-		{
-			WARNING "CDR id ".$cdr->{id}." has no source uid/pid!\n";
-			update_failed_cdr($cdr);
-			return 1;
-		}
-		if($cdr->{destination_user_id} eq "0")
-		{
-			# a relay? must not happen!
-			WARNING "CDR id ".$cdr->{id}." has wether source nor destination uid/pid!\n";
-			update_failed_cdr($cdr);
-			return 1;
-		}
-
 		# TODO: should there be an incoming profile to calculate termination fees?
 	
-		$customer_cost = 0;
-		$carrier_cost = 0;
-		$reseller_cost = 0;
+		$cdr->{carrier_cost} = $carrier_cost;
+		$cdr->{reseller_cost} = $reseller_cost;
+		$cdr->{customer_cost} = $customer_cost;
+		return 1;
 	}
-	else
+
+	# caller is local
+
+	my %provider_info = ();
+	my %reseller_info = ();
+	my $dst_class;
+	my $domain_first = 0;
+	my $rating_duration;
+	my $fragmentation = 0;
+
+	if($cdr->{destination_provider_id} eq "0")
 	{
-		# caller is local
+		# call to voicebox or conference?
+		WARNING "CDR id ".$cdr->{id}." has no destination provider id\n";
 
-		if($cdr->{source_provider_id} eq "0")
-		{
-			WARNING "CDR id ".$cdr->{id}." has no source provider id\n";
-			update_failed_cdr($cdr);
-			return 1;
-		}
-		if($cdr->{destination_provider_id} eq "0")
-		{
-			WARNING "CDR id ".$cdr->{id}." has no destination provider id\n";
-			update_failed_cdr($cdr);
-			return 1;
-		}
+		$dst_class = 'reseller';
 
-		my %provider_info = ();
+	} else {
+
 		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_date},
 			\%provider_info)
 			or FATAL "Error getting destination provider info\n";
-
-		my %reseller_info = ();
-		my $dst_class;
-		my $domain_first = 0;
-		my $rating_duration;
-		my $fragmentation = 0;
 
 		if($provider_info{class} eq "reseller")
 		{
@@ -1117,7 +1098,7 @@ sub rate_cdr
 					$fragmentation = 1;
 				}
 			}
-	
+
 			# for reseller we first have to find the billing profile
 			%reseller_info = ();
 			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
@@ -1148,14 +1129,16 @@ sub rate_cdr
 			FATAL "Destination provider id ".$cdr->{destination_provider_id}." has invalid ".
 				"class '".$provider_info{class}."' in cdr ".$cdr->{id}."\n";
 		}
-			
-		get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost, \$rating_duration)
-			or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
+	}
+		
+	get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost, \$rating_duration)
+		or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
 
-		if($split_peak_parts and $cdr->{duration} > $rating_duration) {
-			DEBUG "customer rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
-			$cdr->{duration} = $rating_duration;
-			$cdr->{is_fragmented} = 1;
+	if($split_peak_parts and $cdr->{duration} > $rating_duration) {
+		DEBUG "customer rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
+		$cdr->{duration} = $rating_duration;
+		$cdr->{is_fragmented} = 1;
+		if($cdr->{destination_provider_id} ne "0") {
 			if($dst_class eq 'reseller') {
 				if($provider_info{profile_id}) {
 					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$rating_duration)
@@ -1167,7 +1150,7 @@ sub rate_cdr
 						or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
 					if($cdr->{duration} != $rating_duration) {
 						FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
-					      	". Customer and carrier profiles don't match.\n";
+				      		". Customer and carrier profiles don't match.\n";
 					}
 				}
 				if($reseller_info{profile_id}) {
@@ -1177,21 +1160,20 @@ sub rate_cdr
 			}
 			if($cdr->{duration} != $rating_duration) {
 				FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
-				      ". Customer and reseller profiles don't match.\n";
+			      	". Customer and reseller profiles don't match.\n";
 			}
-		} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
-			DEBUG "rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
-			FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
-			      ". Customer and reseller/carrier profiles don't match.\n";
 		}
-
-		if($split_peak_parts and $fragmentation) {
-			my $sth = $sth_create_cdr_fragment;
-			$sth->execute($rating_duration, $rating_duration, $cdr->{id})
-				or FATAL "Error executing create cdr fragment statement: ".$sth->errstr;
-		}
+	} elsif($rating_duration > $cdr->{duration} and $fragmentation) {
+		DEBUG "rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
+		FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
+		      ". Customer and reseller/carrier profiles don't match.\n";
 	}
 
+	if($split_peak_parts and $fragmentation) {
+		my $sth = $sth_create_cdr_fragment;
+		$sth->execute($rating_duration, $rating_duration, $cdr->{id})
+			or FATAL "Error executing create cdr fragment statement: ".$sth->errstr;
+	}
 
 	$cdr->{carrier_cost} = $carrier_cost;
 	$cdr->{reseller_cost} = $reseller_cost;
@@ -1269,8 +1251,8 @@ sub main
 			foreach my $cdr(@cdrs)
 			{
 				DEBUG "rate cdr #".$cdr->{id}."\n";
-				rate_cdr($cdr, $type);
-				update_cdr($cdr);
+				rate_cdr($cdr, $type)
+				    && update_cdr($cdr);
 				$rated++;
 			}
 		};
