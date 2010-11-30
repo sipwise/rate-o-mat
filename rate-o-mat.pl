@@ -464,19 +464,35 @@ sub get_contract_balance
 			if($binfo->{prepaid} == 1)
 			{
 				WARNING "TODO: do we need to process prepaid balances here?";
+				### should have been handled during call - why are we here anyway?
 			}
 			else
 			{
-				if($pinfo->{use_free_time} && $balance{free_time_balance} >= $$rduration)
+				if($pinfo->{use_free_time} && $balance{free_time_balance} > 0)
 				{
 					$balance{free_time_balance} -= $$rduration;
-					$balance{free_time_balance_interval} += $$rduration;
-					$$cost = 0;
+					if($balance{free_time_balance} >= 0) {
+						$balance{free_time_balance_interval} += $$rduration;
+						$$cost = 0;
+					} else {   # partial free-time payment
+						$balance{free_time_balance} *= -1;
+						$$cost *= $balance{free_time_balance} / $$rduration;
+						$balance{free_time_balance_interval} += $$rduration - $balance{free_time_balance};
+						$balance{free_time_balance} = 0;
+					}
 				}
-				else
+				if($$cost and $balance{cash_balance} > 0)
 				{
-					# TODO: also decrement cash balance? Is this possible for post-paid?
-					$balance{cash_balance_interval} += $$cost;
+					$balance{cash_balance} -= $$cost;
+					if($balance{cash_balance} >= 0) {
+						$balance{cash_balance_interval} += $$cost;
+						$$cost = 0;
+					} else {  # partial free-cash payment
+						$balance{cash_balance} *= -1;
+						$balance{cash_balance_interval} += $$cost - $balance{cash_balance};
+						$$cost = $balance{cash_balance};
+						$balance{cash_balance} = 0;
+					}
 				}
 			}
 		}
@@ -996,8 +1012,6 @@ sub get_provider_call_cost
 		$cdr->{frag_carrier_onpeak} = $onpeak if $split_peak_parts;
 	}
 	
-	# TODO: also update carrier/reseller balance (we're missing the billing_info, right?)
-
 	return 1;
 }
 
