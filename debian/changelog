@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.0.0) unstable; urgency=low
+
+  * reconnecting to database if connection is lost
+  * fixed zone / destination export for deleted billing fees
+  * fixed free time / cash handling
+  * fixed cdr update handling
+
+ -- Daniel Tiefnig <dtiefnig@sipwise.com>  Tue, 30 Nov 2010 04:43:02 +0100
+
 ngcp-rate-o-mat (0.3.0) unstable; urgency=low
 
   * created templates for centralized config
