@@ -900,6 +900,16 @@ sub get_call_cost
 	my $init = 0;
 	my $duration = $cdr->{duration};
 
+	if($duration == 0) {  # zero duration call, yes these are possible
+		if(is_offpeak_special($start_unixtime, $offset, \@offpeak_special)
+                   or is_offpeak_weekday($start_unixtime, $offset, \@offpeak_weekdays))
+		{
+			$$r_onpeak = 0;
+		} else {
+			$$r_onpeak = 1;
+		}
+	}
+
 	while($duration > 0)
 	{
 		if(is_offpeak_special($start_unixtime, $offset, \@offpeak_special))
