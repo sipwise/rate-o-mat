@@ -80,7 +80,7 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	unless($DBI::err == 2006)
+	unless(defined $DBI::err and $DBI::err == 2006)
 	{
 		$billdbh->rollback if defined $billdbh;
 		$acctdbh->rollback if defined $acctdbh;
