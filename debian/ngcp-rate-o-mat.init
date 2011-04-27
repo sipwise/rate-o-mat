@@ -25,7 +25,7 @@ SCRIPTNAME=/etc/init.d/$PACKAGE
 [ -x "$DAEMON" ] || exit 0
 
 # Read configuration variable file if it is present
-[ -r /etc/default/$PACKAGE ] || echo "$NAME: Missing configuration file /etc/default/$PACKAGE, not starting." && exit 1
+[ -r /etc/default/$PACKAGE ] || echo "$NAME: Missing configuration file /etc/default/$PACKAGE, not starting." && exit 0
 . /etc/default/$PACKAGE
 
 # Load the VERBOSE setting and other rcS variables
