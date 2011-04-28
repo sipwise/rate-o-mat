@@ -1,3 +1,15 @@
+ngcp-rate-o-mat (1.1.0) unstable; urgency=low
+
+  [ Daniel Tiefnig ]
+  * Support onpeak / offpeak detection fix for zero duration calls.
+  * Avoid warning on undefined $DBI::err in FATAL().
+  * Only start rate-o-mat daemon if configuration file is present.
+
+  [ Andreas Granig ]
+  * Fixes to properly start rate-o-mat.
+
+ -- Michael Prokop <mprokop@sipwise.com>  Fri, 29 Apr 2011 01:44:25 +0200
+
 ngcp-rate-o-mat (1.0.0) unstable; urgency=low
 
   * reconnecting to database if connection is lost
