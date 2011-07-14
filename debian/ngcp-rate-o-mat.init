@@ -32,6 +32,7 @@ else
         exit 0
 fi
 
+
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
 
@@ -44,6 +45,11 @@ fi
 #
 do_start()
 {
+	if [ "$RATEOMAT_RUN" == "no" ];then
+		echo "$NAME disabled. Not starting."
+		exit 0
+	fi
+
 	# Return
 	#   0 if daemon has been started
 	#   1 if daemon was already running
