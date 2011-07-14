@@ -1,3 +1,10 @@
 [% TAGS [- -] %]
 #!/bin/bash
+[- IF PRO -]
+ngcp-check_active > /dev/null
+if [ "$?" == "0" ]; then
+        monit restart rate-o-mat
+fi
+[- ELSE -]
 /etc/init.d/ngcp-rate-o-mat restart
+[- END -]
