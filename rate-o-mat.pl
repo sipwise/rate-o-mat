@@ -1268,11 +1268,14 @@ sub main
 		};
 		if($@)
 		{
-			INFO "Caught DBI:err ".$DBI::err, "\n";
-			if($DBI::err == 2006)
+			if(defined $DBI::err)
 			{
-				INFO "DB connection gone, retrying...";
-				next;
+				INFO "Caught DBI:err ".$DBI::err, "\n";
+				if($DBI::err == 2006)
+				{
+					INFO "DB connection gone, retrying...";
+					next;
+				}
 			}
 			FATAL "Error rating CDR batch: " . $@;
 		}
