@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          rate-o-mat
 # Required-Start:    $remote_fs $syslog
@@ -45,7 +45,7 @@ fi
 #
 do_start()
 {
-	if [ "$RATEOMAT_RUN" == "no" ];then
+	if [ "$RATEOMAT_RUN" = "no" ];then
 		echo "$NAME disabled. Not starting."
 		exit 0
 	fi
@@ -160,5 +160,3 @@ case "$1" in
 	exit 3
 	;;
 esac
-
-:
