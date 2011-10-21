@@ -185,8 +185,8 @@ sub init_db
 		SELECT lnp_provider_id
 		  FROM lnp_numbers
 		 WHERE ? LIKE CONCAT(number,'%')
-		   AND (start <= ? OR start IS NULL)
-		   AND (end > ? OR end IS NULL)
+		   AND (from_unixtime(start) <= ? OR from_unixtime(start) IS NULL)
+		   AND (from_unixtime(end) > ? OR from_unixtime(end) IS NULL)
 	".       join(", ", "ORDER BY length(number) DESC", @lnp_order_by) ."
                  LIMIT 1
 	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
@@ -215,20 +215,20 @@ sub init_db
 		"LIMIT 1"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
-	$sth_offpeak_weekdays = $billdbh->prepare(
+	$sth_offpeak_weekdays = $billdbh->prepare( # TODO: optimize lines 4 and 10 below
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
 		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(?) <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
-		"AND weekday >= WEEKDAY(?) ".
-		"AND weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
+		"AND WEEKDAY(FROM_UNIXTIME(?)) <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
+		"AND weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
+		"AND weekday <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
 		"UNION ".
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
 		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(?) > WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)) ".
-		"AND (weekday >= WEEKDAY(?) ".
-		"OR weekday <= WEEKDAY(DATE_ADD(?, INTERVAL ? SECOND)))"
+		"AND WEEKDAY(FROM_UNIXTIME(?)) > WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
+		"AND (weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
+		"OR weekday <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)))"
 	) or FATAL "Error preparing weekday offpeak statement: ".$billdbh->errstr;
 
 	$sth_offpeak_special = $billdbh->prepare(
@@ -236,9 +236,9 @@ sub init_db
 		"FROM billing.billing_peaktime_special ".
 		"WHERE billing_profile_id = ? ".
 		"AND ( ".
-		"start <= ? AND end >= ? ".
-		"OR start >= ? AND end <= DATE_ADD(?, INTERVAL ? SECOND) ".
-		"OR start <= DATE_ADD(?, INTERVAL ? SECOND) AND end >= DATE_ADD(?, INTERVAL ? SECOND) ".
+		"start <= FROM_UNIXTIME(?) AND end >= FROM_UNIXTIME(?) ".
+		"OR start >= FROM_UNIXTIME(?) AND end <= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) ".
+		"OR start <= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) AND end >= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) ".
 		")"
 	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
 
@@ -314,7 +314,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"end >= ? ORDER BY start ASC"
+		"from_unixtime(end) >= ? ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 	
 	$sth_get_last_cbalance = $billdbh->prepare(
@@ -322,7 +322,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"start <= ? AND end <= ? ORDER BY end DESC LIMIT 1"
+		"from_unixtime(start) <= ? AND from_unixtime(end) <= ? ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
 	$sth_new_cbalance_week = $billdbh->prepare(
@@ -862,9 +862,6 @@ sub get_call_cost
 
 
 
-	my $start_unixtime;
-	set_start_unixtime($cdr->{start_time}, \$start_unixtime);
-	
 	unless(get_profile_info($profile_id, $type, $destination_class, $first, 
 		$r_profile_info, $cdr->{start_time}))
 	{
@@ -901,8 +898,8 @@ sub get_call_cost
 	my $duration = $cdr->{duration};
 
 	if($duration == 0) {  # zero duration call, yes these are possible
-		if(is_offpeak_special($start_unixtime, $offset, \@offpeak_special)
-                   or is_offpeak_weekday($start_unixtime, $offset, \@offpeak_weekdays))
+		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special)
+                   or is_offpeak_weekday($cdr->{start_time}, $offset, \@offpeak_weekdays))
 		{
 			$$r_onpeak = 0;
 		} else {
@@ -912,12 +909,12 @@ sub get_call_cost
 
 	while($duration > 0)
 	{
-		if(is_offpeak_special($start_unixtime, $offset, \@offpeak_special))
+		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special))
 		{
 			#print "offset $offset is offpeak-special\n";
 			$onpeak = 0;
 		}
-		elsif(is_offpeak_weekday($start_unixtime, $offset, \@offpeak_weekdays))
+		elsif(is_offpeak_weekday($cdr->{start_time}, $offset, \@offpeak_weekdays))
 		{
 			#print "offset $offset is offpeak-weekday\n";
 			$onpeak = 0;
