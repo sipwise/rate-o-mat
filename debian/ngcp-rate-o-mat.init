@@ -71,12 +71,10 @@ do_stop()
 {
 	# Return
 	#   0 if daemon has been stopped
-	#   1 if daemon was already stopped
 	#   2 if daemon could not be stopped
 	#   other if a failure occurred
 	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
-	RETVAL="$?"
-	[ "$RETVAL" = 2 ] && return 2
+	[ "$?" = 2 ] && return 2
 	# Wait for children to finish too if this is a daemon that forks
 	# and if the daemon is only ever run from this initscript.
 	# If the above conditions are not satisfied then add some other code
@@ -84,8 +82,9 @@ do_stop()
 	# needed by services started subsequently.  A last resort is to
 	# sleep for some time.
 	start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
-	[ "$?" = 2 ] && return 2
-	# Many daemons don't delete their pidfiles when they exit.
+	RETVAL="$?"
+	[ "$RETVAL" = 2 ] && return 2
+	# daemon doesn't delete its pidfile when it exits
 	rm -f $PIDFILE
 	return "$RETVAL"
 }
@@ -106,19 +105,32 @@ do_reload() {
 case "$1" in
   start)
 	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+
+	# check for already running daemon, don't start more than once
+	# but return with exit code 0 as requested by LSB
+	if status_of_proc "$DAEMON" "$NAME" >/dev/null 2>&1 ; then
+		[ "$VERBOSE" != no ] && log_daemon_msg "$DESC already running, not starting again" "ok"
+		[ "$VERBOSE" != no ] && log_end_msg 0
+		exit 0
+	fi
+
 	do_start
+	RETVAL="$?"
 	case "$?" in
 		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
 		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
 	esac
+	exit "$RETVAL"
 	;;
   stop)
 	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
 	do_stop
-	case "$?" in
+	RETVAL="$?"
+	case "$RETVAL" in
 		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
 		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
 	esac
+	exit "$RETVAL"
 	;;
   status)
        status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
