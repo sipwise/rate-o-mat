@@ -3,7 +3,7 @@ use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
 use DBI;
 use POSIX qw(setsid mktime);
-use Fcntl qw(LOCK_EX LOCK_NB);
+use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
 use Sys::Syslog;
 use Data::Dumper;
@@ -20,7 +20,7 @@ my $log_opts = 'ndely,cons,pid,nowait';
 # if split_peak_parts is set to true, rate-o-mat will create a separate
 # CDR every time a peak time border is crossed for either the customer,
 # the reseller or the carrier billing profile.
-my $split_peak_parts = int $ENV{RATEOMAT_SPLIT_PEAK_PARTS};
+my $split_peak_parts = int($ENV{RATEOMAT_SPLIT_PEAK_PARTS} || 0);
 
 # if the LNP database is used not just for LNP, but also for on-net
 # billing, special routing or similar things, this should be set to
@@ -1197,12 +1197,14 @@ sub daemonize
 	open STDIN, '/dev/null' or FATAL "Can't read /dev/null: $!\n";
 	#open STDOUT, "|-", "logger -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
 	#open STDOUT, '>/dev/null' or FATAL "Can't write to /dev/null: $!\n";
+	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
+	open PID, ">>$pidfile" or FATAL "Can't open '$pidfile' for writing: $!\n";
+	flock(PID, LOCK_EX | LOCK_NB) or FATAL "Unable to lock pidfile '$pidfile': $!\n";
 	defined(my $pid = fork) or FATAL "Can't fork: $!\n";
 	exit if $pid;
 	setsid or FATAL "Can't start a new session: $!\n";
-	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
-	open PID, ">$pidfile" or FATAL "Can't write to pidfile '$pidfile': $!\n";
-	flock(PID, LOCK_EX | LOCK_NB) || FATAL "Unable to lock pidfile '$pidfile': $!\n";
+	seek PID, 0, SEEK_SET;
+	truncate PID, 0;
 	printflush PID "$$\n";
 }
 
@@ -1309,4 +1311,6 @@ sub main
 	$billdbh->disconnect;
 	$acctdbh->disconnect;
 	closelog;
+	close PID;
+	unlink $pidfile;
 }
