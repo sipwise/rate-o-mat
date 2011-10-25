@@ -314,7 +314,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"from_unixtime(end) >= ? ORDER BY start ASC"
+		"end >= ? ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 	
 	$sth_get_last_cbalance = $billdbh->prepare(
@@ -322,7 +322,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"from_unixtime(start) <= ? AND from_unixtime(end) <= ? ORDER BY end DESC LIMIT 1"
+		"start <= ? AND end <= ? ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
 	$sth_new_cbalance_week = $billdbh->prepare(
