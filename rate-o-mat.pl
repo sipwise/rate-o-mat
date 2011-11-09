@@ -47,6 +47,7 @@ my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS} || die "Missing accounting D
 sub main;
 
 my $shutdown = 0;
+my $prepaid_costs;
 
 my $billdbh;
 my $acctdbh;
@@ -67,6 +68,8 @@ my $sth_new_cbalance_month;
 my $sth_get_last_cbalance;
 my $sth_lnp_number;
 my $sth_lnp_profile_info;
+my $sth_prepaid_costs;
+my $sth_delete_prepaid_cost;
 
 my $connect_interval = 3;
 
@@ -243,7 +246,7 @@ sub init_db
 	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
 
 	$sth_unrated_cdrs = $acctdbh->prepare(
-		"SELECT id, ".
+		"SELECT id, call_id, ".
 		"source_user_id, source_provider_id, ".
 		"destination_user_id, destination_provider_id, ".
 		"destination_user, destination_domain, ".
@@ -343,6 +346,14 @@ sub init_db
 		"free_time_balance = ?, free_time_balance_interval = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
+
+	$sth_prepaid_costs = $acctdbh->prepare(
+		"SELECT * FROM prepaid_costs"
+	) or FATAL "Error preparing prepaid costs statement: ".$acctdbh->errstr;
+
+	$sth_delete_prepaid_cost = $acctdbh->prepare(
+		"DELETE FROM prepaid_costs WHERE id = ?"
+	) or FATAL "Error preparing delete prepaid costs statement: ".$acctdbh->errstr;
 
 	return 1;
 }
@@ -987,6 +998,20 @@ sub get_customer_call_cost
 		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, $r_rating_duration)
 			or FATAL "Error updating customer contract balance\n";
 	}
+	else {
+		# overwrite the calculated costs with the ones from our table
+		if (!$prepaid_costs) {
+			$sth_prepaid_costs->execute()
+				or FATAL "Error executing get prepaid costs statement: ".$sth_prepaid_costs->errstr;
+			$prepaid_costs = $sth_prepaid_costs->fetchall_hashref('call_id');
+		}
+		if (exists($prepaid_costs->{$cdr->{call_id}})) {
+			my $entry = $prepaid_costs->{$cdr->{call_id}};
+			$$r_cost = $entry->{cost};
+			$sth_delete_prepaid_cost->execute($entry->{id});
+			delete($prepaid_costs->{$cdr->{call_id}});
+		}
+	}
 
 	return 1;
 }
@@ -1232,6 +1257,7 @@ sub main
 	{
 		$billdbh->ping || init_db;
 		$acctdbh->ping || init_db;
+		undef($prepaid_costs);
 
 		my @cdrs = ();
 		eval { get_unrated_cdrs(\@cdrs); };
