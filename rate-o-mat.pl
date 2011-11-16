@@ -177,8 +177,8 @@ sub init_db
 		"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
 		"billing.billing_profiles d ".
 		"WHERE a.uuid = ? AND a.contract_id = b.contract_id ".
-		"AND ( b.start_date IS NULL OR b.start_date <= ?) ".
-		"AND ( b.end_date IS NULL OR b.end_date >= ? ) ".
+		"AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) ) ".
+		"AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) ) ".
 		"AND b.billing_profile_id = d.id ".
 		"ORDER BY b.start_date DESC ".
 		"LIMIT 1"
@@ -188,9 +188,9 @@ sub init_db
 		SELECT lnp_provider_id
 		  FROM lnp_numbers
 		 WHERE ? LIKE CONCAT(number,'%')
-		   AND (from_unixtime(start) <= ? OR from_unixtime(start) IS NULL)
-		   AND (from_unixtime(end) > ? OR from_unixtime(end) IS NULL)
-	".       join(", ", "ORDER BY length(number) DESC", @lnp_order_by) ."
+		   AND (start <= FROM_UNIXTIME(?) OR start IS NULL)
+		   AND (end > FROM_UNIXTIME(?) OR end IS NULL)
+	".       join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) ."
                  LIMIT 1
 	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
@@ -222,16 +222,16 @@ sub init_db
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
 		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(FROM_UNIXTIME(?)) <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
+		"AND WEEKDAY(FROM_UNIXTIME(?)) <= WEEKDAY(FROM_UNIXTIME(? + ?)) ".
 		"AND weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
-		"AND weekday <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
+		"AND weekday <= WEEKDAY(FROM_UNIXTIME(? + ?)) ".
 		"UNION ".
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
 		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(FROM_UNIXTIME(?)) > WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)) ".
+		"AND WEEKDAY(FROM_UNIXTIME(?)) > WEEKDAY(FROM_UNIXTIME(? + ?)) ".
 		"AND (weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
-		"OR weekday <= WEEKDAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND)))"
+		"OR weekday <= WEEKDAY(FROM_UNIXTIME(? + ?)))"
 	) or FATAL "Error preparing weekday offpeak statement: ".$billdbh->errstr;
 
 	$sth_offpeak_special = $billdbh->prepare(
@@ -239,9 +239,9 @@ sub init_db
 		"FROM billing.billing_peaktime_special ".
 		"WHERE billing_profile_id = ? ".
 		"AND ( ".
-		"start <= FROM_UNIXTIME(?) AND end >= FROM_UNIXTIME(?) ".
-		"OR start >= FROM_UNIXTIME(?) AND end <= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) ".
-		"OR start <= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) AND end >= DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? SECOND) ".
+		"(start <= FROM_UNIXTIME(?) AND end >= FROM_UNIXTIME(?)) ".
+		"OR (start >= FROM_UNIXTIME(?) AND end <= FROM_UNIXTIME(? + ?)) ".
+		"OR (start <= FROM_UNIXTIME(? + ?) AND end >= FROM_UNIXTIME(? + ?)) ".
 		")"
 	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
 
@@ -319,7 +319,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval, start ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"end >= ? ORDER BY start ASC"
+		"end >= FROM_UNIXTIME(?) ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 	
 	$sth_get_last_cbalance = $billdbh->prepare(
@@ -327,7 +327,7 @@ sub init_db
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"start <= ? AND end <= ? ORDER BY end DESC LIMIT 1"
+		"start <= FROM_UNIXTIME(?) AND end <= FROM_UNIXTIME(?) ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
 	$sth_new_cbalance_week = $billdbh->prepare(
@@ -558,13 +558,13 @@ sub update_contract_balance
 
 sub get_billing_info
 {
-	my $start_str = shift;
+	my $start = shift;
 	my $uid = shift;
 	my $r_info = shift;
 
 	my $sth = $sth_billing_info;
 
-	$sth->execute($uid, $start_str, $start_str) or
+	$sth->execute($uid, $start, $start) or
 		FATAL "Error executing billing info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No billing info found for uuid '".$uid."'\n" unless @res;
