@@ -305,8 +305,8 @@ sub init_db
 		"SELECT p.class, bm.billing_profile_id ".
 		"FROM billing.products p, billing.billing_mappings bm ".
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
-		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
 	$sth_reseller_info = $billdbh->prepare(
@@ -316,8 +316,8 @@ sub init_db
 		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
 		"AND c.reseller_id = bm.contract_id ".
 		"AND r.id = c.reseller_id ".
-		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
 	
 	$sth_get_cbalance = $billdbh->prepare(
@@ -1164,7 +1164,7 @@ sub rate_cdr
 
 	} else {
 
-		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_date},
+		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time},
 			\%provider_info)
 			or FATAL "Error getting destination provider info\n";
 
@@ -1204,7 +1204,7 @@ sub rate_cdr
 
 			# for reseller we first have to find the billing profile
 			%reseller_info = ();
-			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
+			get_reseller_info($cdr->{source_user_id}, $cdr->{start_time},
 				\%reseller_info)
 				or FATAL "Error getting source reseller info\n";
 
