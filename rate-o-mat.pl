@@ -310,11 +310,12 @@ sub init_db
 	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
 	$sth_reseller_info = $billdbh->prepare(
-		"SELECT bm.billing_profile_id ".
+		"SELECT bm.billing_profile_id, r.contract_id ".
 		"FROM billing.billing_mappings bm, billing.voip_subscribers vs, ".
-		"billing.contracts c ".
+		"billing.contracts c, billing.resellers r ".
 		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
 		"AND c.reseller_id = bm.contract_id ".
+		"AND r.id = c.reseller_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
 	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
@@ -838,6 +839,7 @@ sub get_provider_info
 
 	$r_info->{class} = $res[0];
 	$r_info->{profile_id} = $res[1];
+	$r_info->{contract_id} = $pid;
 
 	return 1;
 }
@@ -857,6 +859,7 @@ sub get_reseller_info
 
 	$r_info->{profile_id} = $res[0];
 	$r_info->{class} = 'reseller';
+	$r_info->{contract_id} = $res[1];
 
 	return 1;
 }
