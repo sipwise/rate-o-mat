@@ -1025,8 +1025,9 @@ sub get_customer_call_cost
 	}
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
-		$domain_first, \%profile_info, $r_cost, $r_free_time, $r_rating_duration, \$onpeak)
+	get_call_cost($cdr, $type, $destination_class,
+		$billing_info{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
+		$r_rating_duration, \$onpeak)
 		or FATAL "Error getting customer call cost\n";
 
 	$cdr->{customer_billing_fee_id} = $profile_info{fee_id};
@@ -1069,12 +1070,29 @@ sub get_provider_call_cost
 	my $r_rating_duration = shift;
 	my $onpeak;
 
+	my %billing_info = ();
+	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, \%billing_info) or
+		FATAL "Error getting billing info\n";
+	#print Dumper \%billing_info;
+
+	unless($billing_info{profile_id}) {
+		$$r_rating_duration = $cdr->{duration};
+		return -1;
+	}
+
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $r_info->{class}, 
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak)
 		or FATAL "Error getting provider call cost\n";
  
+	unless($billing_info{prepaid} == 1)
+	{
+		update_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \%profile_info,
+				$r_cost, $r_free_time, $r_rating_duration)
+			or FATAL "Error updating provider contract balance\n";
+	}
+
 	if($r_info->{class} eq "reseller")
 	{
 		$cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
