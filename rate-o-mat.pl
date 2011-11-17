@@ -51,6 +51,7 @@ my $prepaid_costs;
 
 my $billdbh;
 my $acctdbh;
+my $sth_get_subscriber_contract_id;
 my $sth_billing_info;
 my $sth_profile_info;
 my $sth_offpeak_weekdays;
@@ -170,13 +171,17 @@ sub init_db
 	connect_billdbh;
 	connect_acctdbh;
 
+	$sth_get_subscriber_contract_id = $billdbh->prepare(
+		"SELECT contract_id FROM voip_subscribers WHERE uuid = ?"
+	);
+
 	$sth_billing_info = $billdbh->prepare(
-		"SELECT a.contract_id, b.billing_profile_id, ".
+		"SELECT b.billing_profile_id, ".
 		"d.prepaid, d.interval_charge, d.interval_free_time, d.interval_free_cash, ".
 		"d.interval_unit, d.interval_count ".
-		"FROM billing.voip_subscribers a, billing.billing_mappings b, ".
+		"FROM billing.billing_mappings b, ".
 		"billing.billing_profiles d ".
-		"WHERE a.uuid = ? AND a.contract_id = b.contract_id ".
+		"WHERE b.contract_id = ? ".
 		"AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) ) ".
 		"AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) ) ".
 		"AND b.billing_profile_id = d.id ".
@@ -363,18 +368,18 @@ sub init_db
 sub create_contract_balance
 {
 	my $latest_end = shift;
-	my $cdr = shift;
+	my $start_time = shift;
 	my $binfo = shift;
 	my $r_res = shift;
 
 	my $sth = $sth_get_last_cbalance;
-	$sth->execute($binfo->{contract_id}, $cdr->{start_time}, $cdr->{start_time})
+	$sth->execute($binfo->{contract_id}, $start_time, $start_time)
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 
 	# TODO: we could just create a new one, we just have to know when to start
 	FATAL "No contract balance for contract id ".$binfo->{contract_id}." starting earlier than '".
-		$cdr->{start_time}."' found\n"
+		$start_time."' found\n"
 		unless(@res);
 	
 	my $last_id = $res[0];
@@ -389,8 +394,8 @@ sub create_contract_balance
 
 
 	my %last_profile = ();
-	get_billing_info($last_end, $cdr->{source_user_id}, \%last_profile) or
-		FATAL "Error getting billing info for date '".$last_end."' and uuid '".$cdr->{source_user_id}."'\n";
+	get_billing_info($last_end, $binfo->{contract_id}, \%last_profile) or
+		FATAL "Error getting billing info for date '".$last_end."' and contract_id $binfo->{contract_id}\n";
 
 	my %current_profile = ();
 	my $last_end_unix;
@@ -398,8 +403,8 @@ sub create_contract_balance
 	$last_end_unix += 1;
 	my $current_date;
 	set_start_strtime($last_end_unix, \$current_date);
-	get_billing_info($current_date, $cdr->{source_user_id}, \%current_profile) or
-		FATAL "Error getting billing info for date '".$current_date."' and uuid '".$cdr->{source_user_id}."'\n";
+	get_billing_info($current_date, $binfo->{contract_id}, \%current_profile) or
+		FATAL "Error getting billing info for date '".$current_date."' and contract_id $binfo->{contract_id}\n";
 
 	my $new_free_balance = $last_free_balance + $current_profile{int_free_time} - 
 		($last_profile{int_free_time} - $last_free_balance_int);
@@ -435,12 +440,13 @@ sub create_contract_balance
 	$r_res->{free_time_balance} = $new_free_balance;
 	$r_res->{free_time_balance_interval} = $new_free_balance_int;
 
-	return create_contract_balance($last_end, $cdr, $binfo, $r_res);
+	return create_contract_balance($last_end, $start_time, $binfo, $r_res);
 }
 
 sub get_contract_balance
 {
-	my $cdr = shift;
+	my $start_time = shift;
+	my $contract_id = shift;
 	my $binfo = shift;
 	my $pinfo = shift;
 	my $r_cost = shift;
@@ -450,14 +456,14 @@ sub get_contract_balance
 
 	my $sth = $sth_get_cbalance;
 	$sth->execute(
-		$binfo->{contract_id}, $cdr->{start_time})
+		$binfo->{contract_id}, $start_time)
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 
 	unless(@$res)
 	{
 		my %new_row = ();
-		create_contract_balance('invalid', $cdr, $binfo, \%new_row)
+		create_contract_balance('invalid', $start_time, $binfo, \%new_row)
 			or FATAL "Failed to create new contract balance\n";
 		push @$res, \%new_row;
 	}
@@ -538,7 +544,8 @@ sub get_contract_balance
 
 sub update_contract_balance
 {
-	my $cdr = shift;
+	my $start_time = shift;
+	my $contract_id = shift;
 	my $binfo = shift;
 	my $pinfo = shift;
 	my $r_cost = shift;
@@ -547,7 +554,7 @@ sub update_contract_balance
 
 	my @balances = ();
 
-	get_contract_balance($cdr, $binfo, $pinfo, $r_cost, $r_free_time, $r_duration, \@balances)
+	get_contract_balance($start_time, $contract_id, $binfo, $pinfo, $r_cost, $r_free_time, $r_duration, \@balances)
 		or FATAL "Error getting contract balances\n";
 
 	# the above does the update as well, so we're done here
@@ -556,27 +563,41 @@ sub update_contract_balance
 	return 1;
 }
 
+sub get_subscriber_contract_id
+{
+	my $uuid = shift;
+
+	my $sth = $sth_get_subscriber_contract_id;
+
+	$sth->execute($uuid) or
+		FATAL "Error executing get_subscriber_contract_id statement: ".$sth->errstr;
+	my @res = $sth->fetchrow_array();
+	FATAL "No contract id found for uuid '$uuid'\n" unless @res;
+
+	return $res[0];
+}
+
 sub get_billing_info
 {
 	my $start = shift;
-	my $uid = shift;
+	my $contract_id = shift;
 	my $r_info = shift;
 
 	my $sth = $sth_billing_info;
 
-	$sth->execute($uid, $start, $start) or
+	$sth->execute($contract_id, $start, $start) or
 		FATAL "Error executing billing info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
-	FATAL "No billing info found for uuid '".$uid."'\n" unless @res;
+	FATAL "No billing info found for contract_id $contract_id\n" unless @res;
 
-	$r_info->{contract_id} = $res[0];
-	$r_info->{profile_id} = $res[1];
-	$r_info->{prepaid} = $res[2];
-	$r_info->{int_charge} = $res[3];
-	$r_info->{int_free_time} = $res[4];
-	$r_info->{int_free_cash} = $res[5];
-	$r_info->{int_unit} = $res[6];
-	$r_info->{int_count} = $res[7];
+	$r_info->{contract_id} = $contract_id;
+	$r_info->{profile_id} = $res[0];
+	$r_info->{prepaid} = $res[1];
+	$r_info->{int_charge} = $res[2];
+	$r_info->{int_free_time} = $res[3];
+	$r_info->{int_free_cash} = $res[4];
+	$r_info->{int_unit} = $res[5];
+	$r_info->{int_count} = $res[6];
 	
 	$sth->finish;
 	
@@ -988,8 +1009,10 @@ sub get_customer_call_cost
 	my $r_rating_duration = shift;
 	my $onpeak;
 
+	my $contract_id = get_subscriber_contract_id($cdr->{source_user_id});
+
 	my %billing_info = ();
-	get_billing_info($cdr->{start_time}, $cdr->{source_user_id}, \%billing_info) or
+	get_billing_info($cdr->{start_time}, $contract_id, \%billing_info) or
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
@@ -1009,8 +1032,8 @@ sub get_customer_call_cost
 
 	unless($billing_info{prepaid} == 1)
 	{
-		update_contract_balance($cdr, \%billing_info, \%profile_info, $r_cost, $r_free_time,
-				$r_rating_duration)
+		update_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \%profile_info,
+				$r_cost, $r_free_time, $r_rating_duration)
 			or FATAL "Error updating customer contract balance\n";
 	}
 	else {
@@ -1343,6 +1366,7 @@ sub main
 
 	INFO "Shutting down.\n";
 
+	$sth_get_subscriber_contract_id->finish;
 	$sth_billing_info->finish;
 	$sth_profile_info->finish;
 	$sth_offpeak_weekdays->finish;
