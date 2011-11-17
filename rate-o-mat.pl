@@ -306,7 +306,9 @@ sub init_db
 		"FROM billing.products p, billing.billing_mappings bm ".
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?))"
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
+		"ORDER BY bm.start_date DESC ".
+		"LIMIT 1"
 	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
 	$sth_reseller_info = $billdbh->prepare(
@@ -317,7 +319,9 @@ sub init_db
 		"AND c.reseller_id = bm.contract_id ".
 		"AND r.id = c.reseller_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?))"
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
+		"ORDER BY bm.start_date DESC ".
+		"LIMIT 1"
 	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
 	
 	$sth_get_cbalance = $billdbh->prepare(
