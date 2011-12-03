@@ -300,18 +300,23 @@ sub init_db
 		"SELECT p.class, bm.billing_profile_id ".
 		"FROM billing.products p, billing.billing_mappings bm ".
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
-		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
+		"ORDER BY bm.start_date DESC ".
+		"LIMIT 1"
 	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
 	$sth_reseller_info = $billdbh->prepare(
-		"SELECT bm.billing_profile_id ".
+		"SELECT bm.billing_profile_id, r.contract_id ".
 		"FROM billing.billing_mappings bm, billing.voip_subscribers vs, ".
-		"billing.contracts c ".
+		"billing.contracts c, billing.resellers r ".
 		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
 		"AND c.reseller_id = bm.contract_id ".
-		"AND (bm.start_date IS NULL OR bm.start_date <= ?) ".
-		"AND (bm.end_date IS NULL OR bm.end_date >= ?)"
+		"AND r.id = c.reseller_id ".
+		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
+		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
+		"ORDER BY bm.start_date DESC ".
+		"LIMIT 1"
 	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
 	
 	$sth_get_cbalance = $billdbh->prepare(
@@ -817,6 +822,7 @@ sub get_provider_info
 
 	$r_info->{class} = $res[0];
 	$r_info->{profile_id} = $res[1];
+	$r_info->{contract_id} = $pid;
 
 	return 1;
 }
@@ -836,6 +842,7 @@ sub get_reseller_info
 
 	$r_info->{profile_id} = $res[0];
 	$r_info->{class} = 'reseller';
+	$r_info->{contract_id} = $res[1];
 
 	return 1;
 }
@@ -999,8 +1006,9 @@ sub get_customer_call_cost
 	}
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $destination_class, $billing_info{profile_id}, 
-		$domain_first, \%profile_info, $r_cost, $r_free_time, $r_rating_duration, \$onpeak)
+	get_call_cost($cdr, $type, $destination_class,
+		$billing_info{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
+		$r_rating_duration, \$onpeak)
 		or FATAL "Error getting customer call cost\n";
 
 	$cdr->{customer_billing_fee_id} = $profile_info{fee_id};
@@ -1043,12 +1051,29 @@ sub get_provider_call_cost
 	my $r_rating_duration = shift;
 	my $onpeak;
 
+	my %billing_info = ();
+	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, \%billing_info) or
+		FATAL "Error getting billing info\n";
+	#print Dumper \%billing_info;
+
+	unless($billing_info{profile_id}) {
+		$$r_rating_duration = $cdr->{duration};
+		return -1;
+	}
+
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $r_info->{class}, 
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak)
 		or FATAL "Error getting provider call cost\n";
  
+	unless($billing_info{prepaid} == 1)
+	{
+		update_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \%profile_info,
+				$r_cost, $r_free_time, $r_rating_duration)
+			or FATAL "Error updating provider contract balance\n";
+	}
+
 	if($r_info->{class} eq "reseller")
 	{
 		$cdr->{reseller_billing_fee_id} = $profile_info{fee_id};
@@ -1120,7 +1145,7 @@ sub rate_cdr
 
 	} else {
 
-		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_date},
+		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time},
 			\%provider_info)
 			or FATAL "Error getting destination provider info\n";
 
@@ -1160,7 +1185,7 @@ sub rate_cdr
 
 			# for reseller we first have to find the billing profile
 			%reseller_info = ();
-			get_reseller_info($cdr->{source_user_id}, $cdr->{start_date},
+			get_reseller_info($cdr->{source_user_id}, $cdr->{start_time},
 				\%reseller_info)
 				or FATAL "Error getting source reseller info\n";
 
