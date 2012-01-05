@@ -412,7 +412,7 @@ sub create_contract_balance
 
 	my $new_cash_balance;
 	if($current_profile{int_free_cash}) {
-		my $old_free_cash = sprintf("%.4f", $current_profile{int_free_cash} * $ratio);
+		my $old_free_cash = sprintf("%.4f", $last_profile{int_free_cash} * $ratio);
 		if($last_cash_balance_int < $old_free_cash) {
 			$new_cash_balance = $last_cash_balance + $last_cash_balance_int - 
 				$old_free_cash + $current_profile{int_free_cash};
@@ -426,7 +426,7 @@ sub create_contract_balance
 
 	my $new_free_balance;
 	if($current_profile{int_free_time}) {
-		my $old_free_time = sprintf("%.4f", $current_profile{int_free_time} * $ratio);
+		my $old_free_time = sprintf("%.4f", $last_profile{int_free_time} * $ratio);
 		if($last_free_balance_int < $old_free_time) {
 			$new_free_balance = $last_free_balance + $last_free_balance_int - 
 				$old_free_time + $current_profile{int_free_time};
