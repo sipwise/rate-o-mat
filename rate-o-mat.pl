@@ -336,13 +336,13 @@ sub init_db
 	
 	$sth_new_cbalance_week = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? WEEK) )"
+		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? WEEK) )"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_month = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"DATE_ADD(?, INTERVAL 1 SECOND), ".
-		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH)))), ".
+		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? MONTH)))), ".
 		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 	
