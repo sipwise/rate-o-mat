@@ -71,6 +71,7 @@ my $sth_lnp_number;
 my $sth_lnp_profile_info;
 my $sth_prepaid_costs;
 my $sth_delete_prepaid_cost;
+my $sth_get_contract_info;
 
 my $connect_interval = 3;
 
@@ -115,17 +116,6 @@ sub WARNING
 	chomp $msg;
 	print "WARNING: $msg\n" if($fork != 1);
 	syslog('warning', $msg);
-}
-
-sub set_start_unixtime
-{
-	my $start = shift;
-	my $r_unix = shift;
-
-	my ($y, $m, $d, $H, $M, $S) = $start =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
-	$$r_unix = mktime($S, $M, $H, $d, $m-1, $y-1900, 0, 0, -1);
-
-	return 0;
 }
 
 sub set_start_strtime
@@ -173,7 +163,11 @@ sub init_db
 
 	$sth_get_subscriber_contract_id = $billdbh->prepare(
 		"SELECT contract_id FROM voip_subscribers WHERE uuid = ?"
-	);
+	) or FATAL "Error preparing subscriber contract id statement: ".$billdbh->errstr;
+	
+	$sth_get_contract_info = $billdbh->prepare(
+		"SELECT UNIX_TIMESTAMP(create_timestamp) FROM contracts WHERE id = ?"
+	) or FATAL "Error preparing subscriber contract info statement: ".$billdbh->errstr;
 
 	$sth_billing_info = $billdbh->prepare(
 		"SELECT b.billing_profile_id, ".
@@ -331,9 +325,9 @@ sub init_db
 		"WHERE contract_id = ? AND ".
 		"end >= FROM_UNIXTIME(?) ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
-	
+
 	$sth_get_last_cbalance = $billdbh->prepare(
-		"SELECT id, end, cash_balance, cash_balance_interval, ".
+		"SELECT id, UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end), cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
@@ -342,13 +336,13 @@ sub init_db
 	
 	$sth_new_cbalance_week = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(?, INTERVAL 1 SECOND), DATE_ADD(?, INTERVAL ? WEEK) )"
+		"DATE_ADD(FROM_UNIXTIME(?), INTERVAL 1 SECOND), DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? WEEK) )"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_month = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(?, INTERVAL 1 SECOND), ".
-		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(?, INTERVAL ? MONTH)))), ".
+		"DATE_ADD(FROM_UNIXTIME(?), INTERVAL 1 SECOND), ".
+		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? MONTH)))), ".
 		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 	
@@ -375,6 +369,7 @@ sub create_contract_balance
 	my $latest_end = shift;
 	my $start_time = shift;
 	my $binfo = shift;
+	my $create_time = shift;
 	my $r_res = shift;
 
 	my $sth = $sth_get_last_cbalance;
@@ -388,11 +383,12 @@ sub create_contract_balance
 		unless(@res);
 	
 	my $last_id = $res[0];
-	my $last_end = $res[1];
-	my $last_cash_balance = $res[2];
-	my $last_cash_balance_int = $res[3];
-	my $last_free_balance = $res[4];
-	my $last_free_balance_int = $res[5];
+	my $last_start = $res[1];
+	my $last_end = $res[2];
+	my $last_cash_balance = $res[3];
+	my $last_cash_balance_int = $res[4];
+	my $last_free_balance = $res[5];
+	my $last_free_balance_int = $res[6];
 
 	# break recursion if we got the last result as last time
 	return 1 if($latest_end eq $last_end);
@@ -403,22 +399,45 @@ sub create_contract_balance
 		FATAL "Error getting billing info for date '".$last_end."' and contract_id $binfo->{contract_id}\n";
 
 	my %current_profile = ();
-	my $last_end_unix;
-	set_start_unixtime($last_end, \$last_end_unix);
-	$last_end_unix += 1;
+	my $last_end_unix = $last_end + 1;
 	my $current_date;
 	set_start_strtime($last_end_unix, \$current_date);
 	get_billing_info($current_date, $binfo->{contract_id}, \%current_profile) or
 		FATAL "Error getting billing info for date '".$current_date."' and contract_id $binfo->{contract_id}\n";
 
-	my $new_free_balance = $last_free_balance + $current_profile{int_free_time} - 
-		($last_profile{int_free_time} - $last_free_balance_int);
-	my $new_free_balance_int = 0;
-	
-	my $new_cash_balance = $last_cash_balance + $current_profile{int_free_cash} - 
-		($last_profile{int_free_cash} - $last_cash_balance_int);
+	my $ratio = 1;
+	if($create_time > $last_start and $create_time < $last_end) {
+		$ratio = ($last_end + 1 - $create_time) / ($last_end + 1 - $last_start);
+	}
+
+	my $new_cash_balance;
+	if($current_profile{int_free_cash}) {
+		my $old_free_cash = sprintf("%.4f", $last_profile{int_free_cash} * $ratio);
+		if($last_cash_balance_int < $old_free_cash) {
+			$new_cash_balance = $last_cash_balance + $last_cash_balance_int - 
+				$old_free_cash + $current_profile{int_free_cash};
+		} else {
+			$new_cash_balance = $last_cash_balance + $current_profile{int_free_cash};
+		}
+	} else {
+		$new_cash_balance = $last_cash_balance;
+	}
 	my $new_cash_balance_int = 0;
 
+	my $new_free_balance;
+	if($current_profile{int_free_time}) {
+		my $old_free_time = sprintf("%.4f", $last_profile{int_free_time} * $ratio);
+		if($last_free_balance_int < $old_free_time) {
+			$new_free_balance = $last_free_balance + $last_free_balance_int - 
+				$old_free_time + $current_profile{int_free_time};
+		} else {
+			$new_free_balance = $last_free_balance + $current_profile{int_free_time};
+		}
+	} else {
+		$new_free_balance = $last_free_balance;
+	}
+	my $new_free_balance_int = 0;
+	
 	if($binfo->{int_unit} eq "week")
 	{
 		$sth = $sth_new_cbalance_week;
@@ -445,7 +464,7 @@ sub create_contract_balance
 	$r_res->{free_time_balance} = $new_free_balance;
 	$r_res->{free_time_balance_interval} = $new_free_balance_int;
 
-	return create_contract_balance($last_end, $start_time, $binfo, $r_res);
+	return create_contract_balance($last_end, $start_time, $binfo, $create_time, $r_res);
 }
 
 sub get_contract_balance
@@ -467,8 +486,13 @@ sub get_contract_balance
 
 	unless(@$res)
 	{
+		my $sth_cid = $sth_get_contract_info;
+		$sth_cid->execute($binfo->{contract_id})
+			or FATAL "Error executing get contract balance statement: ".$sth_cid->errstr;
+		my $create_time = ($sth_cid->fetchrow_array())[0];
+
 		my %new_row = ();
-		create_contract_balance('invalid', $start_time, $binfo, \%new_row)
+		create_contract_balance('invalid', $start_time, $binfo, $create_time, \%new_row)
 			or FATAL "Failed to create new contract balance\n";
 		push @$res, \%new_row;
 	}
@@ -1411,6 +1435,7 @@ sub main
 	$sth_get_last_cbalance->finish;
 	$sth_lnp_number->finish;
 	$sth_lnp_profile_info->finish;
+	$sth_get_contract_info->finish;
 
 
 	$billdbh->disconnect;

@@ -1,3 +1,9 @@
+ngcp-rate-o-mat (1.2.3) unstable; urgency=low
+
+  * Fix carry-over handling of contract balances.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 09 Jan 2012 22:56:09 +0100
+
 ngcp-rate-o-mat (1.2.2) unstable; urgency=low
 
   * More timestamp handling fixes.
