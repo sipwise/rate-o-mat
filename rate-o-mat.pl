@@ -8,6 +8,7 @@ use IO::Handle;
 use Sys::Syslog;
 use Data::Dumper;
 
+$0 = 'rate-o-mat';
 my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
@@ -64,8 +65,7 @@ my $sth_provider_info;
 my $sth_reseller_info;
 my $sth_get_cbalance;
 my $sth_update_cbalance;
-my $sth_new_cbalance_week;
-my $sth_new_cbalance_month;
+my $sth_new_cbalance;
 my $sth_get_last_cbalance;
 my $sth_lnp_number;
 my $sth_lnp_profile_info;
@@ -334,15 +334,9 @@ sub init_db
 		"start <= FROM_UNIXTIME(?) AND end <= FROM_UNIXTIME(?) ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
-	$sth_new_cbalance_week = $billdbh->prepare(
+	$sth_new_cbalance = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(FROM_UNIXTIME(?), INTERVAL 1 SECOND), DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? WEEK) )"
-	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
-
-	$sth_new_cbalance_month = $billdbh->prepare(
-		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"DATE_ADD(FROM_UNIXTIME(?), INTERVAL 1 SECOND), ".
-		"FROM_UNIXTIME(UNIX_TIMESTAMP(LAST_DAY(DATE_ADD(FROM_UNIXTIME(?), INTERVAL ? MONTH)))), ".
+		"FROM_UNIXTIME(?), FROM_UNIXTIME(?), ".
 		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 	
@@ -438,13 +432,31 @@ sub create_contract_balance
 	}
 	my $new_free_balance_int = 0;
 	
+	my ($etime, $stime);
+	$sth = $sth_new_cbalance;
 	if($binfo->{int_unit} eq "week")
 	{
-		$sth = $sth_new_cbalance_week;
+		# XXX not implemented in ossbss
+		$stime = $last_end + 1;
+		$etime = $stime + 86400 * 7 * $binfo->{int_count} - 1;
 	}
 	elsif($binfo->{int_unit} eq "month")
 	{
-		$sth = $sth_new_cbalance_month;
+		my $next_start = $last_end + 1;
+
+		my ($cyear, $cmonth, $cday) = (localtime $next_start)[5,4,3];
+
+		my $bmonth = $cmonth - $cmonth % $binfo->{int_count};
+		$stime = mktime(0,0,0,1,$bmonth,$cyear);
+
+		my $eyear = $cyear;
+		my $emonth = $bmonth + $binfo->{int_count};
+		while ($emonth >= 12) {
+			$emonth -= 12;
+			$eyear++;
+		}
+		$etime = mktime(0,0,0,1,$emonth,$eyear);
+		$etime--;
 	}
 	else
 	{
@@ -454,8 +466,7 @@ sub create_contract_balance
 
 	$sth->execute($binfo->{contract_id}, $new_cash_balance, $new_cash_balance_int,
 		$new_free_balance, $new_free_balance_int, 
-		$last_end, 
-		$last_end, $binfo->{int_count})
+		$stime, $etime)
 		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
 
 	$r_res->{id} = $billdbh->last_insert_id(undef, undef, undef, undef);
@@ -1430,8 +1441,7 @@ sub main
 	$sth_reseller_info->finish;
 	$sth_get_cbalance->finish;
 	$sth_update_cbalance->finish;
-	$sth_new_cbalance_week->finish;
-	$sth_new_cbalance_month->finish;
+	$sth_new_cbalance->finish;
 	$sth_get_last_cbalance->finish;
 	$sth_lnp_number->finish;
 	$sth_lnp_profile_info->finish;
