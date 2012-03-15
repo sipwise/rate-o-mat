@@ -8,6 +8,7 @@ use IO::Handle;
 use Sys::Syslog;
 use Data::Dumper;
 
+$0 = 'rate-o-mat';
 my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
