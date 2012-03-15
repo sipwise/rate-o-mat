@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (1.2.4) unstable; urgency=low
+
+  * Alter $0 to make the process monitorable
+  * Copy ossbss logic for contract balance creation 
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Thu, 15 Mar 2012 15:50:30 +0100
+
 ngcp-rate-o-mat (1.2.3) unstable; urgency=low
 
   * Fix carry-over handling of contract balances.
