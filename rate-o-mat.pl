@@ -1422,6 +1422,13 @@ sub main
 		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
 
 		DEBUG "$rated CDRs rated so far.\n";
+
+		unless(@cdrs >= 5)
+		{
+			DEBUG "Less than 5 new CDRs rated, sleep $loop_interval";
+			sleep($loop_interval);
+			next;
+		}
 	}
 
 	INFO "Shutting down.\n";
