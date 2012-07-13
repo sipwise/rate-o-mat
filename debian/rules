@@ -46,7 +46,7 @@ ngcp-rate-o-mat:
 	install -m 755 rate-o-mat.pl   $(b)/$@/usr/sbin/rate-o-mat
 	dh_installexamples   -p$@ -P$(b)/$@
 	dh_installman        -p$@ -P$(b)/$@
-	dh_installinit        -p$@ -P$(b)/$@
+#	dh_installinit        -p$@ -P$(b)/$@
 	dh_link              -p$@ -P$(b)/$@
 	dh_strip             -p$@ -P$(b)/$@
 	dh_compress          -p$@ -P$(b)/$@
