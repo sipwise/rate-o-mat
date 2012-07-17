@@ -8,7 +8,7 @@ Homepage: http://sipwise.com/
 
 Package: ngcp-templates-ce-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ngcp-templates-ce-config
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: ngcp-templates-pro-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
@@ -16,7 +16,7 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-templates-pro-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ngcp-templates-pro-config
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: ngcp-templates-ce-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
