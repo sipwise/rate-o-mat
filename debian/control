@@ -8,7 +8,7 @@ Homepage: http://sipwise.com/
 
 Package: ngcp-templates-ce-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Conflicts: ngcp-templates-pro-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
@@ -16,7 +16,7 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-templates-pro-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Conflicts: ngcp-templates-ce-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
@@ -24,7 +24,12 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-rate-o-mat
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, perl-modules, libdbd-mysql-perl, libexception-class-perl, ngcp-templates-rate-o-mat
+Depends: libdbd-mysql-perl,
+         libexception-class-perl,
+         ngcp-templates-rate-o-mat,
+         perl-modules,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: ngcp-ossbss-billing (< 3)
 Description: Rating daemon for the NGCP
  Perl daemon to rate CDRs in an NGCP.
