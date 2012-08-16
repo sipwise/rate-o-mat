@@ -1,3 +1,24 @@
+ngcp-rate-o-mat (1.3.0) unstable; urgency=low
+
+  [ rfuchs ]
+  * TODO: remove obsolete TODO file from 2007
+  * rate-o-mat.pl: use cash_balance_interval to keep track of accumulated costs
+
+
+  [ Michael Prokop ]
+  * control: Bump Standards-Version to 3.9.3
+
+
+  [ dtiefnig ]
+  * rate-o-mat.pl: make rate-o-mat sleep a bit more, do decrease the number of sql queries
+
+
+  [ jbonilla ]
+  * ngcp-rate-o-mat.init,rules: Remove init script from rate-o-mat package
+  * control: Remove dependency on deprecated packages 
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 16 Aug 2012 20:44:50 +0200
+
 ngcp-rate-o-mat (1.2.4) unstable; urgency=low
 
   * Alter $0 to make the process monitorable
