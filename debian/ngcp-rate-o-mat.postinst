@@ -4,19 +4,19 @@
 set -e
 
 restart_handler() {
-  if [ -x "/etc/init.d/rate-o-mat" ]; then
+  if [ -x "/etc/init.d/ngcp-rate-o-mat" ]; then
     if [ -x "$(which invoke-rc.d 2>/dev/null)" ]; then
-      invoke-rc.d rate-o-mat restart || exit $?
+      invoke-rc.d ngcp-rate-o-mat restart || exit $?
     else
-      /etc/init.d/rate-o-mat restart || exit $?
+      /etc/init.d/ngcp-rate-o-mat restart || exit $?
     fi
   fi
 }
 
 initscript_handler() {
-  if [ -x "/etc/init.d/rate-o-mat" ]; then
-    update-rc.d rate-o-mat defaults >/dev/null
-    invoke-rc.d rate-o-mat start || exit $?
+  if [ -x "/etc/init.d/ngcp-rate-o-mat" ]; then
+    update-rc.d ngcp-rate-o-mat defaults >/dev/null
+    invoke-rc.d ngcp-rate-o-mat start || exit $?
   fi
 }
 
@@ -29,10 +29,10 @@ init_handler() {
     initscript_handler
   else # do not restart daemon on inactive node in pro systems
     if ngcp-check_active ; then
-      echo "Active node detected, restarting rate-o-mat"
+      echo "Active node detected, restarting ngcp-rate-o-mat"
       restart_handler
     else
-      echo "Inactive node detected, ignoring request to restart rate-o-mat"
+      echo "Inactive node detected, ignoring request to restart ngcp-rate-o-mat"
     fi
   fi
 }
