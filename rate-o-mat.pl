@@ -71,6 +71,7 @@ my $sth_lnp_number;
 my $sth_lnp_profile_info;
 my $sth_prepaid_costs;
 my $sth_delete_prepaid_cost;
+my $sth_delete_old_prepaid;
 my $sth_get_contract_info;
 
 my $connect_interval = 3;
@@ -348,12 +349,16 @@ sub init_db
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
 	$sth_prepaid_costs = $acctdbh->prepare(
-		"SELECT * FROM prepaid_costs"
+		"SELECT * FROM prepaid_costs order by timestamp asc" # newer entries overwrite older ones
 	) or FATAL "Error preparing prepaid costs statement: ".$acctdbh->errstr;
 
 	$sth_delete_prepaid_cost = $acctdbh->prepare(
-		"DELETE FROM prepaid_costs WHERE id = ?"
+		"DELETE FROM prepaid_costs WHERE call_id = ?"
 	) or FATAL "Error preparing delete prepaid costs statement: ".$acctdbh->errstr;
+
+	$sth_delete_old_prepaid = $acctdbh->prepare(
+		"delete from prepaid_costs where timestamp < date_sub(now(), interval 7 day) limit 10000"
+	) or FATAL "Error preparing delete_old_prepaid statement: ".$acctdbh->errstr;
 
 	return 1;
 }
@@ -1089,7 +1094,7 @@ sub get_customer_call_cost
 			my $entry = $prepaid_costs->{$cdr->{call_id}};
 			$$r_cost = $entry->{cost};
 			$$r_free_time = $entry->{free_time_used};
-			$sth_delete_prepaid_cost->execute($entry->{id});
+			$sth_delete_prepaid_cost->execute($entry->{call_id});
 			delete($prepaid_costs->{$cdr->{call_id}});
 		}
 	}
@@ -1363,6 +1368,7 @@ sub main
 
 	init_db or FATAL "Error initializing database handlers\n";
 	my $rated = 0;
+	my $next_del = 10000;
 
 	INFO "Up and running.\n";
 	while(!$shutdown)
@@ -1422,6 +1428,11 @@ sub main
 
 		DEBUG "$rated CDRs rated so far.\n";
 
+		if ($rated >= $next_del) {
+			$next_del = $rated + 10000;
+			while ($sth_delete_old_prepaid->execute > 0) { ; }
+		}
+
 		unless(@cdrs >= 5)
 		{
 			DEBUG "Less than 5 new CDRs rated, sleep $loop_interval";
@@ -1452,6 +1463,9 @@ sub main
 	$sth_lnp_number->finish;
 	$sth_lnp_profile_info->finish;
 	$sth_get_contract_info->finish;
+	$sth_prepaid_costs->finish;
+	$sth_delete_prepaid_cost->finish;
+	$sth_delete_old_prepaid->finish;
 
 
 	$billdbh->disconnect;
