@@ -543,16 +543,17 @@ sub get_contract_balance
 						$balance{free_time_balance} = 0;
 					}
 				}
-				if($$r_cost)
+				if($$r_cost and $balance{cash_balance} > 0)
 				{
 					$balance{cash_balance} -= $$r_cost;
 					if($balance{cash_balance} >= 0) {
 						$balance{cash_balance_interval} += $$r_cost;
 						$$r_cost = 0;
 					} else {  # partial free-cash payment
-						my $part_cost = $balance{cash_balance} * -1;
-						$balance{cash_balance_interval} += $$r_cost - $part_cost;
-						$$r_cost = $part_cost;
+						$balance{cash_balance} *= -1;
+						$balance{cash_balance_interval} += $$r_cost - $balance{cash_balance};
+						$$r_cost = $balance{cash_balance};
+						$balance{cash_balance} = 0;
 					}
 				}
 			}
