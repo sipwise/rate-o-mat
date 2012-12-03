@@ -928,27 +928,27 @@ sub get_call_cost
 	my $first;
 	my $second;
 
-	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
-	{
+#	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
+#	{
 		$dst_user = $cdr->{destination_user};
 		$dst_domain = $cdr->{destination_user}.'@'.$cdr->{destination_domain};
-	}
-	else
-	{
-		$dst_user = $cdr->{destination_user_in};
-		$dst_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain_in};
-	}
+#	}
+#	else
+#	{
+#		$dst_user = $cdr->{destination_user_in};
+#		$dst_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain_in};
+#	}
 	
-	if($domain_first == 1)
-	{
+#	if($domain_first == 1)
+#	{
 		$first = $dst_domain;
 		$second = $dst_user;
-	}
-	else
-	{
-		$first = $dst_user;
-		$second = $dst_domain;
-	}
+#	}
+#	else
+#	{
+#		$first = $dst_user;
+#		$second = $dst_domain;
+#	}
 
 
 
