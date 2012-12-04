@@ -928,16 +928,8 @@ sub get_call_cost
 	my $first;
 	my $second;
 
-#	if($destination_class eq "pstnpeering" || $destination_class eq "sippeering")
-#	{
-		$dst_user = $cdr->{destination_user};
-		$dst_domain = $cdr->{destination_user}.'@'.$cdr->{destination_domain};
-#	}
-#	else
-#	{
-#		$dst_user = $cdr->{destination_user_in};
-#		$dst_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain_in};
-#	}
+	$dst_user = $cdr->{destination_user_in};
+	$dst_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 	
 #	if($domain_first == 1)
 #	{
