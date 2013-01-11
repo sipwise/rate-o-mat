@@ -798,6 +798,14 @@ sub is_offpeak_weekday
 	return 0;
 }
 
+sub check_shutdown {
+	if ($shutdown) {
+		syslog('warn', 'Shutdown detected, aborting work in progress');
+		return 1;
+	}
+	return 0;
+}
+
 sub get_unrated_cdrs
 {
 	my $r_cdrs = shift;
@@ -809,6 +817,7 @@ sub get_unrated_cdrs
 	while(my $res = $sth->fetchrow_hashref())
 	{
 		push @$r_cdrs, $res;
+		check_shutdown() and return 0;
 	}
 
 	# the while above may have been interupted because there is no
@@ -1400,6 +1409,7 @@ sub main
 				rate_cdr($cdr, $type)
 				    && update_cdr($cdr);
 				$rated++;
+				check_shutdown() and last;
 			}
 		};
 		if($@)
@@ -1420,6 +1430,8 @@ sub main
 		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
 
 		DEBUG "$rated CDRs rated so far.\n";
+
+		$shutdown and last;
 
 		if ($rated >= $next_del) {
 			$next_del = $rated + 10000;
