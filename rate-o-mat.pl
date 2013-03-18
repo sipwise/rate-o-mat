@@ -488,10 +488,6 @@ sub get_contract_balance
 	my $start_time = shift;
 	my $contract_id = shift;
 	my $binfo = shift;
-	my $pinfo = shift;
-	my $r_cost = shift;
-	my $r_free_time = shift;
-	my $r_duration = shift;
 	my $r_balances = shift;
 
 	my $sth = $sth_get_cbalance;
@@ -517,71 +513,9 @@ sub get_contract_balance
 	{
 		my $row = $res->[$i];
 
-		my %balance = ();
-		$balance{id} = $row->{id};
-		$balance{cash_balance} = $row->{cash_balance};
-		$balance{cash_balance_interval} = $row->{cash_balance_interval};
-		$balance{free_time_balance} = $row->{free_time_balance};
-		$balance{free_time_balance_interval} = $row->{free_time_balance_interval};
-
-		if($i == 0)
-		{
-			if($binfo->{prepaid} == 1)
-			{
-				WARNING "TODO: do we need to process prepaid balances here?";
-				### should have been handled during call - why are we here anyway?
-			}
-			else
-			{
-				if($pinfo->{use_free_time} && $balance{free_time_balance} > 0)
-				{
-					$balance{free_time_balance} -= $$r_duration;
-					if($balance{free_time_balance} >= 0) {
-						$balance{free_time_balance_interval} += $$r_duration;
-						$$r_cost = 0;
-						$$r_free_time += $$r_duration;
-					} else {   # partial free-time payment
-						$balance{free_time_balance} *= -1;
-						$$r_cost *= $balance{free_time_balance} / $$r_duration;
-						$balance{free_time_balance_interval} += $$r_duration - $balance{free_time_balance};
-						$$r_free_time += $$r_duration - $balance{free_time_balance};
-						$balance{free_time_balance} = 0;
-					}
-				}
-				if($$r_cost and $balance{cash_balance} > 0)
-				{
-					$balance{cash_balance} -= $$r_cost;
-					if($balance{cash_balance} >= 0) {
-						$balance{cash_balance_interval} += $$r_cost;
-						$$r_cost = 0;
-					} else {  # partial free-cash payment
-						$balance{cash_balance} *= -1;
-						$balance{cash_balance_interval} += $$r_cost - $balance{cash_balance};
-						$$r_cost = $balance{cash_balance};
-						$balance{cash_balance} = 0;
-					}
-				}
-			}
-		}
-
-		if($i < @$res - 1)
-		{
-			# TODO: shift calculated values to next balance
-			# if call falls in an old balance
-		}
-
-
-		#print "contract balance:\n";
-		#print Dumper \%balance;
-	
-		$sth = $sth_update_cbalance;
-		$sth->execute(
-			$balance{cash_balance}, $balance{cash_balance_interval},
-			$balance{free_time_balance}, $balance{free_time_balance_interval},
-			$balance{id})
-			or FATAL "Error executing update contract balance statement: ".$sth->errstr;
-
+		my %balance = %$row;
 		push @$r_balances, \%balance;
+	
 	}
 
 	return 1;
@@ -589,21 +523,17 @@ sub get_contract_balance
 
 sub update_contract_balance
 {
-	my $start_time = shift;
-	my $contract_id = shift;
-	my $binfo = shift;
-	my $pinfo = shift;
-	my $r_cost = shift;
-	my $r_free_time = shift;
-	my $r_duration = shift;
+	my $r_balances = shift;
 
-	my @balances = ();
+	my $sth = $sth_update_cbalance;
 
-	get_contract_balance($start_time, $contract_id, $binfo, $pinfo, $r_cost, $r_free_time, $r_duration, \@balances)
-		or FATAL "Error getting contract balances\n";
-
-	# the above does the update as well, so we're done here
-	
+	for my $bal (@$r_balances) {
+		$sth->execute(
+			$bal->{cash_balance}, $bal->{cash_balance_interval},
+			$bal->{free_time_balance}, $bal->{free_time_balance_interval},
+			$bal->{id})
+			or FATAL "Error executing update contract balance statement: ".$sth->errstr;
+	}
 
 	return 1;
 }
@@ -929,6 +859,7 @@ sub get_call_cost
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $r_onpeak = shift;
+	my $r_balances = shift;
 
 	$$r_rating_duration = 0; # ensure we start with zero length
 
@@ -1036,11 +967,42 @@ sub get_call_cost
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
 		}
+		$rate *= $interval;
 
-		$$r_cost += $rate * $interval;
+		my @bals = grep {($_->{start} + $offset) <= $cdr->{start_time}} @$r_balances;
+		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
+		@bals = sort {$a->{start} <=> $b->{start}} @bals;
+		my $bal = $bals[0];
+
+		if ($bal->{free_time_balance} >= $interval) {
+			$$r_rating_duration += $interval;
+			$duration -= $interval;
+			$bal->{free_time_balance} -= $interval;
+			$bal->{free_time_balance_interval} += $interval;
+			next;
+		}
+
+		if ($bal->{free_time_balance} > 0) {
+			$$r_rating_duration += $bal->{free_time_balance};
+			$duration -= $bal->{free_time_balance};
+			$bal->{free_time_balance_interval} += $bal->{free_time_balance};
+			$rate *= 1.0 - ($bal->{free_time_balance} / $interval);
+			$interval -= $bal->{free_time_balance};
+			$bal->{free_time_balance} = 0;
+		}
+
+		if ($rate <= $bal->{cash_balance}) {
+			$bal->{cash_balance} -= $rate;
+			$bal->{cash_balance_interval} += $rate;
+		}
+		else {
+			$$r_cost += $rate;
+		}
+
 		$duration -= $interval;
-		$offset += $interval;
 		$$r_rating_duration += $interval;
+
+		$offset += $interval;
 	}
 
 	return 1;
@@ -1069,10 +1031,13 @@ sub get_customer_call_cost
 		return -1;
 	}
 
+	my @balances;
+	get_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \@balances);
+
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $destination_class,
 		$billing_info{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
-		$r_rating_duration, \$onpeak)
+		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting customer call cost\n";
 
 	$cdr->{customer_billing_fee_id} = $profile_info{fee_id};
@@ -1081,8 +1046,7 @@ sub get_customer_call_cost
 
 	unless($billing_info{prepaid} == 1)
 	{
-		update_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \%profile_info,
-				$r_cost, $r_free_time, $r_rating_duration)
+		update_contract_balance(\@balances)
 			or FATAL "Error updating customer contract balance\n";
 	}
 	else {
@@ -1125,16 +1089,18 @@ sub get_provider_call_cost
 		return -1;
 	}
 
+	my @balances;
+	get_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \@balances);
+
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $r_info->{class}, 
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
-		$r_rating_duration, \$onpeak)
+		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting provider call cost\n";
  
 	unless($billing_info{prepaid} == 1)
 	{
-		update_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \%profile_info,
-				$r_cost, $r_free_time, $r_rating_duration)
+		update_contract_balance(\@balances)
 			or FATAL "Error updating provider contract balance\n";
 	}
 
