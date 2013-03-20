@@ -268,7 +268,7 @@ sub init_db
 		"destination_carrier_cost = ?, destination_reseller_cost = ?, destination_customer_cost = ?, ".
 		"destination_carrier_free_time = ?, destination_reseller_free_time = ?, destination_customer_free_time = ?, ".
 		"destination_carrier_billing_fee_id = ?, destination_reseller_billing_fee_id = ?, destination_customer_billing_fee_id = ?, ".
-		"destination_carrier_billing_zone_id = ?, destination_reseller_billing_zone_id = ?, destination_customer_billing_zone_id = ?, ".
+		"destination_carrier_billing_zone_id = ?, destination_reseller_billing_zone_id = ?, destination_customer_billing_zone_id = ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
