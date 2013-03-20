@@ -195,14 +195,15 @@ sub init_db
 	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
-		"SELECT id, destination, ".
+		"SELECT id, direction, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
 		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? AND ? REGEXP(destination) ".
+		"AND bf_id IS NOT NULL AND type = ? ".
+		"AND direction = ? AND ? REGEXP(destination) ".
 		"ORDER BY LENGTH(destination) DESC LIMIT 1"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
@@ -583,6 +584,7 @@ sub get_profile_info
 {
 	my $bpid = shift;
 	my $type = shift;
+	my $direction = shift;
 	my $destination_class = shift;
 	my $destination = shift;
 	my $b_info = shift;
@@ -609,7 +611,7 @@ sub get_profile_info
 	my $sth = $sth_profile_info;
 
 	unless(@res) {
-		$sth->execute($bpid, $type, $destination)
+		$sth->execute($bpid, $type, $direction, $destination)
 			or FATAL "Error executing profile info statement: ".$sth->errstr;
 		@res = $sth->fetchrow_array();
 	}
@@ -617,17 +619,18 @@ sub get_profile_info
 	return 0 unless @res;
 	
 	$b_info->{fee_id} = $res[0];
-	$b_info->{pattern} = $res[1];
-	$b_info->{on_init_rate} = $res[2];
-	$b_info->{on_init_interval} = $res[3] == 0 ? 1 : $res[3]; # prevent loops
-	$b_info->{on_follow_rate} = $res[4];
-	$b_info->{on_follow_interval} = $res[5] == 0 ? 1 : $res[5];
-	$b_info->{off_init_rate} = $res[6];
-	$b_info->{off_init_interval} = $res[7] == 0 ? 1 : $res[7];
-	$b_info->{off_follow_rate} = $res[8];
-	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];
-	$b_info->{zone_id} = $res[10];
-	$b_info->{use_free_time} = $res[11];
+	$b_info->{direction} = $res[1];
+	$b_info->{pattern} = $res[2];
+	$b_info->{on_init_rate} = $res[3];
+	$b_info->{on_init_interval} = $res[4] == 0 ? 1 : $res[4]; # prevent loops
+	$b_info->{on_follow_rate} = $res[5];
+	$b_info->{on_follow_interval} = $res[6] == 0 ? 1 : $res[6];
+	$b_info->{off_init_rate} = $res[7];
+	$b_info->{off_init_interval} = $res[8] == 0 ? 1 : $res[8];
+	$b_info->{off_follow_rate} = $res[9];
+	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
+	$b_info->{zone_id} = $res[11];
+	$b_info->{use_free_time} = $res[12];
 	
 	$sth->finish;
 
@@ -851,6 +854,7 @@ sub get_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
+	my $direction = shift;
 	my $destination_class = shift;
 	my $profile_id = shift;
 	my $domain_first = shift;
@@ -884,10 +888,10 @@ sub get_call_cost
 
 
 
-	unless(get_profile_info($profile_id, $type, $destination_class, $first, 
+	unless(get_profile_info($profile_id, $type, $direction, $destination_class, $first, 
 		$r_profile_info, $cdr->{start_time}))
 	{
-		unless(get_profile_info($profile_id, $type, $destination_class, $second, 
+		unless(get_profile_info($profile_id, $type, $direction, $destination_class, $second, 
 			$r_profile_info, $cdr->{start_time}))
 		{
 			FATAL "No fee info for profile $profile_id and user '$dst_user' ".
@@ -1012,6 +1016,7 @@ sub get_customer_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
+	my $direction = shift;
 	my $destination_class = shift;
 	my $domain_first = shift;
 	my $r_cost = shift;
@@ -1035,7 +1040,7 @@ sub get_customer_call_cost
 	get_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \@balances);
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $destination_class,
+	get_call_cost($cdr, $type, $direction, $destination_class,
 		$billing_info{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting customer call cost\n";
@@ -1072,6 +1077,7 @@ sub get_provider_call_cost
 {
 	my $cdr = shift;
 	my $type = shift;
+	my $direction = shift;
 	my $domain_first = shift;
 	my $r_info = shift;
 	my $r_cost = shift;
@@ -1093,7 +1099,7 @@ sub get_provider_call_cost
 	get_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \@balances);
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $r_info->{class}, 
+	get_call_cost($cdr, $type, $direction, $r_info->{class}, 
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting provider call cost\n";
@@ -1131,6 +1137,8 @@ sub rate_cdr
 	my $customer_free_time = 0;
 	my $carrier_free_time = 0;
 	my $reseller_free_time = 0;
+
+	my $direction = 'out'; # TODO also rate in direction
 	
 	unless($cdr->{call_status} eq "ok")
 	{
@@ -1186,7 +1194,7 @@ sub rate_cdr
 
 			if($provider_info{profile_id}) {
 				# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
-				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
+				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
 					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
 				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
 					DEBUG "reseller rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
@@ -1203,7 +1211,7 @@ sub rate_cdr
 
 			if($provider_info{profile_id}) {
 				# carrier cost can be calculated directly with available billing profile
-				get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
+				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
 					or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
 				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
 					DEBUG "carrier rating_duration: $rating_duration, cdr->duration: $$cdr{duration}.\n";
@@ -1220,7 +1228,7 @@ sub rate_cdr
 				or FATAL "Error getting source reseller info\n";
 
 			if($reseller_info{profile_id}) {
-				get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
+				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%reseller_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
 					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
 
 				if($split_peak_parts and $cdr->{duration} > $rating_duration) {
@@ -1228,7 +1236,7 @@ sub rate_cdr
 					$cdr->{duration} = $rating_duration;
 					$cdr->{is_fragmented} = 1;
 					$fragmentation = 1;
-					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
+					get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
 						or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
 					if($cdr->{duration} != $rating_duration) {
 						FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.". Carrier and reseller profiles don't match.\n";
@@ -1245,7 +1253,7 @@ sub rate_cdr
 		}
 	}
 		
-	get_customer_call_cost($cdr, $type, $dst_class, $domain_first, \$customer_cost, \$customer_free_time, \$rating_duration)
+	get_customer_call_cost($cdr, $type, $direction, $dst_class, $domain_first, \$customer_cost, \$customer_free_time, \$rating_duration)
 		or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
 
 	if($split_peak_parts and $cdr->{duration} > $rating_duration) {
@@ -1255,12 +1263,12 @@ sub rate_cdr
 		if($cdr->{destination_provider_id} ne "0") {
 			if($dst_class eq 'reseller') {
 				if($provider_info{profile_id}) {
-					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
+					get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
 						or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
 				}
 			} else {
 				if($provider_info{profile_id}) {
-					get_provider_call_cost($cdr, $type, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
+					get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$carrier_cost, \$carrier_free_time, \$rating_duration)
 						or FATAL "Error getting carrier cost again for cdr ".$cdr->{id}."\n";
 					if($cdr->{duration} != $rating_duration) {
 						FATAL "Error getting stable rating fragment for cdr ".$cdr->{id}.
@@ -1268,7 +1276,7 @@ sub rate_cdr
 					}
 				}
 				if($reseller_info{profile_id}) {
-					get_provider_call_cost($cdr, $type, $domain_first, \%reseller_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
+					get_provider_call_cost($cdr, $type, $direction, $domain_first, \%reseller_info, \$reseller_cost, \$reseller_free_time, \$rating_duration)
 						or FATAL "Error getting reseller cost again for cdr ".$cdr->{id}."\n";
 				}
 			}
