@@ -208,14 +208,15 @@ sub init_db
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
 	$sth_lnp_profile_info = $billdbh->prepare(
-		"SELECT id, destination, ".
+		"SELECT id, direction, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
 		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? AND destination = ? ".
+		"AND bf_id IS NOT NULL AND type = ? ".
+		"AND direction = ? AND destination = ? ".
 		"LIMIT 1"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
@@ -600,7 +601,7 @@ sub get_profile_info
 
 		if(defined $lnppid and $lnppid =~ /^\d+$/) {
 			# let's see if we have a billing fee entry for the LNP provider ID
-			$sth_lnp_profile_info->execute($bpid, $type, 'lnp:'.$lnppid)
+			$sth_lnp_profile_info->execute($bpid, $type, $direction, 'lnp:'.$lnppid)
 				or FATAL "Error executing LNP profile info statement: ".$sth_lnp_profile_info->errstr;
 			@res = $sth_lnp_profile_info->fetchrow_array();
 			FATAL "Error fetching LNP profile info: ".$sth_lnp_profile_info->errstr
