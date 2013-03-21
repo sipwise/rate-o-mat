@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (1.4.1) unstable; urgency=high
+
+  * Fix incorrect carry-over of free time balance after a billing
+    profile change has happened, if the profile contains interval
+    free time
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Thu, 21 Mar 2013 12:10:18 -0400
+
 ngcp-rate-o-mat (1.4.0) unstable; urgency=low
 
   [ Daniel Tiefnig ]
