@@ -410,10 +410,8 @@ sub create_contract_balance
 
 	my %current_profile = ();
 	my $last_end_unix = $last_end + 1;
-	my $current_date;
-	set_start_strtime($last_end_unix, \$current_date);
-	get_billing_info($current_date, $binfo->{contract_id}, \%current_profile) or
-		FATAL "Error getting billing info for date '".$current_date."' and contract_id $binfo->{contract_id}\n";
+	get_billing_info($last_end_unix, $binfo->{contract_id}, \%current_profile) or
+		FATAL "Error getting billing info for date '".$last_end_unix."' and contract_id $binfo->{contract_id}\n";
 
 	my $ratio = 1;
 	if($create_time > $last_start and $create_time < $last_end) {
