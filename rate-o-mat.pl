@@ -81,8 +81,10 @@ sub FATAL
 	print "FATAL: $msg\n" if($fork != 1);
 	unless(defined $DBI::err and $DBI::err == 2006)
 	{
-		$billdbh->rollback if defined $billdbh;
-		$acctdbh->rollback if defined $acctdbh;
+		# we manually start the transaction and call commit, 
+		# so no need to rollback here
+		#$billdbh->rollback if defined $billdbh;
+		#$acctdbh->rollback if defined $acctdbh;
 	}
 	syslog('crit', $msg);
 	die "$msg\n";
@@ -129,7 +131,7 @@ sub connect_billdbh
 {
 	do {
 		INFO "Trying to connect to billing db...";
-		$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0, PrintWarn => 0});
+		$billdbh = DBI->connect("dbi:mysql:database=$BillDB_Name;host=$BillDB_Host;port=$BillDB_Port", $BillDB_User, $BillDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
 	} while(!defined $billdbh && ($DBI::err == 2002 || $DBI::err == 2003) && !$shutdown && sleep $connect_interval);
 	
 	FATAL "Error connecting to db: ".$DBI::errstr
@@ -141,7 +143,7 @@ sub connect_acctdbh
 {
 	do {
 		INFO "Trying to connect to accounting db...";
-		$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 0, PrintWarn => 0});
+		$acctdbh = DBI->connect("dbi:mysql:database=$AcctDB_Name;host=$AcctDB_Host;port=$AcctDB_Port", $AcctDB_User, $AcctDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
 	} while(!defined $acctdbh && ($DBI::err == 2002 || $DBI::err == 2003) && !$shutdown && sleep $connect_interval);
 
 	FATAL "Error connecting to db: ".$DBI::errstr
@@ -188,7 +190,7 @@ sub init_db
 	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
-		"SELECT id, direction, destination, ".
+		"SELECT id, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
@@ -201,7 +203,7 @@ sub init_db
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
 	$sth_lnp_profile_info = $billdbh->prepare(
-		"SELECT id, direction, destination, ".
+		"SELECT id, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
@@ -552,7 +554,6 @@ sub get_profile_info
 	my $bpid = shift;
 	my $type = shift;
 	my $direction = shift;
-	my $destination_class = shift;
 	my $destination = shift;
 	my $b_info = shift;
 	my $start_time = shift;
@@ -586,18 +587,17 @@ sub get_profile_info
 	return 0 unless @res;
 	
 	$b_info->{fee_id} = $res[0];
-	$b_info->{direction} = $res[1];
-	$b_info->{pattern} = $res[2];
-	$b_info->{on_init_rate} = $res[3];
-	$b_info->{on_init_interval} = $res[4] == 0 ? 1 : $res[4]; # prevent loops
-	$b_info->{on_follow_rate} = $res[5];
-	$b_info->{on_follow_interval} = $res[6] == 0 ? 1 : $res[6];
-	$b_info->{off_init_rate} = $res[7];
-	$b_info->{off_init_interval} = $res[8] == 0 ? 1 : $res[8];
-	$b_info->{off_follow_rate} = $res[9];
-	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
-	$b_info->{zone_id} = $res[11];
-	$b_info->{use_free_time} = $res[12];
+	$b_info->{pattern} = $res[1];
+	$b_info->{on_init_rate} = $res[2];
+	$b_info->{on_init_interval} = $res[3] == 0 ? 1 : $res[3]; # prevent loops
+	$b_info->{on_follow_rate} = $res[4];
+	$b_info->{on_follow_interval} = $res[5] == 0 ? 1 : $res[5];
+	$b_info->{off_init_rate} = $res[6];
+	$b_info->{off_init_interval} = $res[7] == 0 ? 1 : $res[7];
+	$b_info->{off_follow_rate} = $res[8];
+	$b_info->{off_follow_interval} = $res[9] == 0 ? 1 : $res[9];
+	$b_info->{zone_id} = $res[10];
+	$b_info->{use_free_time} = $res[11];
 	
 	$sth->finish;
 
@@ -809,7 +809,6 @@ sub get_call_cost
 	my $cdr = shift;
 	my $type = shift;
 	my $direction = shift;
-	my $destination_class = shift;
 	my $profile_id = shift;
 	my $domain_first = shift;
 	my $r_profile_info = shift;
@@ -842,14 +841,15 @@ sub get_call_cost
 
 
 
-	unless(get_profile_info($profile_id, $type, $direction, $destination_class, $first, 
+	unless(get_profile_info($profile_id, $type, $direction, $first, 
 		$r_profile_info, $cdr->{start_time}))
 	{
-		unless(get_profile_info($profile_id, $type, $direction, $destination_class, $second, 
+		unless(get_profile_info($profile_id, $type, $direction, $second, 
 			$r_profile_info, $cdr->{start_time}))
 		{
-			FATAL "No fee info for profile $profile_id and user '$dst_user' ".
-			      "or domain '$dst_domain' found\n";
+			# we gracefully ignore missing profile infos for inbound direction
+			FATAL "No outbound fee info for profile $profile_id and user '$dst_user' ".
+			      "or domain '$dst_domain' found\n" if($direction eq "out");
 			$$r_cost = 0;
 			$$r_free_time = 0;
 			return 1;
@@ -969,14 +969,20 @@ sub get_customer_call_cost
 	my $cdr = shift;
 	my $type = shift;
 	my $direction = shift;
-	my $destination_class = shift;
 	my $domain_first = shift;
 	my $r_cost = shift;
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $onpeak;
 
-	my $contract_id = get_subscriber_contract_id($cdr->{source_user_id});
+	my $dir;
+	if($direction eq "out") {
+		$dir = "source_";
+	} else {
+		$dir = "destination_";
+	}
+
+	my $contract_id = get_subscriber_contract_id($cdr->{$dir."user_id"});
 
 	my %billing_info = ();
 	get_billing_info($cdr->{start_time}, $contract_id, \%billing_info) or
@@ -992,18 +998,13 @@ sub get_customer_call_cost
 	get_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \@balances);
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $direction, $destination_class,
+	get_call_cost($cdr, $type, $direction,
 		$billing_info{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting customer call cost\n";
 
-	if($direction eq 'out') {
-		$cdr->{source_customer_billing_fee_id} = $profile_info{fee_id};
-		$cdr->{source_customer_billing_zone_id} = $profile_info{zone_id};
-	} elsif($direction eq 'in') {
-		$cdr->{destination_customer_billing_fee_id} = $profile_info{fee_id};
-		$cdr->{destination_customer_billing_zone_id} = $profile_info{zone_id};
-	}
+	$cdr->{$dir."customer_billing_fee_id"} = $profile_info{fee_id};
+	$cdr->{$dir."customer_billing_zone_id"} = $profile_info{zone_id};
 	unless($billing_info{prepaid} == 1)
 	{
 		update_contract_balance(\@balances)
@@ -1107,7 +1108,9 @@ sub rate_cdr
 	my $destination_carrier_free_time = 0;
 	my $destination_reseller_free_time = 0;
 
-	my $direction = 'out'; # TODO also rate in direction
+	my $direction;
+	my $domain_first;
+	my $rating_duration;
 	
 	unless($cdr->{call_status} eq "ok")
 	{
@@ -1126,90 +1129,165 @@ sub rate_cdr
 		return 1;
 	}
 
-	if($cdr->{source_user_id} eq "0")
-	{
-		# caller is not local
-		# TODO: should there be an incoming profile to calculate termination fees?
+	# 1. rate source (termination fees for caller -> source_costs etc.)
+	#	if source_user_id ne 0 (call from local subscriber)
+	# 		fetch source provider profile (reseller) and rate against destination
+	#		fetch source customer profile (subscriber) and rate against dest
+	#	else (call from peer)
+	#		fetch source provider profile (peering) and rate against destination
+	# 2. rate destination (origination fees for callee -> destination_costs etc.)
+	#	if destination_user_id ne 0 (call to local subscriber)
+	# 		fetch destination provider profile (reseller) and rate against destination
+	#		fetch destination customer profile (subscriber) and rate against dest
+	#	else (call to peer)
+	#		fetch destination provider profile (peering) and rate against destination
 
-		$cdr->{source_carrier_cost} = $source_carrier_cost;
-		$cdr->{source_reseller_cost} = $source_reseller_cost;
-		$cdr->{source_customer_cost} = $source_customer_cost;
-		$cdr->{source_carrier_free_time} = $source_carrier_free_time;
-		$cdr->{source_reseller_free_time} = $source_reseller_free_time;
-		$cdr->{source_customer_free_time} = $source_customer_free_time;
-		$cdr->{destination_carrier_cost} = $destination_carrier_cost;
-		$cdr->{destination_reseller_cost} = $destination_reseller_cost;
-		$cdr->{destination_customer_cost} = $destination_customer_cost;
-		$cdr->{destination_carrier_free_time} = $destination_carrier_free_time;
-		$cdr->{destination_reseller_free_time} = $destination_reseller_free_time;
-		$cdr->{destination_customer_free_time} = $destination_customer_free_time;
-		return 1;
+	# for local subscribers (xxx_user_id != 0):
+	#   xxx_user_id is subscriber uuid
+	#   xxx_account_id is subscriber contract id
+	#   xxx_provider_id is reseller contract id
+	# for peering users (xxx_user_id == 0):
+	#   xxx_user_id is 0
+	#   xxx_account_id is 0
+	#   xxx_provider_id is peering contract id
+
+
+	# here we go:
+
+	# since xxx_provider_id always must be set, we can fetch both source and destination infos
+	# and bail out of there is no billing profile for that
+	my %source_provider_info = ();
+	if($cdr->{source_provider_id} eq "0") {
+		FATAL "Missing source_provider_id for source_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
 	}
+	get_provider_info($cdr->{source_provider_id}, $cdr->{start_time}, \%source_provider_info)
+		or FATAL "Error getting source provider info for cdr #".$cdr->{id}."\n";
 
-	# caller is local
+	INFO "source_provider_info:\n";
+	INFO Dumper \%source_provider_info;
 
-	my %provider_info = ();
-	my %reseller_info = ();
-	my $dst_class;
-	my $domain_first = 0;
-	my $rating_duration;
+	#unless($source_provider_info{profile_info}) {
+	#	FATAL "Missing billing profile for source_provider_id ".$cdr->{source_provider_id}." for cdr #".$cdr->{id}."\n";
+	#}
 
-	if($cdr->{destination_provider_id} eq "0")
-	{
-		# call to voicebox or conference?
-		WARNING "CDR id ".$cdr->{id}." has no destination provider id\n";
+	my %destination_provider_info = ();
+	if($cdr->{destination_provider_id} eq "0") {
+		FATAL "Missing destination_provider_id for destination_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
+	}
+	get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
+		or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
 
-		$dst_class = 'reseller';
+	INFO "destination_provider_info:\n";
+	INFO Dumper \%destination_provider_info;
 
+	#unless($destination_provider_info{profile_info}) {
+	#	FATAL "Missing billing profile for destination_provider_id ".$cdr->{destination_provider_id}." for cdr #".$cdr->{id}."\n";
+	#}
+	
+	$domain_first = 0;
+
+	# call from local subscriber
+	if($cdr->{source_user_id} ne "0") {
+		# if we have a call from local subscriber, the source provider MUST be a reseller
+		if($source_provider_info{class} ne "reseller") {
+			FATAL "The local source_user_id ".$cdr->{source_user_id}." has a source_provider_id ".$cdr->{source_provider_id}.
+				" which is not a reseller in cdr #".$cdr->{id}."\n";
+		}
+
+		if($cdr->{destination_user_id} ne "0") {
+			# call to local subscriber (on-net)
+
+			# if destination user is local subscriber, priorize domain over user in fee matching
+			$domain_first = 1;
+
+			# there is no carrier cost for on-net calls
+
+			# for calls towards a local user, termination fees might apply if
+			# we find a fee with direction "in"
+			if($destination_provider_info{profile_id}) {
+				get_provider_call_cost($cdr, $type, "in", $domain_first, 
+							\%destination_provider_info, \$destination_reseller_cost, \$destination_reseller_free_time, 
+							\$rating_duration)
+					or FATAL "Error getting destination reseller cost for local destination_provider_id ".
+							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			} else {
+				# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
+				# in theory, all resellers MUST have a billing profile, so we could bail out here
+			}
+			get_customer_call_cost($cdr, $type, "in", $domain_first,
+						\$destination_customer_cost, \$destination_customer_free_time, 
+						\$rating_duration)
+				or FATAL "Error getting destination customer cost for local destination_user_id ".
+						$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
+		} else {
+			$domain_first = 0;
+
+			# we can't charge termination fees to the callee if it's not local
+
+			# for the carrier cost, we use the destination billing profile of a peer 
+			# (this is what the peering provider is charging the carrier)
+			get_provider_call_cost($cdr, $type, "out", $domain_first, 
+						\%destination_provider_info, \$source_carrier_cost, \$source_carrier_free_time, 
+						\$rating_duration)
+					or FATAL "Error getting source carrier cost for cdr ".$cdr->{id}."\n";
+		}
+
+		# get reseller cost
+		if($destination_provider_info{profile_id}) {
+			get_provider_call_cost($cdr, $type, "out", $domain_first, 
+						\%source_provider_info, \$source_reseller_cost, \$source_reseller_free_time, 
+						\$rating_duration)
+				 or FATAL "Error getting source reseller cost for cdr ".$cdr->{id}."\n";
+		} else {
+			# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
+			# in theory, all resellers MUST have a billing profile, so we could bail out here
+		}
+
+		# get customer cost
+		get_customer_call_cost($cdr, $type, "out", $domain_first, 
+					\$source_customer_cost, \$source_customer_free_time, 
+					\$rating_duration)
+			or FATAL "Error getting source customer cost for local source_user_id ".
+					$cdr->{source_user_id}." for cdr ".$cdr->{id}."\n";
 	} else {
+		# call from a foreign caller
 
-		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time},
-			\%provider_info)
-			or FATAL "Error getting destination provider info\n";
+		# in this case, termination fees for the callee might still apply
+		if($cdr->{destination_user_id} ne "0") {
+			# call to local subscriber
 
-		if($provider_info{class} eq "reseller")
-		{
-			$dst_class = 'reseller';
-			$domain_first = 1; # priorize domain over user to correctly rate onnet-calls
+			# if destination user is local subscriber, priorize domain over user in fee matching
+			$domain_first = 1;
 
-			if($provider_info{profile_id}) {
-				# only calculate reseller cost, carrier cost is 0 (hosting-onnet)
-				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$source_reseller_cost, \$source_reseller_free_time, \$rating_duration)
-					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
+			# for calls towards a local user, termination fees might apply if
+			# we find a fee with direction "in"
+
+			# we use the source provider info (the one of the peer) for the carrier termination fees,
+			# as this is what the peer is charging us
+			get_provider_call_cost($cdr, $type, "in", $domain_first, 
+						\%source_provider_info, \$destination_carrier_cost, \$destination_carrier_free_time, 
+						\$rating_duration)
+				or FATAL "Error getting destination carrier cost for local destination_provider_id ".
+						$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			if($destination_provider_info{profile_id}) {
+				get_provider_call_cost($cdr, $type, "in", $domain_first, 
+							\%destination_provider_info, \$destination_reseller_cost, \$destination_reseller_free_time, 
+							\$rating_duration)
+					or FATAL "Error getting destination reseller cost for local destination_provider_id ".
+							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			} else {
+				# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
+				# in theory, all resellers MUST have a billing profile, so we could bail out here
 			}
-		}
-		elsif($provider_info{class} eq "sippeering" || $provider_info{class} eq "pstnpeering")
-		{
-			$dst_class = $provider_info{class};
-			$domain_first = 0; # for calls leaving our system, priorize user over domain
-
-			if($provider_info{profile_id}) {
-				# carrier cost can be calculated directly with available billing profile
-				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%provider_info, \$source_carrier_cost, \$source_carrier_free_time, \$rating_duration)
-					or FATAL "Error getting carrier cost for cdr ".$cdr->{id}."\n";
-			}
-
-			# for reseller we first have to find the billing profile
-			%reseller_info = ();
-			get_reseller_info($cdr->{source_user_id}, $cdr->{start_time},
-				\%reseller_info)
-				or FATAL "Error getting source reseller info\n";
-
-			if($reseller_info{profile_id}) {
-				get_provider_call_cost($cdr, $type, $direction, $domain_first, \%reseller_info, \$source_reseller_cost, \$source_reseller_free_time, \$rating_duration)
-					or FATAL "Error getting reseller cost for cdr ".$cdr->{id}."\n";
-
-			}
-		}
-		else
-		{
-			FATAL "Destination provider id ".$cdr->{destination_provider_id}." has invalid ".
-				"class '".$provider_info{class}."' in cdr ".$cdr->{id}."\n";
+			get_customer_call_cost($cdr, $type, "in", $domain_first,
+						\$destination_customer_cost, \$destination_customer_free_time, 
+						\$rating_duration)
+				or FATAL "Error getting destination customer cost for local destination_user_id ".
+						$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
+		} else {
+			# TODO what about transit calls?
 		}
 	}
-		
-	get_customer_call_cost($cdr, $type, $direction, $dst_class, $domain_first, \$source_customer_cost, \$source_customer_free_time, \$rating_duration)
-		or FATAL "Error getting customer cost for cdr ".$cdr->{id}."\n";
 
 	$cdr->{source_carrier_cost} = $source_carrier_cost;
 	$cdr->{source_reseller_cost} = $source_reseller_cost;
