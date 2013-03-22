@@ -1055,7 +1055,7 @@ sub get_provider_call_cost
 	get_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \@balances);
 
 	my %profile_info = ();
-	get_call_cost($cdr, $type, $direction, $r_info->{class}, 
+	get_call_cost($cdr, $type, $direction,
 		$r_info->{profile_id}, $domain_first, \%profile_info, $r_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting provider call cost\n";
@@ -1163,9 +1163,6 @@ sub rate_cdr
 	get_provider_info($cdr->{source_provider_id}, $cdr->{start_time}, \%source_provider_info)
 		or FATAL "Error getting source provider info for cdr #".$cdr->{id}."\n";
 
-	INFO "source_provider_info:\n";
-	INFO Dumper \%source_provider_info;
-
 	#unless($source_provider_info{profile_info}) {
 	#	FATAL "Missing billing profile for source_provider_id ".$cdr->{source_provider_id}." for cdr #".$cdr->{id}."\n";
 	#}
@@ -1176,9 +1173,6 @@ sub rate_cdr
 	}
 	get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
 		or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
-
-	INFO "destination_provider_info:\n";
-	INFO Dumper \%destination_provider_info;
 
 	#unless($destination_provider_info{profile_info}) {
 	#	FATAL "Missing billing profile for destination_provider_id ".$cdr->{destination_provider_id}." for cdr #".$cdr->{id}."\n";
