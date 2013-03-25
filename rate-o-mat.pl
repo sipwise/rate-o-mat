@@ -245,6 +245,7 @@ sub init_db
 	$sth_unrated_cdrs = $acctdbh->prepare(
 		"SELECT id, call_id, ".
 		"source_user_id, source_provider_id, ".
+		"source_cli, source_domain, ".
 		"destination_user_id, destination_provider_id, ".
 		"destination_user, destination_domain, ".
 		"destination_user_in, destination_domain_in, ".
