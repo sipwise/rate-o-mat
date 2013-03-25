@@ -550,15 +550,14 @@ sub get_contract_balance
 				{
 					$balance{cash_balance} -= $$r_cost;
 					if($balance{cash_balance} >= 0) {
-						$balance{cash_balance_interval} += $$r_cost;
 						$$r_cost = 0;
 					} else {  # partial free-cash payment
 						$balance{cash_balance} *= -1;
-						$balance{cash_balance_interval} += $$r_cost - $balance{cash_balance};
 						$$r_cost = $balance{cash_balance};
 						$balance{cash_balance} = 0;
 					}
 				}
+				$balance{cash_balance_interval} += $$r_cost;
 			}
 		}
 
