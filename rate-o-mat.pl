@@ -1205,7 +1205,7 @@ sub rate_cdr
 		}
 
 		# get reseller cost
-		if($destination_provider_info{profile_id}) {
+		if($source_provider_info{profile_id}) {
 			get_provider_call_cost($cdr, $type, "out",
 						\%source_provider_info, \$source_reseller_cost, \$source_reseller_free_time, 
 						\$rating_duration)
