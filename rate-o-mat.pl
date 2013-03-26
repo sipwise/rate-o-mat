@@ -937,10 +937,10 @@ sub get_call_cost
 
 		if ($rate <= $bal->{cash_balance}) {
 			$bal->{cash_balance} -= $rate;
-			$bal->{cash_balance_interval} += $rate;
 		}
 		else {
 			$$r_cost += $rate;
+			$bal->{cash_balance_interval} += $rate;
 		}
 
 		$duration -= $interval;
