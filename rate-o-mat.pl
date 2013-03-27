@@ -13,6 +13,7 @@ my $fork = 1;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = $ENV{RATEOMAT_LOOP_INTERVAL} ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10;
+my $debug = $ENV{RATEOMAT_DEBUG} ? int $ENV{RATEOMAT_DEBUG} : 0;
 
 my $log_ident = 'rate-o-mat';
 my $log_facility = 'daemon';
@@ -92,6 +93,7 @@ sub FATAL
 
 sub DEBUG
 {
+	return unless $debug;
 	my $msg = shift;
 	chomp $msg;
 	print "DEBUG: $msg\n" if($fork != 1);
@@ -815,6 +817,7 @@ sub get_call_cost
 	my $profile_id = shift;
 	my $r_profile_info = shift;
 	my $r_cost = shift;
+	my $r_real_cost = shift;
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $r_onpeak = shift;
@@ -827,9 +830,14 @@ sub get_call_cost
 	my $dst_user = $cdr->{destination_user_in};
 	my $dst_user_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 
+	DEBUG "fetching call cost for profile_id $profile_id with type $type, direction $direction, ".
+		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain";
+
 	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, 
 		$r_profile_info, $cdr->{start_time}))
 	{
+		DEBUG "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
+			"src_user_domain $src_user, dst_user_domain $dst_user";
 		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user, 
 			$r_profile_info, $cdr->{start_time}))
 		{
@@ -843,6 +851,8 @@ sub get_call_cost
 			return 1;
 		}
 	}
+
+	DEBUG "billing fee is ".(Dumper $r_profile_info);
 
 	#print Dumper $r_profile_info;
 
@@ -859,6 +869,7 @@ sub get_call_cost
 	#print Dumper \@offpeak_special;
 
 	$$r_cost = 0;
+	$$r_real_cost = 0;
 	$$r_free_time = 0;
 	my $interval = 0;
 	my $rate = 0;
@@ -879,6 +890,8 @@ sub get_call_cost
 
 	while($duration > 0)
 	{
+		DEBUG "try to rate remaining duration of $duration secs";
+
 		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special))
 		{
 			#print "offset $offset is offpeak-special\n";
@@ -903,6 +916,7 @@ sub get_call_cost
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
 			$$r_onpeak = $onpeak;
+			DEBUG "add follow rate $rate per sec to costs";
 		}
 		else
 		{
@@ -910,8 +924,10 @@ sub get_call_cost
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
+			DEBUG "add init rate $rate per sec to costs";
 		}
 		$rate *= $interval;
+		DEBUG "interval is $interval, so rate for this interval is $rate";
 
 		my @bals = grep {($_->{start_unix} + $offset) <= $cdr->{start_time}} @$r_balances;
 		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
@@ -936,12 +952,15 @@ sub get_call_cost
 		}
 
 		if ($rate <= $bal->{cash_balance}) {
+			DEBUG "we still have cash balance $$bal{cash_balance} left, subtract rate $rate from that";
 			$bal->{cash_balance} -= $rate;
 		}
 		else {
+			DEBUG "add current interval cost $rate to total cost $$r_cost";
 			$$r_cost += $rate;
 			$bal->{cash_balance_interval} += $rate;
 		}
+		$$r_real_cost += $rate;
 
 		$duration -= $interval;
 		$$r_rating_duration += $interval;
@@ -961,6 +980,7 @@ sub get_customer_call_cost
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $onpeak;
+	my $real_cost = 0;
 
 	my $dir;
 	if($direction eq "out") {
@@ -986,23 +1006,37 @@ sub get_customer_call_cost
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
-		$billing_info{profile_id}, \%profile_info, $r_cost, $r_free_time,
+		$billing_info{profile_id}, \%profile_info, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting customer call cost\n";
 
 	$cdr->{$dir."customer_billing_fee_id"} = $profile_info{fee_id};
 	$cdr->{$dir."customer_billing_zone_id"} = $profile_info{zone_id};
-	unless($billing_info{prepaid} == 1)
+	DEBUG "got call cost $$r_cost";
+
+	# we don't do prepaid for termination fees for now, so treat it as post-paid
+	if($billing_info{prepaid} != 1 || $direction eq "in")
 	{
+		if($direction eq "in") {
+			DEBUG "treat pre-paid billing profile as post-paid for termination fees";
+			$$r_cost = $real_cost;
+		} else {
+			DEBUG "billing profile is post-paid, update contract balance";
+		}
 		update_contract_balance(\@balances)
 			or FATAL "Error updating customer contract balance\n";
 	}
 	else {
+		DEBUG "billing profile is prepaid";
 		# overwrite the calculated costs with the ones from our table
 		if (!$prepaid_costs) {
+			DEBUG "no prepaid_costs, fetch it";
 			$sth_prepaid_costs->execute()
 				or FATAL "Error executing get prepaid costs statement: ".$sth_prepaid_costs->errstr;
 			$prepaid_costs = $sth_prepaid_costs->fetchall_hashref('call_id');
+			DEBUG "fetched prepaid_costs is ".(Dumper $prepaid_costs);
+		} else {
+			DEBUG "prefetched prepaid_costs is ".(Dumper $prepaid_costs);
 		}
 		if (exists($prepaid_costs->{$cdr->{call_id}})) {
 			my $entry = $prepaid_costs->{$cdr->{call_id}};
@@ -1010,8 +1044,14 @@ sub get_customer_call_cost
 			$$r_free_time = $entry->{free_time_used};
 			$sth_delete_prepaid_cost->execute($entry->{call_id});
 			delete($prepaid_costs->{$cdr->{call_id}});
+		} else {
+			update_contract_balance(\@balances)
+				or FATAL "Error updating customer contract balance\n";
+			$$r_cost = $real_cost;
 		}
 	}
+
+	DEBUG "cost for this call is $$r_cost";
 
 	return 1;
 }
@@ -1026,6 +1066,7 @@ sub get_provider_call_cost
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $onpeak;
+	my $real_cost = 0;
 
 	my %billing_info = ();
 	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, \%billing_info) or
@@ -1042,7 +1083,7 @@ sub get_provider_call_cost
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
-		$r_info->{profile_id}, \%profile_info, $r_cost, $r_free_time,
+		$r_info->{profile_id}, \%profile_info, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting provider call cost\n";
  
@@ -1099,6 +1140,7 @@ sub rate_cdr
 	
 	unless($cdr->{call_status} eq "ok")
 	{
+		DEBUG "cdr #$$cdr{id} has call_status $$cdr{call_status}, skip.";
 		$cdr->{source_carrier_cost} = $source_carrier_cost;
 		$cdr->{source_reseller_cost} = $source_reseller_cost;
 		$cdr->{source_customer_cost} = $source_customer_cost;
@@ -1141,23 +1183,27 @@ sub rate_cdr
 
 	# since xxx_provider_id always must be set, we can fetch both source and destination infos
 	# and bail out of there is no billing profile for that
+	DEBUG "fetching source provider info for source_provider_id #$$cdr{source_provider_id}";
 	my %source_provider_info = ();
 	if($cdr->{source_provider_id} eq "0") {
 		FATAL "Missing source_provider_id for source_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
 	}
 	get_provider_info($cdr->{source_provider_id}, $cdr->{start_time}, \%source_provider_info)
 		or FATAL "Error getting source provider info for cdr #".$cdr->{id}."\n";
+	DEBUG "source_provider_info is ".(Dumper \%source_provider_info);
 
 	#unless($source_provider_info{profile_info}) {
 	#	FATAL "Missing billing profile for source_provider_id ".$cdr->{source_provider_id}." for cdr #".$cdr->{id}."\n";
 	#}
 
+	DEBUG "fetching destination provider info for destination_provider_id #$$cdr{destination_provider_id}";
 	my %destination_provider_info = ();
 	if($cdr->{destination_provider_id} eq "0") {
 		FATAL "Missing destination_provider_id for destination_user_id ".$cdr->{destination_user_id}." in cdr #".$cdr->{id}."\n";
 	}
 	get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
 		or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
+	DEBUG "destination_provider_info is ".(Dumper \%destination_provider_info);
 
 	#unless($destination_provider_info{profile_info}) {
 	#	FATAL "Missing billing profile for destination_provider_id ".$cdr->{destination_provider_id}." for cdr #".$cdr->{id}."\n";
@@ -1165,6 +1211,7 @@ sub rate_cdr
 	
 	# call from local subscriber
 	if($cdr->{source_user_id} ne "0") {
+		DEBUG "call from local subscriber, source_user_id is $$cdr{source_user_id}";
 		# if we have a call from local subscriber, the source provider MUST be a reseller
 		if($source_provider_info{class} ne "reseller") {
 			FATAL "The local source_user_id ".$cdr->{source_user_id}." has a source_provider_id ".$cdr->{source_provider_id}.
@@ -1172,6 +1219,7 @@ sub rate_cdr
 		}
 
 		if($cdr->{destination_user_id} ne "0") {
+			DEBUG "call to local subscriber, destination_user_id is $$cdr{destination_user_id}";
 			# call to local subscriber (on-net)
 
 			# there is no carrier cost for on-net calls
@@ -1179,20 +1227,26 @@ sub rate_cdr
 			# for calls towards a local user, termination fees might apply if
 			# we find a fee with direction "in"
 			if($destination_provider_info{profile_id}) {
+				DEBUG "destination provider has billing profile $destination_provider_info{profile_id}, get reseller termination cost";
 				get_provider_call_cost($cdr, $type, "in",
 							\%destination_provider_info, \$destination_reseller_cost, \$destination_reseller_free_time, 
 							\$rating_duration)
 					or FATAL "Error getting destination reseller cost for local destination_provider_id ".
 							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+				DEBUG "destination reseller termination cost is $destination_reseller_cost";
 			} else {
 				# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
 				# in theory, all resellers MUST have a billing profile, so we could bail out here
+				DEBUG "destination provider $$cdr{destination_provider_id} has no billing profile, skip reseller termination cost";
 			}
+			DEBUG "get customer termination cost for destination_user_id $$cdr{destination_user_id}";
 			get_customer_call_cost($cdr, $type, "in",
 						\$destination_customer_cost, \$destination_customer_free_time, 
 						\$rating_duration)
 				or FATAL "Error getting destination customer cost for local destination_user_id ".
 						$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
+			DEBUG "destination customer termination cost is $destination_customer_cost";
+
 		} else {
 			# we can't charge termination fees to the callee if it's not local
 
@@ -1333,7 +1387,7 @@ sub main
 
 		unless(@cdrs)
 		{
-			DEBUG "No new CDRs to rate, sleep $loop_interval";
+			INFO "No new CDRs to rate, sleep $loop_interval";
 			sleep($loop_interval);
 			next;
 		}
@@ -1345,7 +1399,7 @@ sub main
 		{
 			foreach my $cdr(@cdrs)
 			{
-				DEBUG "rate cdr #".$cdr->{id}."\n";
+				INFO "rate cdr #".$cdr->{id}."\n";
 				rate_cdr($cdr, $type)
 				    && update_cdr($cdr);
 				$rated++;
@@ -1369,7 +1423,7 @@ sub main
 		$billdbh->commit or FATAL "Error committing cdrs: ".$billdbh->errstr;
 		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
 
-		DEBUG "$rated CDRs rated so far.\n";
+		INFO "$rated CDRs rated so far.\n";
 
 		$shutdown and last;
 
@@ -1380,7 +1434,7 @@ sub main
 
 		unless(@cdrs >= 5)
 		{
-			DEBUG "Less than 5 new CDRs rated, sleep $loop_interval";
+			INFO "Less than 5 new CDRs rated, sleep $loop_interval";
 			sleep($loop_interval);
 			next;
 		}
