@@ -1154,7 +1154,7 @@ sub rate_cdr
 
 	my %destination_provider_info = ();
 	if($cdr->{destination_provider_id} eq "0") {
-		FATAL "Missing destination_provider_id for destination_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
+		FATAL "Missing destination_provider_id for destination_user_id ".$cdr->{destination_user_id}." in cdr #".$cdr->{id}."\n";
 	}
 	get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
 		or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
