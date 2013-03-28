@@ -1,3 +1,9 @@
+ngcp-rate-o-mat (1.5.4) unstable; urgency=low
+
+  * Fix free time calculation and add more debug messages.
+
+ -- Andreas Granig <agranig@sipwise.com>  Thu, 28 Mar 2013 15:48:58 +0100
+
 ngcp-rate-o-mat (1.5.0) unstable; urgency=low
 
   * Implement source-based fee matching.
