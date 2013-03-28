@@ -947,13 +947,13 @@ sub get_call_cost
 
 		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} > 0) {
 			DEBUG "using $$bal{free_time_balance} sec free time for this interval and calculate cost for remaining interval chunk";
+			$$r_free_time += $bal->{free_time_balance};
 			$$r_rating_duration += $bal->{free_time_balance};
 			$duration -= $bal->{free_time_balance};
 			$bal->{free_time_balance_interval} += $bal->{free_time_balance};
 			$rate *= 1.0 - ($bal->{free_time_balance} / $interval);
 			$interval -= $bal->{free_time_balance};
 			$bal->{free_time_balance} = 0;
-			$$r_free_time += $bal->{free_time_balance};
 			DEBUG "calculate cost for remaining interval chunk $interval";
 		}
 
@@ -1018,7 +1018,7 @@ sub get_customer_call_cost
 
 	$cdr->{$dir."customer_billing_fee_id"} = $profile_info{fee_id};
 	$cdr->{$dir."customer_billing_zone_id"} = $profile_info{zone_id};
-	DEBUG "got call cost $$r_cost";
+	DEBUG "got call cost $$r_cost and free time $r_free_time";
 
 	# we don't do prepaid for termination fees for now, so treat it as post-paid
 	if($billing_info{prepaid} != 1 || $direction eq "in")
