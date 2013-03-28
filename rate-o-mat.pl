@@ -96,6 +96,7 @@ sub DEBUG
 	return unless $debug;
 	my $msg = shift;
 	chomp $msg;
+	$msg =~ s/#012 +/ /g;
 	print "DEBUG: $msg\n" if($fork != 1);
 	syslog('debug', $msg);
 }
@@ -916,7 +917,7 @@ sub get_call_cost
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
 			$$r_onpeak = $onpeak;
-			DEBUG "add follow rate $rate per sec to costs";
+			DEBUG "add init rate $rate per sec to costs";
 		}
 		else
 		{
@@ -924,7 +925,7 @@ sub get_call_cost
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
 			$rate = $onpeak == 1 ? 
 				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
-			DEBUG "add init rate $rate per sec to costs";
+			DEBUG "add follow rate $rate per sec to costs";
 		}
 		$rate *= $interval;
 		DEBUG "interval is $interval, so rate for this interval is $rate";
@@ -934,21 +935,26 @@ sub get_call_cost
 		@bals = sort {$a->{start_unix} <=> $b->{start_unix}} @bals;
 		my $bal = $bals[0];
 
-		if ($bal->{free_time_balance} >= $interval) {
+		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} >= $interval) {
+			DEBUG "subtracting $interval sec from free_time_balance $$bal{free_time_balance} and skip costs for this interval";
 			$$r_rating_duration += $interval;
 			$duration -= $interval;
 			$bal->{free_time_balance} -= $interval;
 			$bal->{free_time_balance_interval} += $interval;
+			$$r_free_time += $interval;
 			next;
 		}
 
-		if ($bal->{free_time_balance} > 0) {
+		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} > 0) {
+			DEBUG "using $$bal{free_time_balance} sec free time for this interval and calculate cost for remaining interval chunk";
 			$$r_rating_duration += $bal->{free_time_balance};
 			$duration -= $bal->{free_time_balance};
 			$bal->{free_time_balance_interval} += $bal->{free_time_balance};
 			$rate *= 1.0 - ($bal->{free_time_balance} / $interval);
 			$interval -= $bal->{free_time_balance};
 			$bal->{free_time_balance} = 0;
+			$$r_free_time += $bal->{free_time_balance};
+			DEBUG "calculate cost for remaining interval chunk $interval";
 		}
 
 		if ($rate <= $bal->{cash_balance}) {
@@ -1017,7 +1023,7 @@ sub get_customer_call_cost
 	# we don't do prepaid for termination fees for now, so treat it as post-paid
 	if($billing_info{prepaid} != 1 || $direction eq "in")
 	{
-		if($direction eq "in") {
+		if($billing_info{prepaid} == 1 && $direction eq "in") {
 			DEBUG "treat pre-paid billing profile as post-paid for termination fees";
 			$$r_cost = $real_cost;
 		} else {
@@ -1156,40 +1162,14 @@ sub rate_cdr
 		return 1;
 	}
 
-	# 1. rate source (termination fees for caller -> source_costs etc.)
-	#	if source_user_id ne 0 (call from local subscriber)
-	# 		fetch source provider profile (reseller) and rate against destination
-	#		fetch source customer profile (subscriber) and rate against dest
-	#	else (call from peer)
-	#		fetch source provider profile (peering) and rate against destination
-	# 2. rate destination (origination fees for callee -> destination_costs etc.)
-	#	if destination_user_id ne 0 (call to local subscriber)
-	# 		fetch destination provider profile (reseller) and rate against destination
-	#		fetch destination customer profile (subscriber) and rate against dest
-	#	else (call to peer)
-	#		fetch destination provider profile (peering) and rate against destination
-
-	# for local subscribers (xxx_user_id != 0):
-	#   xxx_user_id is subscriber uuid
-	#   xxx_account_id is subscriber contract id
-	#   xxx_provider_id is reseller contract id
-	# for peering users (xxx_user_id == 0):
-	#   xxx_user_id is 0
-	#   xxx_account_id is 0
-	#   xxx_provider_id is peering contract id
-
-
-	# here we go:
-
-	# since xxx_provider_id always must be set, we can fetch both source and destination infos
-	# and bail out of there is no billing profile for that
 	DEBUG "fetching source provider info for source_provider_id #$$cdr{source_provider_id}";
 	my %source_provider_info = ();
 	if($cdr->{source_provider_id} eq "0") {
-		FATAL "Missing source_provider_id for source_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
+		WARNING "Missing source_provider_id for source_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
+	} else {
+		get_provider_info($cdr->{source_provider_id}, $cdr->{start_time}, \%source_provider_info)
+			or FATAL "Error getting source provider info for cdr #".$cdr->{id}."\n";
 	}
-	get_provider_info($cdr->{source_provider_id}, $cdr->{start_time}, \%source_provider_info)
-		or FATAL "Error getting source provider info for cdr #".$cdr->{id}."\n";
 	DEBUG "source_provider_info is ".(Dumper \%source_provider_info);
 
 	#unless($source_provider_info{profile_info}) {
@@ -1199,10 +1179,11 @@ sub rate_cdr
 	DEBUG "fetching destination provider info for destination_provider_id #$$cdr{destination_provider_id}";
 	my %destination_provider_info = ();
 	if($cdr->{destination_provider_id} eq "0") {
-		FATAL "Missing destination_provider_id for destination_user_id ".$cdr->{destination_user_id}." in cdr #".$cdr->{id}."\n";
+		WARNING "Missing destination_provider_id for destination_user_id ".$cdr->{destination_user_id}." in cdr #".$cdr->{id}."\n";
+	} else {
+		get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
+			or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
 	}
-	get_provider_info($cdr->{destination_provider_id}, $cdr->{start_time}, \%destination_provider_info)
-		or FATAL "Error getting destination provider info for cdr #".$cdr->{id}."\n";
 	DEBUG "destination_provider_info is ".(Dumper \%destination_provider_info);
 
 	#unless($destination_provider_info{profile_info}) {
@@ -1213,7 +1194,7 @@ sub rate_cdr
 	if($cdr->{source_user_id} ne "0") {
 		DEBUG "call from local subscriber, source_user_id is $$cdr{source_user_id}";
 		# if we have a call from local subscriber, the source provider MUST be a reseller
-		if($source_provider_info{class} ne "reseller") {
+		if($source_provider_info{profile_id} && $source_provider_info{class} ne "reseller") {
 			FATAL "The local source_user_id ".$cdr->{source_user_id}." has a source_provider_id ".$cdr->{source_provider_id}.
 				" which is not a reseller in cdr #".$cdr->{id}."\n";
 		}
@@ -1252,10 +1233,15 @@ sub rate_cdr
 
 			# for the carrier cost, we use the destination billing profile of a peer 
 			# (this is what the peering provider is charging the carrier)
-			get_provider_call_cost($cdr, $type, "out",
-						\%destination_provider_info, \$source_carrier_cost, \$source_carrier_free_time, 
-						\$rating_duration)
-					or FATAL "Error getting source carrier cost for cdr ".$cdr->{id}."\n";
+			if($destination_provider_info{profile_id}) {
+				DEBUG "fetching source_carrier_cost based on destination_provider_info ".(Dumper \%destination_provider_info);
+				get_provider_call_cost($cdr, $type, "out",
+							\%destination_provider_info, \$source_carrier_cost, \$source_carrier_free_time, 
+							\$rating_duration)
+						or FATAL "Error getting source carrier cost for cdr ".$cdr->{id}."\n";
+			} else {
+				WARNING "missing destination profile, so we can't calculate source_carrier_cost for destination_provider_info ".(Dumper \%destination_provider_info);
+			}
 		}
 
 		# get reseller cost
@@ -1287,12 +1273,18 @@ sub rate_cdr
 
 			# we use the source provider info (the one of the peer) for the carrier termination fees,
 			# as this is what the peer is charging us
-			get_provider_call_cost($cdr, $type, "in",
-						\%source_provider_info, \$destination_carrier_cost, \$destination_carrier_free_time, 
-						\$rating_duration)
-				or FATAL "Error getting destination carrier cost for local destination_provider_id ".
-						$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			if($source_provider_info{profile_id}) {
+				DEBUG "fetching destination_carrier_cost based on source_provider_info ".(Dumper \%source_provider_info);
+				get_provider_call_cost($cdr, $type, "in",
+							\%source_provider_info, \$destination_carrier_cost, \$destination_carrier_free_time, 
+							\$rating_duration)
+					or FATAL "Error getting destination carrier cost for local destination_provider_id ".
+							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			} else {
+				WARNING "missing source profile, so we can't calculate destination_carrier_cost for source_provider_info ".(Dumper \%source_provider_info);
+			}
 			if($destination_provider_info{profile_id}) {
+				DEBUG "fetching destination_reseller_cost based on source_provider_info ".(Dumper \%destination_provider_info);
 				get_provider_call_cost($cdr, $type, "in",
 							\%destination_provider_info, \$destination_reseller_cost, \$destination_reseller_free_time, 
 							\$rating_duration)
@@ -1301,6 +1293,7 @@ sub rate_cdr
 			} else {
 				# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
 				# in theory, all resellers MUST have a billing profile, so we could bail out here
+				WARNING "missing destination profile, so we can't calculate destination_reseller_cost for destination_provider_info ".(Dumper \%destination_provider_info);
 			}
 			get_customer_call_cost($cdr, $type, "in",
 						\$destination_customer_cost, \$destination_customer_free_time, 
