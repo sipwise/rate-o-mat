@@ -398,16 +398,28 @@ sub create_contract_balance
 	my $new_cash_balance_int = 0;
 
 	my $new_free_balance;
+	# agranig: This logic carries over any free time which was put into the account on
+	# top of the free time configured in the last billing profile during or earlier than
+	# the last balance interval. This seems to cause some confusion and might also
+	# cause issues when the billing profile free time is edited mid-interval or
+	# the profile changes to some other with a different free time, so we just
+	# drop the last free time and start the balance interval over with the value
+	# configured in the current billing profile. sigh.
+#	if($current_profile{int_free_time}) {
+#		my $old_free_time = sprintf("%.4f", $last_profile{int_free_time} * $ratio);
+#		if($last_free_balance_int < $old_free_time) {
+#			$new_free_balance = $last_free_balance + $last_free_balance_int - 
+#				$old_free_time + $current_profile{int_free_time};
+#		} else {
+#			$new_free_balance = $last_free_balance + $current_profile{int_free_time};
+#		}
+#	} else {
+#		$new_free_balance = $last_free_balance;
+#	}
 	if($current_profile{int_free_time}) {
-		my $old_free_time = sprintf("%.4f", $last_profile{int_free_time} * $ratio);
-		if($last_free_balance_int < $old_free_time) {
-			$new_free_balance = $last_free_balance + $last_free_balance_int - 
-				$old_free_time + $current_profile{int_free_time};
-		} else {
-			$new_free_balance = $last_free_balance + $current_profile{int_free_time};
-		}
+		$new_free_balance = $current_profile{int_free_time};
 	} else {
-		$new_free_balance = $last_free_balance;
+		$new_free_balance = 0;
 	}
 	my $new_free_balance_int = 0;
 	
