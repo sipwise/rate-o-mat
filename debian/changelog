@@ -1,3 +1,9 @@
+ngcp-rate-o-mat (1.4.2) unstable; urgency=low
+
+  * Fix usint cash_balance_interval to keep track of accumulated costs
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Wed, 03 Apr 2013 09:08:06 -0400
+
 ngcp-rate-o-mat (1.4.1) unstable; urgency=high
 
   * Fix incorrect carry-over of free time balance after a billing
