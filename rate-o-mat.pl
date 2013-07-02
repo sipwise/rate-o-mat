@@ -297,7 +297,8 @@ sub init_db
 	$sth_get_cbalance = $billdbh->prepare(
 		"SELECT id, cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval, start, ".
-		"unix_timestamp(start) start_unix ".
+		"unix_timestamp(start) start_unix, ".
+		"unix_timestamp(end) end_unix ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
 		"end >= FROM_UNIXTIME(?) ORDER BY start ASC"
@@ -930,7 +931,12 @@ sub get_call_cost
 		$rate *= $interval;
 		DEBUG "interval is $interval, so rate for this interval is $rate";
 
-		my @bals = grep {($_->{start_unix} + $offset) <= $cdr->{start_time}} @$r_balances;
+		#my @bals = grep {($_->{start_unix} + $offset) <= $cdr->{start_time}} @$r_balances;
+		my $current_call_time = $cdr->{start_time} + $offset;
+		my @bals = grep {
+			$_->{start_unix} <= $current_call_time && 
+			$current_call_time <= $_->{end_unix} 
+		} @$r_balances;
 		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
 		@bals = sort {$a->{start_unix} <=> $b->{start_unix}} @bals;
 		my $bal = $bals[0];
