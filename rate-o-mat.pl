@@ -346,7 +346,6 @@ sub create_contract_balance
 	my $start_time = shift;
 	my $binfo = shift;
 	my $create_time = shift;
-	my $r_res = shift;
 
 	my $sth = $sth_get_last_cbalance;
 	$sth->execute($binfo->{contract_id}, $start_time, $start_time)
@@ -449,18 +448,13 @@ sub create_contract_balance
 		$stime, $etime)
 		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
 
-	$r_res->{id} = $billdbh->last_insert_id(undef, undef, undef, undef);
-	$r_res->{cash_balance} = $new_cash_balance;
-	$r_res->{cash_balance_interval} = $new_cash_balance_int;
-	$r_res->{free_time_balance} = $new_free_balance;
-	$r_res->{free_time_balance_interval} = $new_free_balance_int;
-
-	return create_contract_balance($last_end, $start_time, $binfo, $create_time, $r_res);
+	return create_contract_balance($last_end, $start_time, $binfo, $create_time);
 }
 
 sub get_contract_balance
 {
 	my $start_time = shift;
+	my $duration = shift;
 	my $contract_id = shift;
 	my $binfo = shift;
 	my $r_balances = shift;
@@ -471,27 +465,23 @@ sub get_contract_balance
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 
-	unless(@$res)
+	if (!@$res || $res->[$#$res]{end_unix} < ($start_time + $duration))
 	{
 		my $sth_cid = $sth_get_contract_info;
 		$sth_cid->execute($binfo->{contract_id})
 			or FATAL "Error executing get contract balance statement: ".$sth_cid->errstr;
 		my $create_time = ($sth_cid->fetchrow_array())[0];
 
-		my %new_row = ();
-		create_contract_balance('invalid', $start_time, $binfo, $create_time, \%new_row)
+		create_contract_balance('invalid', $start_time + $duration, $binfo, $create_time)
 			or FATAL "Failed to create new contract balance\n";
-		push @$res, \%new_row;
+
+		$sth->execute(
+			$binfo->{contract_id}, $start_time)
+			or FATAL "Error executing get contract balance statement: ".$sth->errstr;
+		$res = $sth->fetchall_arrayref({});
 	}
 
-	for(my $i = 0; $i < @$res; ++$i)
-	{
-		my $row = $res->[$i];
-
-		my %balance = %$row;
-		push @$r_balances, \%balance;
-	
-	}
+	push(@$r_balances, @$res);
 
 	return 1;
 }
@@ -1014,7 +1004,7 @@ sub get_customer_call_cost
 	}
 
 	my @balances;
-	get_contract_balance($cdr->{start_time}, $contract_id, \%billing_info, \@balances);
+	get_contract_balance($cdr->{start_time}, $cdr->{duration}, $contract_id, \%billing_info, \@balances);
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
@@ -1091,7 +1081,7 @@ sub get_provider_call_cost
 	}
 
 	my @balances;
-	get_contract_balance($cdr->{start_time}, $$r_info{contract_id}, \%billing_info, \@balances);
+	get_contract_balance($cdr->{start_time}, $cdr->{duration}, $$r_info{contract_id}, \%billing_info, \@balances);
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
