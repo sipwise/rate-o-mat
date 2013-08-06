@@ -284,10 +284,11 @@ sub init_db
 	$sth_reseller_info = $billdbh->prepare(
 		"SELECT bm.billing_profile_id, r.contract_id ".
 		"FROM billing.billing_mappings bm, billing.voip_subscribers vs, ".
-		"billing.contracts c, billing.resellers r ".
+		"billing.contracts c, billing.contacts ct, billing.resellers r ".
 		"WHERE vs.uuid = ? AND vs.contract_id = c.id ".
-		"AND c.reseller_id = bm.contract_id ".
-		"AND r.id = c.reseller_id ".
+		"AND c.contact_id = ct.id ".
+		"AND ct.reseller_id = r.id ".
+		"AND r.contract_id = bm.contract_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
 		"ORDER BY bm.start_date DESC ".
