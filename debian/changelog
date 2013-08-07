@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (1.6.0) unstable; urgency=low
+
+  [ agranig ]
+  * Align reseller id handling to new billing.contact/contract schema.
+
+ -- Andreas Granig <agranig@sipwise.com>  Wed, 07 Aug 2013 12:18:47 +0200
+
 ngcp-rate-o-mat (1.5.5) unstable; urgency=low
 
   * Fix offset handling for calls close to start of new balance.
