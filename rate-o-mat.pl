@@ -922,7 +922,7 @@ sub get_call_cost
 		DEBUG "interval is $interval, so rate for this interval is $rate";
 
 		#my @bals = grep {($_->{start_unix} + $offset) <= $cdr->{start_time}} @$r_balances;
-		my $current_call_time = $cdr->{start_time} + $offset;
+		my $current_call_time = int($cdr->{start_time} + $offset);
 		my @bals = grep {
 			$_->{start_unix} <= $current_call_time && 
 			$current_call_time <= $_->{end_unix} 
