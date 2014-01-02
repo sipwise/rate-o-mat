@@ -1049,9 +1049,8 @@ sub get_customer_call_cost
 			$sth_prepaid_costs->execute()
 				or FATAL "Error executing get prepaid costs statement: ".$sth_prepaid_costs->errstr;
 			$prepaid_costs = $sth_prepaid_costs->fetchall_hashref('call_id');
-			DEBUG "fetched prepaid_costs is ".(Dumper $prepaid_costs);
 		} else {
-			DEBUG "prefetched prepaid_costs is ".(Dumper $prepaid_costs);
+			DEBUG "already prefetched prepaid_costs";
 		}
 		if (exists($prepaid_costs->{$cdr->{call_id}})) {
 			my $entry = $prepaid_costs->{$cdr->{call_id}};
