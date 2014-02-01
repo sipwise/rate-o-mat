@@ -1,3 +1,9 @@
+ngcp-rate-o-mat (1.6.2+0~mr3.3) unstable; urgency=low
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sat, 01 Feb 2014 19:56:34 +0100
+
 ngcp-rate-o-mat (1.6.2) unstable; urgency=low
 
   * [18492ab] MT#5515 Don't try to dump prepaid cost hash.
