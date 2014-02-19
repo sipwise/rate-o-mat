@@ -314,7 +314,7 @@ sub init_db
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
 	$sth_new_cbalance = $billdbh->prepare(
-		"INSERT INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
+		"INSERT IGNORE INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"FROM_UNIXTIME(?), FROM_UNIXTIME(?), ".
 		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
