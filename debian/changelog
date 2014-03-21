@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.6.3.0+0~mr3.2.2.0) unstable; urgency=low
+
+  [ Alexander Lutay ]
+  * [46ebedd] MT#6169 Warning obsolete-relation-form-in-source has been fixed
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 21 Mar 2014 17:36:39 +0100
+
 ngcp-rate-o-mat (1.6.2+0~mr3.2.1) unstable; urgency=low
 
   * New release.
