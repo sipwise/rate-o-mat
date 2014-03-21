@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (1.7.0.0+0~mr3.3.0.0) unstable; urgency=low
+
+  [ Alexander Lutay ]
+  * [601c66d] MT#6169 Warning obsolete-relation-form-in-source has been fixed
+
+  [ Richard Fuchs ]
+  * [5af273f] MT#6013 use unique key in contract_balances to avoid duplicate entries
+
+ -- Alexander Lutay <alutay@sipwise.com>  Fri, 21 Mar 2014 15:44:07 +0100
+
 ngcp-rate-o-mat (1.6.2+0~mr3.3) unstable; urgency=low
 
   * New release.
