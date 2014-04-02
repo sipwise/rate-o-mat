@@ -2,13 +2,15 @@ Source: ngcp-rate-o-mat
 Section: utils
 Priority: extra
 Maintainer: Sipwise Development Team <support@sipwise.com>
-Build-Depends: debhelper (>= 5), libtemplate-perl
-Standards-Version: 3.9.3
+Build-Depends: debhelper (>= 5),
+               libtemplate-perl
+Standards-Version: 3.9.5
 Homepage: http://sipwise.com/
 
 Package: ngcp-templates-ce-rate-o-mat
 Architecture: all
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: ngcp-templates-pro-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
@@ -16,7 +18,8 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-templates-pro-rate-o-mat
 Architecture: all
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: ngcp-templates-ce-rate-o-mat
 Provides: ngcp-templates-rate-o-mat
 Description: Configuration templates for rate-o-mat
