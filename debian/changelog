@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (1.6.3.1+0~mr3.2.2.1) unstable; urgency=low
+
+  [ Andrew Pogrebennyk ]
+  * [8e8bfe2] MT#6633 Fix stdout redirection in the daemonize procedure.
+  * [5d35d7a] MT#6633 Send the messages on STDOUT to console too.
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 13 May 2014 12:08:34 +0200
+
 ngcp-rate-o-mat (1.6.3.0+0~mr3.2.2.0) unstable; urgency=low
 
   [ Alexander Lutay ]
