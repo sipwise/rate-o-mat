@@ -38,6 +38,12 @@ my $AcctDB_Host = $ENV{RATEOMAT_ACCOUNTING_DB_HOST} || 'localhost';
 my $AcctDB_Port = $ENV{RATEOMAT_ACCOUNTING_DB_PORT} ? int $ENV{RATEOMAT_ACCOUNTING_DB_PORT} : 3306;
 my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER} || die "Missing accounting DB user setting.";
 my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS} || die "Missing accounting DB password setting.";
+# duplication database
+my $DupDB_Name = $ENV{RATEOMAT_DUPLICATE_DB_NAME} || 'accounting';
+my $DupDB_Host = $ENV{RATEOMAT_DUPLICATE_DB_HOST} || 'localhost';
+my $DupDB_Port = $ENV{RATEOMAT_DUPLICATE_DB_PORT} ? int $ENV{RATEOMAT_DUPLICATE_DB_PORT} : 3306;
+my $DupDB_User = $ENV{RATEOMAT_DUPLICATE_DB_USER};
+my $DupDB_Pass = $ENV{RATEOMAT_DUPLICATE_DB_PASS};
 
 ########################################################################
 
@@ -48,6 +54,7 @@ my $prepaid_costs;
 
 my $billdbh;
 my $acctdbh;
+my $dupdbh;
 my $sth_get_subscriber_contract_id;
 my $sth_billing_info;
 my $sth_profile_info;
@@ -67,8 +74,11 @@ my $sth_prepaid_costs;
 my $sth_delete_prepaid_cost;
 my $sth_delete_old_prepaid;
 my $sth_get_contract_info;
+my $sth_duplicate_cdr;
 
 my $connect_interval = 3;
+
+my @cdr_fields = qw(source_user_id source_provider_id source_external_subscriber_id source_external_contract_id source_account_id source_user source_domain source_cli source_clir source_ip destination_user_id destination_provider_id destination_external_subscriber_id destination_external_contract_id destination_account_id destination_user destination_domain destination_user_dialed destination_user_in destination_domain_in peer_auth_user peer_auth_realm call_type call_status call_code init_time start_time duration call_id source_carrier_cost source_reseller_cost source_customer_cost source_carrier_free_time source_reseller_free_time source_customer_free_time source_carrier_billing_fee_id source_reseller_billing_fee_id source_customer_billing_fee_id source_carrier_billing_zone_id source_reseller_billing_zone_id source_customer_billing_zone_id destination_carrier_cost destination_reseller_cost destination_customer_cost destination_carrier_free_time destination_reseller_free_time destination_customer_free_time destination_carrier_billing_fee_id destination_reseller_billing_fee_id destination_customer_billing_fee_id destination_carrier_billing_zone_id destination_reseller_billing_zone_id destination_customer_billing_zone_id frag_carrier_onpeak frag_reseller_onpeak frag_customer_onpeak is_fragmented split rated_at rating_status exported_at export_status);
 
 main;
 exit 0;
@@ -117,16 +127,21 @@ sub WARNING
 	syslog('warning', $msg);
 }
 
+sub sql_time {
+	my ($time) = @_;
+
+	my ($y, $m, $d, $H, $M, $S) = (localtime($time))[5,4,3,2,1,0];
+	$y += 1900;
+	$m += 1;
+	return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $y, $m, $d, $H, $M, $S);
+}
+
 sub set_start_strtime
 {
 	my $start = shift;
 	my $r_str = shift;
 
-	my ($y, $m, $d, $H, $M, $S) = (localtime($start))[5,4,3,2,1,0];
-	$y += 1900;
-	$m += 1;
-
-	$$r_str = "$y-$m-$d $H:$M:$S";
+	$$r_str = sql_time($start);
 	return 0;
 }
 
@@ -154,11 +169,26 @@ sub connect_acctdbh
 	INFO "Successfully connected to accounting db...";
 }
 
+sub connect_dupdbh
+{
+	$DupDB_User && $DupDB_Pass or return;
+
+	do {
+		INFO "Trying to connect to duplication db...";
+		$dupdbh = DBI->connect("dbi:mysql:database=$DupDB_Name;host=$DupDB_Host;port=$DupDB_Port", $DupDB_User, $DupDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
+	} while(!defined $dupdbh && ($DBI::err == 2002 || $DBI::err == 2003) && !$shutdown && sleep $connect_interval);
+
+	FATAL "Error connecting to db: ".$DBI::errstr
+		unless defined($dupdbh);
+	INFO "Successfully connected to accounting db...";
+}
+
 
 sub init_db
 {
 	connect_billdbh;
 	connect_acctdbh;
+	connect_dupdbh;
 
 	$sth_get_subscriber_contract_id = $billdbh->prepare(
 		"SELECT contract_id FROM voip_subscribers WHERE uuid = ?"
@@ -246,13 +276,7 @@ sub init_db
 	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
 
 	$sth_unrated_cdrs = $acctdbh->prepare(
-		"SELECT id, call_id, ".
-		"source_user_id, source_provider_id, ".
-		"source_cli, source_domain, ".
-		"destination_user_id, destination_provider_id, ".
-		"destination_user, destination_domain, ".
-		"destination_user_in, destination_domain_in, ".
-		"start_time, duration, call_status ".
+		"SELECT * ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"ORDER BY start_time ASC LIMIT 100 " # ."FOR UPDATE"
 	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
@@ -261,7 +285,7 @@ sub init_db
 		"UPDATE accounting.cdr SET ".
 		"source_carrier_cost = ?, source_reseller_cost = ?, source_customer_cost = ?, ".
 		"source_carrier_free_time = ?, source_reseller_free_time = ?, source_customer_free_time = ?, ".
-		"rated_at = now(), rating_status = ?, ".
+		"rated_at = ?, rating_status = ?, ".
 		"source_carrier_billing_fee_id = ?, source_reseller_billing_fee_id = ?, source_customer_billing_fee_id = ?, ".
 		"source_carrier_billing_zone_id = ?, source_reseller_billing_zone_id = ?, source_customer_billing_zone_id = ?, ".
 		"destination_carrier_cost = ?, destination_reseller_cost = ?, destination_customer_cost = ?, ".
@@ -337,6 +361,16 @@ sub init_db
 	$sth_delete_old_prepaid = $acctdbh->prepare(
 		"delete from prepaid_costs where timestamp < date_sub(now(), interval 7 day) limit 10000"
 	) or FATAL "Error preparing delete_old_prepaid statement: ".$acctdbh->errstr;
+
+	$dupdbh or return 1;
+
+	$sth_duplicate_cdr = $dupdbh->prepare(
+		'insert into cdr ('.
+		join(',', @cdr_fields).
+		') values (',
+		join(',', (map {'?'} @cdr_fields)).
+		')'
+	) or FATAL "Error preparing duplicate_cdr statement: ".$dupdbh->errstr;
 
 	return 1;
 }
@@ -743,11 +777,14 @@ sub update_cdr
 {
 	my $cdr = shift;
 
+	$cdr->{rating_status} = 'ok';
+	$cdr->{rated_at} = sql_time(time());
+
 	my $sth = $sth_update_cdr;
 	$sth->execute(
 		$cdr->{source_carrier_cost}, $cdr->{source_reseller_cost}, $cdr->{source_customer_cost},
 		$cdr->{source_carrier_free_time}, $cdr->{source_reseller_free_time}, $cdr->{source_customer_free_time},
-		'ok',
+		$cdr->{rated_at}, $cdr->{rating_status},
 		$cdr->{source_carrier_billing_fee_id}, $cdr->{source_reseller_billing_fee_id}, $cdr->{source_customer_billing_fee_id},
 		$cdr->{source_carrier_billing_zone_id}, $cdr->{source_reseller_billing_zone_id}, $cdr->{source_customer_billing_zone_id},
 		$cdr->{destination_carrier_cost}, $cdr->{destination_reseller_cost}, $cdr->{destination_customer_cost},
@@ -757,20 +794,11 @@ sub update_cdr
 		$cdr->{id})
 		or FATAL "Error executing update cdr statement: ".$sth->errstr;
 
-	return 1;
-}
+	if ($sth_duplicate_cdr) {
+		$sth_duplicate_cdr->execute(@$cdr{@cdr_fields})
+		or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
+	}
 
-sub update_failed_cdr
-{
-	my $cdr = shift;
-
-	my $sth = $sth_update_cdr;
-	$sth->execute(undef, undef, undef, undef, undef, undef,
-		      'failed', undef, undef, undef, undef, undef, undef,
-		      undef, undef, undef, undef, undef, undef,
-		      undef, undef, undef, undef, undef, undef,
-		      $cdr->{id})
-		or FATAL "Error executing update cdr statement: ".$sth->errstr;
 	return 1;
 }
 
@@ -1371,6 +1399,7 @@ sub main
 	{
 		$billdbh->ping || init_db;
 		$acctdbh->ping || init_db;
+		$dupdbh and ($dupdbh->ping || init_db);
 		undef($prepaid_costs);
 
 		my @cdrs = ();
@@ -1394,6 +1423,7 @@ sub main
 
 		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
 		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
+		$dupdbh and ($dupdbh->begin_work or FATAL "Error starting transaction: ".$dupdbh->errstr);
 
 		eval 
 		{
@@ -1422,6 +1452,7 @@ sub main
 
 		$billdbh->commit or FATAL "Error committing cdrs: ".$billdbh->errstr;
 		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
+		$dupdbh and ($dupdbh->commit or FATAL "Error committing cdrs: ".$dupdbh->errstr);
 
 		INFO "$rated CDRs rated so far.\n";
 
@@ -1461,10 +1492,12 @@ sub main
 	$sth_prepaid_costs->finish;
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
+	$sth_duplicate_cdr->finish;
 
 
 	$billdbh->disconnect;
 	$acctdbh->disconnect;
+	$dupdbh->disconnect;
 	closelog;
 	close PID;
 	unlink $pidfile;
