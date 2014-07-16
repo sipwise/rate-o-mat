@@ -367,7 +367,7 @@ sub init_db
 	$sth_duplicate_cdr = $dupdbh->prepare(
 		'insert into cdr ('.
 		join(',', @cdr_fields).
-		') values (',
+		') values ('.
 		join(',', (map {'?'} @cdr_fields)).
 		')'
 	) or FATAL "Error preparing duplicate_cdr statement: ".$dupdbh->errstr;
