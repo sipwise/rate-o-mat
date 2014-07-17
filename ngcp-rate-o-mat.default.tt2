@@ -26,8 +26,8 @@ RATEOMAT_BILLING_DB_USER='[% rateomat.billingdb.user %]'
 RATEOMAT_BILLING_DB_PASS='[% rateomat.billingdb.pass %]'
 
 # accounting database
-RATEOMAT_ACCOUNTING_DB_HOST='[% database.dbhost %]'
-RATEOMAT_ACCOUNTING_DB_PORT='[% database.dbport %]'
+RATEOMAT_ACCOUNTING_DB_HOST='[% database.pair.dbhost %]'
+RATEOMAT_ACCOUNTING_DB_PORT='[% database.pair.dbport %]'
 RATEOMAT_ACCOUNTING_DB_NAME='[% rateomat.accountingdb.name %]'
 RATEOMAT_ACCOUNTING_DB_USER='[% rateomat.accountingdb.user %]'
 RATEOMAT_ACCOUNTING_DB_PASS='[% rateomat.accountingdb.pass %]'
