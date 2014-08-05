@@ -1492,7 +1492,7 @@ sub main
 	$sth_prepaid_costs->finish;
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
-	$sth_duplicate_cdr->finish;
+	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 
 
 	$billdbh->disconnect;
