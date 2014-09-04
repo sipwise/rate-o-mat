@@ -1361,10 +1361,10 @@ sub daemonize
 	my $pidfile = shift;
 
 	chdir '/' or FATAL "Can't chdir to /: $!\n";
-	open STDIN, '/dev/null' or FATAL "Can't read /dev/null: $!\n";
+	open STDIN, '<', '/dev/null' or FATAL "Can't read /dev/null: $!\n";
 	open STDOUT, "|-", "logger -s -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
 	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
-	open PID, ">>$pidfile" or FATAL "Can't open '$pidfile' for writing: $!\n";
+	open PID, ">>", "$pidfile" or FATAL "Can't open '$pidfile' for writing: $!\n";
 	flock(PID, LOCK_EX | LOCK_NB) or FATAL "Unable to lock pidfile '$pidfile': $!\n";
 	defined(my $pid = fork) or FATAL "Can't fork: $!\n";
 	exit if $pid;
