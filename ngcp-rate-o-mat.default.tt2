@@ -1,8 +1,17 @@
-[% TAGS [- -] %]
+[% TAGS [- -] -%]
+[% PROCESS '/usr/lib/ngcp-ngcpcfg/get_hostname'; hostname = out -%]
+[%
+  argv.host=hostname; argv.role='proxy';
+  PROCESS '/usr/lib/ngcp-ngcpcfg/has_role';
+  is_proxy = out
+-%]
 # Options for the NGCP rate-o-mat
-
+[% IF is_proxy -%]
 RATEOMAT_RUN=[% rateomat.enable %]
-
+[% ELSE -%]
+# no proxy role
+RATEOMAT_RUN="no"
+[% END -%]
 RATEOMAT_DEBUG=0
 
 # how long we shall sleep before looking for unrated CDRs again
