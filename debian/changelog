@@ -1,3 +1,28 @@
+ngcp-rate-o-mat (1.10.0.0+0~mr3.6.0.0) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [0a60632] additional DB to duplicate CDRs to
+  * [9b70113] typo fix
+  * [6a4321b] add duplication db config to tt2
+  * [561afa7] MT#8477 remove stray error message
+
+  [ Andrew Pogrebennyk ]
+  * [cb4426e] MT#8117 use "pair" database for accounting
+
+  [ Alexander Lutay ]
+  * [41861ae] MT#8741 Sync ngcp-rate-o-mat.init with templates
+
+  [ Victor Seva ]
+  * [4196eee] MT#8745 remove postinst/postrm scripts
+  * [8ef2437] MT#7505 Add gitreview file
+  * [819e1d2] MT#8773 fix perl warning
+  * [34d8cfa] MT#8117 use central database for billing and duplicate if necessary
+  * [001cbc2] MT#8125 disable rate-o-mat daemon from starting on non proxy nodes
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 09 Oct 2014 16:53:16 +0200
+
 ngcp-rate-o-mat (1.9.0.0+0~mr3.5.0.0) unstable; urgency=low
 
   * New release.
