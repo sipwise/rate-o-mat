@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.11.0.0+0~mr3.7.0.0) unstable; urgency=low
+
+  [ Andreas Granig ]
+  * [da10ac9] MT#8117 Duplicate gpp parameters
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 30 Oct 2014 17:29:37 +0100
+
 ngcp-rate-o-mat (1.10.0.0+0~mr3.6.0.0) unstable; urgency=low
 
   [ Richard Fuchs ]
