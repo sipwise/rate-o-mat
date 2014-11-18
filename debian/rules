@@ -1,105 +1,27 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
 
 # Uncomment this to turn on verbose mode.
 # export DH_VERBOSE=1
 
-b=$(CURDIR)/debian/build
+%:
+	dh $@
 
-build: build-stamp
-
-build-stamp:
-	dh_testdir
-	mkdir -p pro/etc/default
-	mkdir -p ce/etc/default
-	tpage --define PRO=true   ngcp-rate-o-mat.default.tt2 >pro/etc/default/ngcp-rate-o-mat.tt2
-	tpage                     ngcp-rate-o-mat.default.tt2 >ce/etc/default/ngcp-rate-o-mat.tt2
-	tpage --define PRO=true   ngcp-rate-o-mat.services >pro/etc/default/ngcp-rate-o-mat.services
-	tpage                     ngcp-rate-o-mat.services >ce/etc/default/ngcp-rate-o-mat.services
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp
-	rm -rf $(b) pro ce
+override_dh_clean:
 	dh_clean
+	rm -rf pro ce rate-o-mat
 
-install: build
-	dh_testdir
-	dh_testroot
-	dh_clean -k
-	dh_installdirs
+override_dh_auto_build:
+	mkdir -p pro/etc/default ce/etc/default
+	tpage --define PRO=true   ngcp-rate-o-mat.default.tt2 \
+		> pro/etc/default/ngcp-rate-o-mat.tt2
+	tpage ngcp-rate-o-mat.default.tt2 \
+		> ce/etc/default/ngcp-rate-o-mat.tt2
+	tpage --define PRO=true ngcp-rate-o-mat.services \
+		> pro/etc/default/ngcp-rate-o-mat.services
+	tpage ngcp-rate-o-mat.services \
+		> ce/etc/default/ngcp-rate-o-mat.services
 
-ngcp-rate-o-mat:
-	@echo "--- Building: $@"
-	dh_installdirs       -p$@ -P$(b)/$@
-	dh_installdocs       -p$@ -P$(b)/$@
-	dh_installchangelogs -p$@ -P$(b)/$@
-	dh_install           -p$@ -P$(b)/$@
-	# we have to do this manually, 'cause dh_install can't rename files
-	install -m 755 rate-o-mat.pl   $(b)/$@/usr/sbin/rate-o-mat
-	dh_installexamples   -p$@ -P$(b)/$@
-	dh_installman        -p$@ -P$(b)/$@
-	dh_installinit        -p$@ -P$(b)/$@
-	dh_link              -p$@ -P$(b)/$@
-	dh_strip             -p$@ -P$(b)/$@
-	dh_compress          -p$@ -P$(b)/$@
-	dh_fixperms          -p$@ -P$(b)/$@
-	#dh_perl              -p$@ -P$(b)/$@
-	dh_makeshlibs        -p$@ -P$(b)/$@ -V
-	dh_installdeb        -p$@ -P$(b)/$@
-	dh_shlibdeps         -p$@ -P$(b)/$@
-	dh_installdebconf    -p$@ -P$(b)/$@
-	dh_gencontrol        -p$@ -P$(b)/$@
-	dh_md5sums           -p$@ -P$(b)/$@
-	dh_builddeb          -p$@ -P$(b)/$@
-
-ngcp-templates-ce-rate-o-mat:
-	@echo "--- Building: $@"
-	dh_installdirs       -p$@ -P$(b)/$@
-	dh_link              -p$@ -P$(b)/$@
-	dh_installdocs       -p$@ -P$(b)/$@
-	dh_installchangelogs -p$@ -P$(b)/$@
-	dh_install           -p$@ -P$(b)/$@
-	dh_strip             -p$@ -P$(b)/$@
-	dh_compress          -p$@ -P$(b)/$@
-	dh_fixperms          -p$@ -P$(b)/$@
-	dh_makeshlibs        -p$@ -P$(b)/$@ -V
-	dh_installdeb        -p$@ -P$(b)/$@
-	dh_shlibdeps         -p$@ -P$(b)/$@
-	dh_installdebconf    -p$@ -P$(b)/$@
-	dh_gencontrol        -p$@ -P$(b)/$@
-	dh_md5sums           -p$@ -P$(b)/$@
-	dh_builddeb          -p$@ -P$(b)/$@
-
-ngcp-templates-pro-rate-o-mat:
-	@echo "--- Building: $@"
-	dh_installdirs       -p$@ -P$(b)/$@
-	dh_link              -p$@ -P$(b)/$@
-	dh_installdocs       -p$@ -P$(b)/$@
-	dh_installchangelogs -p$@ -P$(b)/$@
-	dh_install           -p$@ -P$(b)/$@
-	dh_strip             -p$@ -P$(b)/$@
-	dh_compress          -p$@ -P$(b)/$@
-	dh_fixperms          -p$@ -P$(b)/$@
-	dh_makeshlibs        -p$@ -P$(b)/$@ -V
-	dh_installdeb        -p$@ -P$(b)/$@
-	dh_shlibdeps         -p$@ -P$(b)/$@
-	dh_installdebconf    -p$@ -P$(b)/$@
-	dh_gencontrol        -p$@ -P$(b)/$@
-	dh_md5sums           -p$@ -P$(b)/$@
-	dh_builddeb          -p$@ -P$(b)/$@
-
-binary-all: build install
-
-binary-indep: build install ngcp-rate-o-mat \
-	ngcp-templates-ce-rate-o-mat ngcp-templates-pro-rate-o-mat
-
-binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install
+override_dh_auto_install:
+	install -m 755 rate-o-mat.pl rate-o-mat
+	dh_install
