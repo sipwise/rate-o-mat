@@ -748,7 +748,7 @@ sub is_offpeak_weekday
 
 sub check_shutdown {
 	if ($shutdown) {
-		syslog('warn', 'Shutdown detected, aborting work in progress');
+		syslog('warning', 'Shutdown detected, aborting work in progress');
 		return 1;
 	}
 	return 0;
