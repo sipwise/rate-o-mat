@@ -1422,6 +1422,8 @@ sub main
 			next;
 		}
 
+		my $rated_batch = 0;
+
 		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
 		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
 		$dupdbh and ($dupdbh->begin_work or FATAL "Error starting transaction: ".$dupdbh->errstr);
@@ -1433,7 +1435,7 @@ sub main
 				INFO "rate cdr #".$cdr->{id}."\n";
 				rate_cdr($cdr, $type)
 				    && update_cdr($cdr);
-				$rated++;
+				$rated_batch++;
 				check_shutdown() and last;
 			}
 		};
@@ -1447,6 +1449,10 @@ sub main
 					INFO "DB connection gone, retrying...";
 					next;
 				}
+				if ($DBI::err == 1213) {
+					INFO "Transaction concurrency problem, rolling back and retrying...";
+					next;
+				}
 			}
 			FATAL "Error rating CDR batch: " . $@;
 		}
@@ -1455,6 +1461,7 @@ sub main
 		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
 		$dupdbh and ($dupdbh->commit or FATAL "Error committing cdrs: ".$dupdbh->errstr);
 
+		$rated += $rated_batch;
 		INFO "$rated CDRs rated so far.\n";
 
 		$shutdown and last;
