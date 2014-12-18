@@ -1450,10 +1450,17 @@ sub main
 				if($DBI::err == 2006)
 				{
 					INFO "DB connection gone, retrying...";
+					# disconnect from all of them so transactions are on par
+					$billdbh->disconnect;
+					$acctdbh->disconnect;
+					$dupdbh and ($dupdbh->disconnect);
 					next;
 				}
 				if ($DBI::err == 1213) {
 					INFO "Transaction concurrency problem, rolling back and retrying...";
+					$billdbh->rollback;
+					$acctdbh->rollback;
+					$dupdbh and ($dupdbh->rollback);
 					next;
 				}
 			}
