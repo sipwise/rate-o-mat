@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.10.2.3+0~mr3.6.2.3) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [aba9f0b] MT#10551 explicit rollback/disconnect in case of DB problems
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 18 Dec 2014 15:50:46 +0100
+
 ngcp-rate-o-mat (1.10.2.2+0~mr3.6.2.2) unstable; urgency=low
 
   [ Richard Fuchs ]
