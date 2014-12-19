@@ -1512,7 +1512,7 @@ sub main
 
 	$billdbh->disconnect;
 	$acctdbh->disconnect;
-	$dupdbh->disconnect;
+	$dupdbh and $dupdbh->disconnect;
 	closelog;
 	close $PID;
 	unlink $pidfile;
