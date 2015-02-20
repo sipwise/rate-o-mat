@@ -27,7 +27,6 @@ Description: Configuration templates for rate-o-mat
 
 Package: ngcp-rate-o-mat
 Architecture: all
-Pre-Depends: ngcp-system-tools
 Depends: libdbd-mysql-perl,
          libexception-class-perl,
          ngcp-templates-rate-o-mat,
