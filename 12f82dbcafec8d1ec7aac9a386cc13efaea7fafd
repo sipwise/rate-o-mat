@@ -16,6 +16,24 @@
       "revId": "12f82dbcafec8d1ec7aac9a386cc13efaea7fafd",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a2585a7_3fd2cf00",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-04-23T16:16:20Z",
+      "side": 1,
+      "message": "Oh, thanks for the hint! Just pushed a new patchset.",
+      "parentUuid": "5a2585a7_7fde1741",
+      "revId": "12f82dbcafec8d1ec7aac9a386cc13efaea7fafd",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
