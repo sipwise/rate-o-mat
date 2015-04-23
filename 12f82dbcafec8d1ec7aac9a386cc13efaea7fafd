@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a2585a7_7fde1741",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-04-23T15:05:28Z",
+      "side": 1,
+      "message": "This will always give you \"1\".\n\nShould use // operator instead.",
+      "revId": "12f82dbcafec8d1ec7aac9a386cc13efaea7fafd",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
