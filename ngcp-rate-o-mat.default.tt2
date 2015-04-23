@@ -14,6 +14,12 @@ RATEOMAT_RUN="no"
 [% END -%]
 RATEOMAT_DEBUG=0
 
+[% IF rateomat.daemonize == "no" -%]
+RATEOMAT_DAEMONIZE=0
+[% ELSE -%]
+RATEOMAT_DAEMONIZE=1
+[% END -%]
+
 # how long we shall sleep before looking for unrated CDRs again
 RATEOMAT_LOOP_INTERVAL=[% rateomat.loopinterval %]
 
