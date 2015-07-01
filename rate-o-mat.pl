@@ -6,6 +6,7 @@ use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
 use Sys::Syslog;
+use NetAddr::IP;
 use Data::Dumper;
 
 $0 = 'rate-o-mat';
@@ -57,7 +58,8 @@ my $billdbh;
 my $acctdbh;
 my $dupdbh;
 my $sth_get_subscriber_contract_id;
-my $sth_billing_info;
+my $sth_billing_info_v4;
+my $sth_billing_info_v6;
 my $sth_profile_info;
 my $sth_offpeak_weekdays;
 my $sth_offpeak_special;
@@ -187,6 +189,10 @@ sub connect_dupdbh
 	INFO "Successfully connected to accounting db...";
 }
 
+sub _bigint_to_bytes {
+	my ($bigint,$size) = @_;
+	return pack('C' x $size, map { hex($_) } (sprintf('%0' . 2 * $size . 's',substr($bigint->as_hex(),2)) =~ /(..)/g));
+}
 
 sub init_db
 {
@@ -202,19 +208,39 @@ sub init_db
 		"SELECT UNIX_TIMESTAMP(create_timestamp) FROM contracts WHERE id = ?"
 	) or FATAL "Error preparing subscriber contract info statement: ".$billdbh->errstr;
 
-	$sth_billing_info = $billdbh->prepare(
-		"SELECT b.billing_profile_id, ".
-		"d.prepaid, d.interval_charge, d.interval_free_time, d.interval_free_cash, ".
-		"d.interval_unit, d.interval_count ".
-		"FROM billing.billing_mappings b, ".
-		"billing.billing_profiles d ".
-		"WHERE b.contract_id = ? ".
-		"AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) ) ".
-		"AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) ) ".
-		"AND b.billing_profile_id = d.id ".
-		"ORDER BY b.start_date DESC ".
-		"LIMIT 1"
-	) or FATAL "Error preparing billing info statement: ".$billdbh->errstr;
+	$sth_billing_info_v4 = $billdbh->prepare(<<EOS
+		SELECT b.billing_profile_id, d.prepaid, 
+			d.interval_charge, d.interval_free_time, d.interval_free_cash, 
+			d.interval_unit, d.interval_count 
+		FROM billing.billing_mappings b
+		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
+		LEFT JOIN billing.billing_networks n ON n.id = b.network_id
+		LEFT JOIN billing.billing_network_blocks nb ON n.id = nb.network_id
+		WHERE b.contract_id = ?
+		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
+		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
+		AND ( (nb._ipv4_net_from <= ? AND nb._ipv4_net_to >= ?) OR b.network_id IS NULL)
+		ORDER BY b.network_id DESC, b.start_date DESC, b.id DESC
+		LIMIT 1
+EOS
+	) or FATAL "Error preparing v4 billing info statement: ".$billdbh->errstr;
+
+	$sth_billing_info_v6 = $billdbh->prepare(<<EOS
+		SELECT b.billing_profile_id, d.prepaid, 
+			d.interval_charge, d.interval_free_time, d.interval_free_cash, 
+			d.interval_unit, d.interval_count 
+		FROM billing.billing_mappings b
+		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
+		LEFT JOIN billing.billing_networks n ON n.id = b.network_id
+		LEFT JOIN billing.billing_network_blocks nb ON n.id = nb.network_id
+		WHERE b.contract_id = ?
+		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
+		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
+		AND ( (nb._ipv6_net_from <= ? AND nb._ipv6_net_to >= ?) OR b.network_id IS NULL)
+		ORDER BY b.network_id DESC, b.start_date DESC, b.id DESC
+		LIMIT 1
+EOS
+	) or FATAL "Error preparing v6 billing info statement: ".$billdbh->errstr;
 	
 	$sth_lnp_number = $billdbh->prepare("
 		SELECT lnp_provider_id
@@ -385,6 +411,7 @@ sub create_contract_balance
 	my $start_time = shift;
 	my $binfo = shift;
 	my $create_time = shift;
+	my $cdr = shift;
 
 	my $sth = $sth_get_last_cbalance;
 	$sth->execute($binfo->{contract_id}, $start_time, $start_time)
@@ -409,12 +436,12 @@ sub create_contract_balance
 
 
 	my %last_profile = ();
-	get_billing_info($last_end, $binfo->{contract_id}, \%last_profile) or
+	get_billing_info($last_end, $binfo->{contract_id}, $cdr->{source_ip}, \%last_profile) or
 		FATAL "Error getting billing info for date '".$last_end."' and contract_id $binfo->{contract_id}\n";
 
 	my %current_profile = ();
 	my $last_end_unix = $last_end + 1;
-	get_billing_info($last_end_unix, $binfo->{contract_id}, \%current_profile) or
+	get_billing_info($last_end_unix, $binfo->{contract_id}, $cdr->{source_ip}, \%current_profile) or
 		FATAL "Error getting billing info for date '".$last_end_unix."' and contract_id $binfo->{contract_id}\n";
 
 	my $ratio = 1;
@@ -499,16 +526,18 @@ sub create_contract_balance
 		$stime, $etime)
 		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
 
-	return create_contract_balance($last_end, $start_time, $binfo, $create_time);
+	return create_contract_balance($last_end, $start_time, $binfo, $create_time, $cdr);
 }
 
 sub get_contract_balance
 {
-	my $start_time = shift;
-	my $duration = shift;
+	my $cdr = shift;
 	my $contract_id = shift;
 	my $binfo = shift;
 	my $r_balances = shift;
+
+	my $start_time = $cdr->{start_time};
+	my $duration = $cdr->{duration};
 
 	my $sth = $sth_get_cbalance;
 	$sth->execute(
@@ -523,7 +552,7 @@ sub get_contract_balance
 			or FATAL "Error executing get contract balance statement: ".$sth_cid->errstr;
 		my $create_time = ($sth_cid->fetchrow_array())[0];
 
-		create_contract_balance('invalid', $start_time + $duration, $binfo, $create_time)
+		create_contract_balance('invalid', $start_time + $duration, $binfo, $create_time, $cdr)
 			or FATAL "Failed to create new contract balance\n";
 
 		$sth->execute(
@@ -572,11 +601,26 @@ sub get_billing_info
 {
 	my $start = shift;
 	my $contract_id = shift;
+	my $source_ip = shift;
 	my $r_info = shift;
 
-	my $sth = $sth_billing_info;
+	my $sth;
+	my $ip_size;
+	my $ip = NetAddr::IP->new($source_ip);
+	if($ip->version == 4) {
+		$sth = $sth_billing_info_v4;
+		$ip_size = 4;
+	} elsif($ip->version == 6) {
+		$sth = $sth_billing_info_v6;
+		$ip_size = 16;
+	} else {
+		FATAL "Invalid source_ip $source_ip\n";
+	}
 
-	$sth->execute($contract_id, $start, $start) or
+	my $int_ip = $ip->bigint;
+	my $ip_bytes = _bigint_to_bytes($int_ip, $ip_size);
+
+	$sth->execute($contract_id, $start, $start, $ip_bytes, $ip_bytes) or
 		FATAL "Error executing billing info statement: ".$sth->errstr;
 	my @res = $sth->fetchrow_array();
 	FATAL "No billing info found for contract_id $contract_id\n" unless @res;
@@ -1039,7 +1083,7 @@ sub get_customer_call_cost
 	my $contract_id = get_subscriber_contract_id($cdr->{$dir."user_id"});
 
 	my %billing_info = ();
-	get_billing_info($cdr->{start_time}, $contract_id, \%billing_info) or
+	get_billing_info($cdr->{start_time}, $contract_id, $cdr->{source_ip}, \%billing_info) or
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
@@ -1049,7 +1093,7 @@ sub get_customer_call_cost
 	}
 
 	my @balances;
-	get_contract_balance($cdr->{start_time}, $cdr->{duration}, $contract_id, \%billing_info, \@balances);
+	get_contract_balance($cdr, $contract_id, \%billing_info, \@balances);
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
@@ -1115,7 +1159,7 @@ sub get_provider_call_cost
 	my $real_cost = 0;
 
 	my %billing_info = ();
-	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, \%billing_info) or
+	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, $cdr->{source_ip}, \%billing_info) or
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
@@ -1125,7 +1169,7 @@ sub get_provider_call_cost
 	}
 
 	my @balances;
-	get_contract_balance($cdr->{start_time}, $cdr->{duration}, $$r_info{contract_id}, \%billing_info, \@balances);
+	get_contract_balance($cdr, $$r_info{contract_id}, \%billing_info, \@balances);
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
@@ -1492,7 +1536,8 @@ sub main
 	INFO "Shutting down.\n";
 
 	$sth_get_subscriber_contract_id->finish;
-	$sth_billing_info->finish;
+	$sth_billing_info_v4->finish;
+	$sth_billing_info_v6->finish;
 	$sth_profile_info->finish;
 	$sth_offpeak_weekdays->finish;
 	$sth_offpeak_special->finish;
