@@ -78,6 +78,7 @@ my $sth_delete_prepaid_cost;
 my $sth_delete_old_prepaid;
 my $sth_get_contract_info;
 my $sth_duplicate_cdr;
+my $sth_get_profile_package;
 
 my $connect_interval = 3;
 
@@ -199,6 +200,18 @@ sub init_db
 	connect_billdbh;
 	connect_acctdbh;
 	connect_dupdbh;
+
+	$sth_get_profile_package = $billdbh->prepare(<<EOS
+		SELECT
+            p.balance_interval_unit,
+            p.balance_interval_value,
+            p.balance_interval_start_mode,
+            p.carry_over_mode
+        FROM contracts c 
+        LEFT JOIN profile_packages p on c.profile_package_id = p.id
+        WHERE c.id = ?
+EOS
+	) or FATAL "Error preparing subscriber contract id statement: ".$billdbh->errstr;
 
 	$sth_get_subscriber_contract_id = $billdbh->prepare(
 		"SELECT contract_id FROM voip_subscribers WHERE uuid = ?"
@@ -405,6 +418,33 @@ EOS
 	return 1;
 }
 
+sub calculate_balance_interval
+{
+    my ($unit, $count, $last_end, $profile_id) = @_;
+    my $stime = DateTime->from_epoch(epoch => $last_end + 1, 
+        time_zone => DateTime::TimeZone->new(name => 'local'));
+    my $etime;
+
+    if($unit eq "day")
+    {
+        $etime = $stime->clone->add(days => $count);
+    }
+    elsif($unit eq "week")
+    {
+        $etime = $stime->clone->add(weeks => $count);
+    }
+    elsif($unit eq "month")
+    {
+        $etime = $stime->clone->add(months => $count, end_of_month => 'preserve');
+    }
+    else
+    {
+		FATAL "Invalid interval unit '$unit' in profile id $profile_id";
+    }
+    $etime->subtract(seconds => 1);
+    return ($stime->epoch, $etime->epoch);
+}
+
 sub create_contract_balance
 {
 	my $latest_end = shift;
@@ -489,37 +529,15 @@ sub create_contract_balance
 	}
 	my $new_free_balance_int = 0;
 	
-	my ($etime, $stime);
 	$sth = $sth_new_cbalance;
-	if($binfo->{int_unit} eq "week")
-	{
-		# XXX not implemented in ossbss
-		$stime = $last_end + 1;
-		$etime = $stime + 86400 * 7 * $binfo->{int_count} - 1;
-	}
-	elsif($binfo->{int_unit} eq "month")
-	{
-		my $next_start = $last_end + 1;
 
-		my ($cyear, $cmonth, $cday) = (localtime $next_start)[5,4,3];
+	my ($etime, $stime) = calculate_balance_interval(
+        $binfo->{int_unit}, $binfo->{int_count},
+        $last_end, $binfo->{profile_id}
+    );
 
-		my $bmonth = $cmonth - $cmonth % $binfo->{int_count};
-		$stime = mktime(0,0,0,1,$bmonth,$cyear);
 
-		my $eyear = $cyear;
-		my $emonth = $bmonth + $binfo->{int_count};
-		while ($emonth >= 12) {
-			$emonth -= 12;
-			$eyear++;
-		}
-		$etime = mktime(0,0,0,1,$emonth,$eyear);
-		$etime--;
-	}
-	else
-	{
-		FATAL "Invalid interval unit '".$binfo->{int_unit}."' in profile id ".
-			$binfo->{profile_id};
-	}
+    # TODO: adapt to package stuff
 
 	$sth->execute($binfo->{contract_id}, $new_cash_balance, $new_cash_balance_int,
 		$new_free_balance, $new_free_balance_int, 
@@ -1555,6 +1573,7 @@ sub main
 	$sth_prepaid_costs->finish;
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
+    $sth_get_profile_package->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 
 
