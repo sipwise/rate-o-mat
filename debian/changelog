@@ -1,3 +1,18 @@
+ngcp-rate-o-mat (1.13.1.0+0~mr4.0.1.0) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * [d4c4d7a] MT#12669 support setting daemonize option via config.yml
+
+  [ Alexander Lutay ]
+  * [c8b4515] MT#12669 Fix d4c4d7a: support setting daemonize option via config.yml
+
+  [ Andreas Granig ]
+  * [1e70834] MT#13733 Use src ip to get billprof in mapping.
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 Jul 2015 15:33:07 +0200
+
 ngcp-rate-o-mat (1.13.0.0+0~mr4.0.0.0) unstable; urgency=low
 
   [ Richard Fuchs ]
