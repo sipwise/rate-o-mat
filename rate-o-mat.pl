@@ -57,9 +57,11 @@ my $prepaid_costs;
 my $billdbh;
 my $acctdbh;
 my $dupdbh;
+my $sth_get_contract_info;
 my $sth_get_subscriber_contract_id;
 my $sth_billing_info_v4;
 my $sth_billing_info_v6;
+my $sth_billing_info_panel;
 my $sth_profile_info;
 my $sth_offpeak_weekdays;
 my $sth_offpeak_special;
@@ -70,15 +72,18 @@ my $sth_reseller_info;
 my $sth_get_cbalance;
 my $sth_update_cbalance;
 my $sth_new_cbalance;
+my $sth_new_cbalance_infinite_future;
 my $sth_get_last_cbalance;
+my $sth_get_first_cbalance;
+my $sth_get_last_topup_cbalance,
 my $sth_lnp_number;
 my $sth_lnp_profile_info;
 my $sth_prepaid_costs;
 my $sth_delete_prepaid_cost;
 my $sth_delete_old_prepaid;
-my $sth_get_contract_info;
+#my $sth_get_contract_info;
 my $sth_duplicate_cdr;
-my $sth_get_profile_package;
+#my $sth_get_profile_package;
 
 my $connect_interval = 3;
 
@@ -195,31 +200,64 @@ sub _bigint_to_bytes {
 	return pack('C' x $size, map { hex($_) } (sprintf('%0' . 2 * $size . 's',substr($bigint->as_hex(),2)) =~ /(..)/g));
 }
 
+sub _is_infinite_unix {
+    my $unix_ts = shift;
+    return 1 unless defined $unix_ts; #internally, we use undef for infinite future
+    return $unix_ts == 0 ? 1 : 0; #If you pass an out-of-range date to UNIX_TIMESTAMP(), it returns 0
+}
+
+sub last_day_of_month {
+    my $dt = shift;
+    return DateTime->last_day_of_month(year => $dt->year, month => $dt->month,
+                                       time_zone => DateTime::TimeZone->new(name => 'local'))->day;
+}
+
 sub init_db
 {
 	connect_billdbh;
 	connect_acctdbh;
 	connect_dupdbh;
 
-	$sth_get_profile_package = $billdbh->prepare(<<EOS
-		SELECT
-            p.balance_interval_unit,
-            p.balance_interval_value,
-            p.balance_interval_start_mode,
-            p.carry_over_mode
-        FROM contracts c 
-        LEFT JOIN profile_packages p on c.profile_package_id = p.id
-        WHERE c.id = ?
-EOS
-	) or FATAL "Error preparing subscriber contract id statement: ".$billdbh->errstr;
+	$sth_get_contract_info = $billdbh->prepare(
+		"SELECT UNIX_TIMESTAMP(c.create_timestamp),".
+		" UNIX_TIMESTAMP(c.modify_timestamp),".
+		" co.reseller_id,".
+		" p.id,".
+		" p.balance_interval_unit,".
+        " p.balance_interval_value,".
+        " p.balance_interval_start_mode,".
+        " p.carry_over_mode,".
+        " p.notopup_discard_intervals ".
+        "FROM billing.contracts c ".
+        "LEFT JOIN billing.profile_pacakges p on c.profile_package_id = p.id ".
+        "LEFT JOIN billing.contacts co on c.contact_id = co.id ".
+        "WHERE c.id = ?"
+	) or FATAL "Error preparing subscriber contract info statement: ".$billdbh->errstr;
+
+	$sth_get_last_cbalance = $billdbh->prepare(
+		"SELECT id, UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end), cash_balance, cash_balance_interval, ".
+		"free_time_balance, free_time_balance_interval, topup_count, timely_topup_count ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ?".
+		"ORDER BY end DESC LIMIT 1"
+	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
+	$sth_get_first_cbalance = $billdbh->prepare(
+		"SELECT UNIX_TIMESTAMP(start) ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ?".
+		"ORDER BY start ASC LIMIT 1"
+	) or FATAL "Error preparing get first contract balance statement: ".$billdbh->errstr;	
+	$sth_get_last_topup_cbalance = $billdbh->prepare(
+		"SELECT UNIX_TIMESTAMP(start) ".
+		"FROM billing.contract_balances ".
+		"WHERE contract_id = ? AND ".
+		"topup_count > 0 ".
+		"ORDER BY end DESC LIMIT 1"
+	) or FATAL "Error preparing get last topup contract balance statement: ".$billdbh->errstr;	
 
 	$sth_get_subscriber_contract_id = $billdbh->prepare(
 		"SELECT contract_id FROM voip_subscribers WHERE uuid = ?"
 	) or FATAL "Error preparing subscriber contract id statement: ".$billdbh->errstr;
-	
-	$sth_get_contract_info = $billdbh->prepare(
-		"SELECT UNIX_TIMESTAMP(create_timestamp) FROM contracts WHERE id = ?"
-	) or FATAL "Error preparing subscriber contract info statement: ".$billdbh->errstr;
 
 	$sth_billing_info_v4 = $billdbh->prepare(<<EOS
 		SELECT b.billing_profile_id, d.prepaid, 
@@ -254,6 +292,20 @@ EOS
 		LIMIT 1
 EOS
 	) or FATAL "Error preparing v6 billing info statement: ".$billdbh->errstr;
+	
+	$sth_billing_info_panel = $billdbh->prepare(<<EOS
+		SELECT b.billing_profile_id, d.prepaid, 
+			d.interval_charge, d.interval_free_time, d.interval_free_cash, 
+			d.interval_unit, d.interval_count 
+		FROM billing.billing_mappings b
+		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
+		WHERE b.contract_id = ?
+		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
+		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
+		ORDER BY b.start_date DESC, b.id DESC
+		LIMIT 1
+EOS
+	) or FATAL "Error preparing panel billing info statement: ".$billdbh->errstr;	
 	
 	$sth_lnp_number = $billdbh->prepare("
 		SELECT lnp_provider_id
@@ -371,20 +423,18 @@ EOS
 		"WHERE contract_id = ? AND ".
 		"end >= FROM_UNIXTIME(?) ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
-
-	$sth_get_last_cbalance = $billdbh->prepare(
-		"SELECT id, UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end), cash_balance, cash_balance_interval, ".
-		"free_time_balance, free_time_balance_interval ".
-		"FROM billing.contract_balances ".
-		"WHERE contract_id = ? AND ".
-		"start <= FROM_UNIXTIME(?) AND end <= FROM_UNIXTIME(?) ORDER BY end DESC LIMIT 1"
-	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	
 	$sth_new_cbalance = $billdbh->prepare(
 		"INSERT IGNORE INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
 		"FROM_UNIXTIME(?), FROM_UNIXTIME(?), ".
 		"NULL)"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
+	
+	$sth_new_cbalance_infinite_future = $billdbh->prepare(
+		"INSERT IGNORE INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
+		"FROM_UNIXTIME(?), '9999-12-31 23:59:59', ".
+		"NULL)"
+	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;	
 	
 	$sth_update_cbalance = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
@@ -418,150 +468,202 @@ EOS
 	return 1;
 }
 
-sub calculate_balance_interval
-{
-    my ($unit, $count, $last_end, $create_time, $profile_id) = @_;
-    my $stime = DateTime->from_epoch(epoch => $last_end + 1, 
-        time_zone => DateTime::TimeZone->new(name => 'local'));
-    my $etime;
+sub lock_contracts {
+    my $cdrs = shift;
+	my %user_ids = ();
+	foreach my $cdr (@$cdrs) {
+        $user_ids{$cdr->{source_user_id}} = 1;
+        $user_ids{$cdr->{destination_user_id}} = 1;
+    }
+    my @uuids = keys %user_ids;
+    my $uuid_count = scalar @uuids;
+    my $lock_count = 0;
+    if ($uuid_count > 0) {
+        my $sth_contract_lock = $billdbh->prepare("SELECT COUNT(c.id) from billing.contracts c ".
+    		" JOIN voip_subscribers s ON c.id = voip_subscribers.contract_id ".
+    		"WHERE s.uuid IN (" . substr(',?' x $uuid_count,1) . ") ".
+    		"FOR UPDATE") or FATAL "Error preparing contract lock statement: ".$billdbh->errstr;
+        $sth_contract_lock->execute(@uuids);
+        my $row = $sth_contract_lock->fetchrow_arrayref();
+        $lock_count = ((defined $row) ? $$row[0] : undef);
+        $sth_contract_lock->finish;
+        #if ($count > 0) {
+        #    DEBUG "$lock_count contract(s) locked";
+        #}
+    }
+    return $lock_count;
+}
 
-    if($unit eq "day")
-    {
-        $etime = $stime->clone->add(days => $count);
+sub _add_interval {
+    my ($unit,$count,$from,$align_eom,$src) = @_; #all DateTimes here
+    my $to;   
+    my $delta;
+    if($unit eq "day") {
+        $to = $from->clone->add(days => $count);
+    } elsif($unit eq "week") {
+        $to = $from->clone->add(weeks => $count);
+    } elsif($unit eq "month") {
+        $to = $from->clone->add(months => $count, end_of_month => 'preserve');
+        #DateTime's "preserve" mode would get from 30.Jan to 30.Mar, when adding 2 months
+        #When adding 1 month two times, we get 28.Mar or 29.Mar, so we adjust:
+        if (defined $align_eom
+            && $to->day > $align_eom->day
+            && $from->day == last_day_of_month($from)) {
+            $delta = last_day_of_month($align_eom) - $align_eom->day;
+            $to->set(day => last_day_of_month($to) - $delta);
+        }
+    } else {
+		FATAL "Invalid interval unit '$unit' in $src";
     }
-    elsif($unit eq "week")
-    {
-        $etime = $stime->clone->add(weeks => $count);
-    }
-    elsif($unit eq "month")
-    {
-        $etime = $stime->clone->add(months => $count, end_of_month => 'preserve');
-        #'preserve' mode correction:
-        if (defined $create_time) {
-            my $align_eom_dt = DateTime->from_epoch(epoch => $create_time, 
-                time_zone => DateTime::TimeZone->new(name => 'local'));        
-            if ($etime->day > $align_eom_dt->day
-                && $stime->day == last_day_of_month($stime)) {
-                my $delta = last_day_of_month($align_eom_dt) - $align_eom_dt->day;
-                $etime->set(day => last_day_of_month($etime) - $delta);
+    return $to;
+}
+
+sub create_contract_balances {
+    
+	my $now = shift; #my $start_time = shift;
+	my $contract_id = shift;
+	
+	my $sth = $sth_get_contract_info;
+	$sth->execute($contract_id) or FATAL "Error executing get info statement: ".$sth->errstr;
+	my ($create_time,$modify,$contact_reseller_id,$package_id,$interval_unit,$interval_value,$start_mode,$carry_over_mode,$notopup_discard_intervals) = $sth->fetchrow_array();
+	$create_time ||= $modify; #contract create_timestamp might be 0000-00-00 00:00:00
+	my $create_time_aligned;
+	my $has_package = defined $package_id && defined $contact_reseller_id;
+    my $notopup_expiration = undef;
+    my $last_topup_start_time;
+    my $last_topup_start;
+    
+    if ($has_package) {
+        if ($notopup_discard_intervals) { #get notopup_expiration:
+            $sth = $sth_get_last_topup_cbalance;
+            $sth->execute($contract_id) or FATAL "Error executing get latest contract balance statement: ".$sth->errstr;
+	        ($last_topup_start_time) = $sth->fetchrow_array();
+	        if (!$last_topup_start_time) {
+	            $sth = $sth_get_first_cbalance;
+                $sth->execute($contract_id) or FATAL "Error executing get first contract balance statement: ".$sth->errstr;
+	            ($last_topup_start_time) = $sth->fetchrow_array();
+	        }
+            if ($last_topup_start_time) {
+                $last_topup_start = DateTime->from_epoch(epoch => $last_topup_start_time, 
+                    time_zone => DateTime::TimeZone->new(name => 'local')); 
+                $notopup_expiration = _add_interval($interval_unit, $notopup_discard_intervals + 1,
+                    $last_topup_start, undef, "package id " . $package_id)->epoch;
             }
         }
+    } else { #backward-defaults
+        $start_mode = "1st";
+        $carry_over_mode = "carry_over";
     }
-    else
-    {
-		FATAL "Invalid interval unit '$unit' in profile id $profile_id";
-    }
-    $etime->subtract(seconds => 1);
-    return ($stime->epoch, $etime->epoch);
-}
-
-sub last_day_of_month {
-    my $dt = shift;
-    return DateTime->last_day_of_month(year => $dt->year, month => $dt->month,
-                                       time_zone => DateTime::TimeZone->new(name => 'local'))->day;
-}
-
-sub create_contract_balance
-{
-	my $latest_end = shift;
-	my $start_time = shift;
-	my $binfo = shift;
-	my $create_time = shift;
-	my $cdr = shift;
-
-	my $sth = $sth_get_last_cbalance;
-	$sth->execute($binfo->{contract_id}, $start_time, $start_time)
-		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
-	my @res = $sth->fetchrow_array();
-
-	# TODO: we could just create a new one, we just have to know when to start
-	FATAL "No contract balance for contract id ".$binfo->{contract_id}." starting earlier than '".
-		$start_time."' found\n"
-		unless(@res);
 	
-	my $last_id = $res[0];
-	my $last_start = $res[1];
-	my $last_end = $res[2];
-	my $last_cash_balance = $res[3];
-	my $last_cash_balance_int = $res[4];
-	my $last_free_balance = $res[5];
-	my $last_free_balance_int = $res[6];
-
-	# break recursion if we got the last result as last time
-	return 1 if($latest_end eq $last_end);
-
-
-	my %last_profile = ();
-	get_billing_info($last_end, $binfo->{contract_id}, $cdr->{source_ip}, \%last_profile) or
-		FATAL "Error getting billing info for date '".$last_end."' and contract_id $binfo->{contract_id}\n";
-
-	my %current_profile = ();
-	my $last_end_unix = $last_end + 1;
-	get_billing_info($last_end_unix, $binfo->{contract_id}, $cdr->{source_ip}, \%current_profile) or
-		FATAL "Error getting billing info for date '".$last_end_unix."' and contract_id $binfo->{contract_id}\n";
-
-	my $ratio = 1;
-	if($create_time > $last_start and $create_time < $last_end) {
-		$ratio = ($last_end + 1 - $create_time) / ($last_end + 1 - $last_start);
-	}
-
-	my $new_cash_balance;
-	if($current_profile{int_free_cash}) {
-		my $old_free_cash = sprintf("%.4f", $last_profile{int_free_cash} * $ratio);
-		if($last_cash_balance_int < $old_free_cash) {
-			$new_cash_balance = $last_cash_balance + $last_cash_balance_int - 
-				$old_free_cash + $current_profile{int_free_cash};
-		} else {
-			$new_cash_balance = $last_cash_balance + $current_profile{int_free_cash};
+	$sth = $sth_get_last_cbalance;
+    $sth->execute($contract_id) or FATAL "Error executing get latest contract balance statement: ".$sth->errstr;
+	my ($last_id,$last_start,$last_end,$last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int,$last_topups,$last_timely_topups) = $sth->fetchrow_array();
+    
+    my $last_profile = undef;
+    my $next_start;
+    my $profile;
+    my ($stime,$etime);
+    my ($from,$to);
+    my $align_eom;
+    if ("create" eq $start_mode && defined $create_time) {
+        $align_eom = DateTime->from_epoch(epoch => $create_time, 
+            time_zone => DateTime::TimeZone->new(name => 'local')); 
+    } #no eom preserve, since we don't have the begin of the first topup interval
+    #} elsif ("topup_interval" eq $start_mode && defined x) {
+    #    $align_eom = DateTime->from_epoch(epoch => x, 
+    #        time_zone => DateTime::TimeZone->new(name => 'local'));     
+    #}    
+    my $ratio;
+    my $old_free_cash;
+    my $cash_balance;
+    my $cash_balance_interval;
+    my $free_cash;
+    my $free_time;
+    my $free_time_balance;
+    my $free_time_balance_interval;
+    my $balances_count = 0;
+    
+    while (defined $last_id && !_is_infinite_unix($last_end) && $last_end < $now) {
+        $next_start = $last_end + 1; #we have to rewrite this script in 2037 because of those increments
+     
+        #profile of last and next interval:
+	    unless($last_profile) {
+	        #no ip here - same as in panel: for now we assume that the profiles in a contracts'
+	        #profile+network mapping schedule have the same free_time/free cash!
+	        $last_profile = {};
+	        get_billing_info($last_start, $contract_id, undef, $last_profile) or
+		        FATAL "Error getting billing info for date '".$last_start."' and contract_id $contract_id\n";
 		}
-	} else {
-		$new_cash_balance = $last_cash_balance;
-	}
-	my $new_cash_balance_int = 0;
+		$profile = {};
+        get_billing_info($next_start, $contract_id, undef, $profile) or
+		    FATAL "Error getting billing info for date '".$next_start."' and contract_id $contract_id\n";		    
 
-	my $new_free_balance;
-	# agranig: This logic carries over any free time which was put into the account on
-	# top of the free time configured in the last billing profile during or earlier than
-	# the last balance interval. This seems to cause some confusion and might also
-	# cause issues when the billing profile free time is edited mid-interval or
-	# the profile changes to some other with a different free time, so we just
-	# drop the last free time and start the balance interval over with the value
-	# configured in the current billing profile. sigh.
-#	if($current_profile{int_free_time}) {
-#		my $old_free_time = sprintf("%.4f", $last_profile{int_free_time} * $ratio);
-#		if($last_free_balance_int < $old_free_time) {
-#			$new_free_balance = $last_free_balance + $last_free_balance_int - 
-#				$old_free_time + $current_profile{int_free_time};
-#		} else {
-#			$new_free_balance = $last_free_balance + $current_profile{int_free_time};
-#		}
-#	} else {
-#		$new_free_balance = $last_free_balance;
-#	}
-	if($current_profile{int_free_time}) {
-		$new_free_balance = $current_profile{int_free_time};
-	} else {
-		$new_free_balance = 0;
-	}
-	my $new_free_balance_int = 0;
-	
-	$sth = $sth_new_cbalance;
+        #stime, etime:
+        $interval_unit = $has_package ? $interval_unit : ($profile->{int_unit} // 'month'); #backward-defaults
+        $interval_value = $has_package ? $interval_value : ($profile->{int_count} // 1);
+        
+        $from = DateTime->from_epoch(epoch => $next_start, 
+            time_zone => DateTime::TimeZone->new(name => 'local')); 
+        if ("topup" eq $start_mode) {
+            $stime = $from->epoch;
+            $etime = undef;
+        } else {
+            $to = _add_interval($interval_unit, $interval_value, $from, $align_eom, $has_package ? "package id " . $package_id : "profile id " . $profile->{profile_id});
+            $to->subtract(seconds => 1);
+            $stime = $from->epoch;
+            $etime = $to->epoch;          
+        }
+        
+        #balance values:
+        if (("carry_over" eq $carry_over_mode || ("carry_over_timely" eq $carry_over_mode && $last_timely_topups > 0))
+            && (!$notopup_expiration || $stime < $notopup_expiration)) {
+        
+        	$ratio = 1.0;
+        	if($create_time > $last_start and $create_time < $last_end) {
+                $create_time_aligned = DateTime->from_epoch(epoch => $create_time, 
+                    time_zone => DateTime::TimeZone->new(name => 'local'))->clone->truncate(to => 'day')->epoch;
+                $create_time_aligned = $create_time if $create_time_aligned < $stime;
+        		$ratio = ($last_end + 1 - $create_time_aligned) / ($last_end + 1 - $last_start);
+        	}
+       
+        	$old_free_cash = $ratio * ($last_free_balance_int // 0.0); #backward-defaults
+        	$cash_balance = $last_cash_balance;
+            if ($last_cash_balance_int < $old_free_cash) {
+                $cash_balance = $cash_balance + $last_cash_balance_int - $old_free_cash;
+            }
+        }
+        $ratio = 1.0;
+        $free_cash = $ratio * ($profile->{int_free_cash} // 0.0); #backward-defaults
+        $cash_balance += $free_cash;
+        $cash_balance_interval = 0.0;
+    
+        $free_time = $ratio * ($profile->{int_free_time} // 0);
+        $free_time_balance = $free_time;
+        $free_time_balance_interval = 0;
+        
+        #exec create statement:
+        $sth = (defined $etime ? $sth_new_cbalance : $sth_new_cbalance_infinite_future);
+        ($last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int) = 
+        (sprintf("%.4f",$cash_balance), sprintf("%.4f",$cash_balance_interval),
+    		sprintf("%.0f",$free_time_balance), sprintf("%.0f",$free_time_balance_interval));
+        my @bind_parms = ($contract_id,
+            $last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int, 
+    		$stime);
+        push(@bind_parms,$etime) if defined $etime;
+    	$sth->execute(@bind_parms)
+    		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
 
-    my $start_mode = '1st'; #todo: get it from package
-	my ($etime, $stime) = calculate_balance_interval(
-        $binfo->{int_unit}, $binfo->{int_count},
-        $last_end, $start_mode eq 'create' ? $create_time : undef, $binfo->{profile_id}
-    );
+    	$balances_count++;
+    	
+    	#avoid reloading created balance:
+    	($last_id              ,$last_start,$last_end,$last_topups,$last_timely_topups) =
+    	($balances_count       ,      ,$stime     ,$etime   ,0           ,0); #$billdbh->{'mysql_insertid'}
+    		
+        $last_profile = $profile;
 
+    }
+    return $balances_count;
 
-    # TODO: adapt to package stuff
-
-	$sth->execute($binfo->{contract_id}, $new_cash_balance, $new_cash_balance_int,
-		$new_free_balance, $new_free_balance_int, 
-		$stime, $etime)
-		or FATAL "Error executing new contract balance statement: ".$sth->errstr;
-
-	return create_contract_balance($last_end, $start_time, $binfo, $create_time, $cdr);
 }
 
 sub get_contract_balance
@@ -580,18 +682,12 @@ sub get_contract_balance
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 
-	if (!@$res || $res->[$#$res]{end_unix} < ($start_time + $duration))
+	if (!@$res || (!_is_infinite_unix($res->[$#$res]{end_unix}) && $res->[$#$res]{end_unix} < ($start_time + $duration)))
 	{
-		my $sth_cid = $sth_get_contract_info;
-		$sth_cid->execute($binfo->{contract_id})
-			or FATAL "Error executing get contract balance statement: ".$sth_cid->errstr;
-		my $create_time = ($sth_cid->fetchrow_array())[0];
+        catchup_contract_balance($start_time + $duration,$binfo->{contract_id})
+            or FATAL "Failed to catchup contract balances\n";
 
-		create_contract_balance('invalid', $start_time + $duration, $binfo, $create_time, $cdr)
-			or FATAL "Failed to create new contract balance\n";
-
-		$sth->execute(
-			$binfo->{contract_id}, $start_time)
+		$sth->execute($binfo->{contract_id}, $start_time)
 			or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 		$res = $sth->fetchall_arrayref({});
 	}
@@ -640,23 +736,30 @@ sub get_billing_info
 	my $r_info = shift;
 
 	my $sth;
-	my $ip_size;
-	my $ip = NetAddr::IP->new($source_ip);
-	if($ip->version == 4) {
-		$sth = $sth_billing_info_v4;
-		$ip_size = 4;
-	} elsif($ip->version == 6) {
-		$sth = $sth_billing_info_v6;
-		$ip_size = 16;
+	if ($source_ip) {
+    	my $ip_size;
+    	my $ip = NetAddr::IP->new($source_ip);
+    	if($ip->version == 4) {
+    		$sth = $sth_billing_info_v4;
+    		$ip_size = 4;
+    	} elsif($ip->version == 6) {
+    		$sth = $sth_billing_info_v6;
+    		$ip_size = 16;
+    	} else {
+    		FATAL "Invalid source_ip $source_ip\n";
+    	}
+
+	    my $int_ip = $ip->bigint;
+	    my $ip_bytes = _bigint_to_bytes($int_ip, $ip_size);
+
+	    $sth->execute($contract_id, $start, $start, $ip_bytes, $ip_bytes) or
+		    FATAL "Error executing billing info statement: ".$sth->errstr;
 	} else {
-		FATAL "Invalid source_ip $source_ip\n";
+	    $sth = $sth_billing_info_panel;
+	    $sth->execute($contract_id, $start, $start) or
+		    FATAL "Error executing billing info statement: ".$sth->errstr;	    
 	}
-
-	my $int_ip = $ip->bigint;
-	my $ip_bytes = _bigint_to_bytes($int_ip, $ip_size);
-
-	$sth->execute($contract_id, $start, $start, $ip_bytes, $ip_bytes) or
-		FATAL "Error executing billing info statement: ".$sth->errstr;
+	    
 	my @res = $sth->fetchrow_array();
 	FATAL "No billing info found for contract_id $contract_id\n" unless @res;
 
@@ -1506,12 +1609,18 @@ sub main
 
 		my $rated_batch = 0;
 
+        #set the next transaction's isolation level:
+        $billdbh->do('SET TRANSACTION ISOLATION LEVEL READ COMMITTED') or FATAL "Error setting isolation level: ".$billdbh->errstr;
+        #otherwise catchup balances alg won't read contract_balances rows created ...
+        
 		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
+		
 		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
 		$dupdbh and ($dupdbh->begin_work or FATAL "Error starting transaction: ".$dupdbh->errstr);
 
 		eval 
 		{
+		    lock_contracts(\@cdrs); # ... while waiting for contracts row locks!
 			foreach my $cdr(@cdrs)
 			{
 				INFO "rate cdr #".$cdr->{id}."\n";
@@ -1573,6 +1682,7 @@ sub main
 	$sth_get_subscriber_contract_id->finish;
 	$sth_billing_info_v4->finish;
 	$sth_billing_info_v6->finish;
+	$sth_billing_info_panel->finish;
 	$sth_profile_info->finish;
 	$sth_offpeak_weekdays->finish;
 	$sth_offpeak_special->finish;
@@ -1583,14 +1693,17 @@ sub main
 	$sth_get_cbalance->finish;
 	$sth_update_cbalance->finish;
 	$sth_new_cbalance->finish;
+	$sth_new_cbalance_infinite_future->finish;
 	$sth_get_last_cbalance->finish;
+	$sth_get_first_cbalance->finish;
+	$sth_get_last_topup_cbalance->finish;
 	$sth_lnp_number->finish;
 	$sth_lnp_profile_info->finish;
 	$sth_get_contract_info->finish;
 	$sth_prepaid_costs->finish;
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
-    $sth_get_profile_package->finish;
+    #$sth_get_profile_package->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 
 
