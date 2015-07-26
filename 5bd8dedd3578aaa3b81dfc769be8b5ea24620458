@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa5d592f_80e4e60d",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 232,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-07-26T23:41:48Z",
+      "side": 1,
+      "message": "at least this part certainly isn\u0027t right :P",
+      "range": {
+        "startLine": 232,
+        "startChar": 29,
+        "endLine": 232,
+        "endChar": 37
+      },
+      "revId": "5bd8dedd3578aaa3b81dfc769be8b5ea24620458",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
