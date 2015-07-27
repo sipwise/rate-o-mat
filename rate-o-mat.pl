@@ -238,13 +238,13 @@ sub init_db
 		"SELECT id, UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end), cash_balance, cash_balance_interval, ".
 		"free_time_balance, free_time_balance_interval, topup_count, timely_topup_count ".
 		"FROM billing.contract_balances ".
-		"WHERE contract_id = ?".
+		"WHERE contract_id = ? ".
 		"ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 	$sth_get_first_cbalance = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(start) ".
 		"FROM billing.contract_balances ".
-		"WHERE contract_id = ?".
+		"WHERE contract_id = ? ".
 		"ORDER BY start ASC LIMIT 1"
 	) or FATAL "Error preparing get first contract balance statement: ".$billdbh->errstr;
 	$sth_get_last_topup_cbalance = $billdbh->prepare(
