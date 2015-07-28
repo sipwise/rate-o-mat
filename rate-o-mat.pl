@@ -8,6 +8,7 @@ use IO::Handle;
 use Sys::Syslog;
 use NetAddr::IP;
 use Data::Dumper;
+use DateTime;
 
 $0 = 'rate-o-mat';
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
@@ -425,15 +426,15 @@ EOS
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance = $billdbh->prepare(
-		"INSERT IGNORE INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"FROM_UNIXTIME(?), FROM_UNIXTIME(?), ".
-		"NULL)"
+		"INSERT INTO billing.contract_balances (".
+        " contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, start, end".
+        ") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_infinite_future = $billdbh->prepare(
-		"INSERT IGNORE INTO billing.contract_balances VALUES(NULL, ?, ?, ?, ?, ?, ".
-		"FROM_UNIXTIME(?), '9999-12-31 23:59:59', ".
-		"NULL)"
+        "INSERT INTO billing.contract_balances (".
+        " contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, start, end".
+        ") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance = $billdbh->prepare(
@@ -487,7 +488,7 @@ sub lock_contracts {
 		my $row = $sth_contract_lock->fetchrow_arrayref();
 		$lock_count = ((defined $row) ? $$row[0] : undef);
 		$sth_contract_lock->finish;
-		if ($count > 0) {
+		if ($lock_count > 0) {
 		    DEBUG "$lock_count contract(s) locked";
 		}
 	}
@@ -655,6 +656,9 @@ sub catchup_contract_balance {
 		push(@bind_parms,$etime) if defined $etime;
 		$sth->execute(@bind_parms)
 			or FATAL "Error executing new contract balance statement: ".$sth->errstr;
+NULL, ?, ?, ?, ?, ?, ".
+		"FROM_UNIXTIME(?), FROM_UNIXTIME(?), ".
+		"NULL)
 
 		$balances_count++;
 
