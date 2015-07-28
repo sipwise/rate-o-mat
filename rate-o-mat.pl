@@ -615,6 +615,7 @@ sub catchup_contract_balance {
 		}
 
 		#balance values:
+		$cash_balance = 0;
 		if (("carry_over" eq $carry_over_mode || ("carry_over_timely" eq $carry_over_mode && $last_timely_topups > 0))
 			&& (!$notopup_expiration || $stime < $notopup_expiration)) {
 
@@ -625,12 +626,14 @@ sub catchup_contract_balance {
 				$create_time_aligned = $create_time if $create_time_aligned < $stime;
 				$ratio = ($last_end + 1 - $create_time_aligned) / ($last_end + 1 - $last_start);
 			}
-
-			$old_free_cash = $ratio * ($last_free_balance_int // 0.0); #backward-defaults
+			$last_free_balance_int = $last_profile->{int_free_cash} // 0.0; #backward-defaults
+			$old_free_cash = $ratio * $last_free_balance_int;
 			$cash_balance = $last_cash_balance;
 			if ($last_cash_balance_int < $old_free_cash) {
 				$cash_balance = $cash_balance + $last_cash_balance_int - $old_free_cash;
 			}
+			#free time corrections can take place here once..
+			#$last_profile->{int_free_time} ...
 		}
 		$ratio = 1.0;
 		$free_cash = $ratio * ($profile->{int_free_cash} // 0.0); #backward-defaults
