@@ -480,16 +480,16 @@ sub lock_contracts {
 	my $lock_count = 0;
 	if ($uuid_count > 0) {
 		my $sth_contract_lock = $billdbh->prepare("SELECT COUNT(c.id) from billing.contracts c ".
-			" JOIN voip_subscribers s ON c.id = voip_subscribers.contract_id ".
+			" JOIN billing.voip_subscribers s ON c.id = s.contract_id ".
 			"WHERE s.uuid IN (" . substr(',?' x $uuid_count,1) . ") ".
 			"FOR UPDATE") or FATAL "Error preparing contract lock statement: ".$billdbh->errstr;
 		$sth_contract_lock->execute(@uuids);
 		my $row = $sth_contract_lock->fetchrow_arrayref();
 		$lock_count = ((defined $row) ? $$row[0] : undef);
 		$sth_contract_lock->finish;
-		#if ($count > 0) {
-		#    DEBUG "$lock_count contract(s) locked";
-		#}
+		if ($count > 0) {
+		    DEBUG "$lock_count contract(s) locked";
+		}
 	}
 	return $lock_count;
 }
