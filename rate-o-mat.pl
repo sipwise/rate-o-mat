@@ -1155,7 +1155,7 @@ sub get_call_cost
 		my $current_call_time = int($cdr->{start_time} + $offset);
 		my @bals = grep {
 			$_->{start_unix} <= $current_call_time &&
-			$current_call_time <= $_->{end_unix}
+			($current_call_time <= $_->{end_unix} || _is_infinite_unix($_->{end_unix}))
 		} @$r_balances;
 		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
 		@bals = sort {$a->{start_unix} <=> $b->{start_unix}} @bals;
