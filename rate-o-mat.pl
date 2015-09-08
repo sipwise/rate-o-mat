@@ -82,9 +82,7 @@ my $sth_lnp_profile_info;
 my $sth_prepaid_costs;
 my $sth_delete_prepaid_cost;
 my $sth_delete_old_prepaid;
-#my $sth_get_contract_info;
 my $sth_duplicate_cdr;
-#my $sth_get_profile_package;
 
 my $connect_interval = 3;
 
@@ -103,13 +101,13 @@ sub FATAL
 	my $msg = shift;
 	chomp $msg;
 	print "FATAL: $msg\n" if($fork != 1);
-	unless(defined $DBI::err and $DBI::err == 2006)
-	{
-		# we manually start the transaction and call commit,
-		# so no need to rollback here
-		#$billdbh->rollback if defined $billdbh;
-		#$acctdbh->rollback if defined $acctdbh;
-	}
+	#unless(defined $DBI::err and $DBI::err == 2006)
+	#{
+	#	# we manually start the transaction and call commit,
+	#	# so no need to rollback here
+	#	#$billdbh->rollback if defined $billdbh;
+	#	#$acctdbh->rollback if defined $acctdbh;
+	#}
 	syslog('crit', $msg);
 	die "$msg\n";
 }
@@ -193,7 +191,31 @@ sub connect_dupdbh
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($dupdbh);
-	INFO "Successfully connected to accounting db...";
+	INFO "Successfully connected to duplication db...";
+}
+
+sub begin_transaction {
+    my ($dbh,$isolation_level) = @_;
+    if ($dbh) {
+        if ($isolation_level) {
+            $dbh->do('SET TRANSACTION ISOLATION LEVEL '.$isolation_level) or FATAL "Error setting transaction isolation level: ".$dbh->errstr;
+        }
+        $dbh->begin_work or FATAL "Error starting transaction: ".$dbh->errstr;
+    }
+}
+
+sub commit_transaction {
+    my $dbh = shift;
+    if ($dbh) {
+        $dbh->commit or FATAL "Error committing: ".$dbh->errstr;
+    }
+}
+
+sub rollback_transaction {
+    my $dbh = shift;
+    if ($dbh) {
+        $dbh->rollback or FATAL "Error rolling back: ".$dbh->errstr;
+    }
 }
 
 sub _bigint_to_bytes {
@@ -397,7 +419,7 @@ EOS
 		"WHERE bm.contract_id = ? AND bm.product_id = p.id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
-		"ORDER BY bm.start_date DESC ".
+		"ORDER BY bm.start_date, bm.id DESC ".
 		"LIMIT 1"
 	) or FATAL "Error preparing provider info statement: ".$billdbh->errstr;
 
@@ -411,7 +433,7 @@ EOS
 		"AND r.contract_id = bm.contract_id ".
 		"AND (bm.start_date IS NULL OR bm.start_date <= FROM_UNIXTIME(?)) ".
 		"AND (bm.end_date IS NULL OR bm.end_date >= FROM_UNIXTIME(?)) ".
-		"ORDER BY bm.start_date DESC ".
+		"ORDER BY bm.start_date, bm.id DESC ".
 		"LIMIT 1"
 	) or FATAL "Error preparing reseller info statement: ".$billdbh->errstr;
 
@@ -470,28 +492,52 @@ EOS
 }
 
 sub lock_contracts {
-	my $cdrs = shift;
+	my $cdr = shift;
+	my %provider_cids = ();
+	$provider_cids{$cdr->{source_provider_id}} = 1 if $cdr->{source_provider_id} ne "0";
+	$provider_cids{$cdr->{destination_provider_id}} = 1 if $cdr->{destination_provider_id} ne "0";        
+	my @pcids = keys %provider_cids;
+	my $pcid_count = scalar @pcids;	
+	my $sth_contracts = undef;
+	my %lock_cids = ();
+	if ($pcid_count > 0) {
+	    $sth_contracts = $billdbh->prepare("SELECT c.id from billing.contracts c ".
+			"WHERE c.id IN (" . substr(',?' x $pcid_count,1) . ")") 
+			 or FATAL "Error preparing contract row lock selection statement: ".$billdbh->errstr;
+	    $sth_contracts->execute(@pcids);
+	    while (my @row = $sth_contracts->fetchrow_array) {
+	        $lock_cids{$row[0]} = 1;
+        }
+        $sth_contracts->finish;
+	} 
 	my %user_ids = ();
-	foreach my $cdr (@$cdrs) {
-		$user_ids{$cdr->{source_user_id}} = 1;
-		$user_ids{$cdr->{destination_user_id}} = 1;
-	}
+	$user_ids{$cdr->{source_user_id}} = 1 if $cdr->{source_user_id} ne "0";
+	$user_ids{$cdr->{destination_user_id}} = 1 if $cdr->{destination_user_id} ne "0";
 	my @uuids = keys %user_ids;
 	my $uuid_count = scalar @uuids;
-	my $lock_count = 0;
 	if ($uuid_count > 0) {
-		my $sth_contract_lock = $billdbh->prepare("SELECT COUNT(c.id) from billing.contracts c ".
+		$sth_contracts = $billdbh->prepare("SELECT DISTINCT c.id from billing.contracts c ".
 			" JOIN billing.voip_subscribers s ON c.id = s.contract_id ".
-			"WHERE s.uuid IN (" . substr(',?' x $uuid_count,1) . ") ".
-			"FOR UPDATE") or FATAL "Error preparing contract lock statement: ".$billdbh->errstr;
-		$sth_contract_lock->execute(@uuids);
-		my $row = $sth_contract_lock->fetchrow_arrayref();
-		$lock_count = ((defined $row) ? $$row[0] : undef);
-		$sth_contract_lock->finish;
-		if ($lock_count > 0) {
-			DEBUG "$lock_count contract(s) locked";
-		}
+			"WHERE s.uuid IN (" . substr(',?' x $uuid_count,1) . ")")
+			 or FATAL "Error preparing subscriber contract row lock selection statement: ".$billdbh->errstr;
+		$sth_contracts->execute(@uuids);
+	    while (my @row = $sth_contracts->fetchrow_array) {
+	        $lock_cids{$row[0]} = 1;
+        }
+        $sth_contracts->finish;		
 	}
+	my @cids = keys %lock_cids;
+	my $lock_count = scalar @cids;
+	if ($lock_count > 0) {
+	    #the 'for update' statement must avoid joins, otherwise all rows can get locked!
+   	    my $sth_contract_lock = $billdbh->prepare("SELECT c.id from billing.contracts c ".
+   			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ") FOR UPDATE") 
+   			 or FATAL "Error preparing contract row lock statement: ".$billdbh->errstr;
+   	    $sth_contract_lock->execute(@cids);
+        $sth_contract_lock->finish;		    
+		DEBUG "$lock_count contract(s) locked: ".join(', ',@cids);
+	}
+
 	return $lock_count;
 }
 
@@ -501,6 +547,8 @@ sub _add_interval {
 	my $delta;
 	if($unit eq "day") {
 		$to = $from->clone->add(days => $count);
+	} elsif($unit eq "hour") {
+		$to = $from->clone->add(hours => $count);		
 	} elsif($unit eq "week") {
 		$to = $from->clone->add(weeks => $count);
 	} elsif($unit eq "month") {
@@ -592,8 +640,8 @@ sub catchup_contract_balance {
 			#no ip here - same as in panel: for now we assume that the profiles in a contracts'
 			#profile+network mapping schedule have the same free_time/free cash!
 			$last_profile = {};
-			get_billing_info($last_start, $contract_id, undef, $last_profile) or
-				FATAL "Error getting billing info for date '".$last_start."' and contract_id $contract_id\n";
+			get_billing_info($last_start < $create_time ? $create_time : $last_start, $contract_id, undef, $last_profile) or
+				FATAL "Error getting billing info for date '".($last_start < $create_time ? $create_time : $last_start)."' and contract_id $contract_id\n";
 		}
 		$profile = {};
 		get_billing_info($next_start, $contract_id, undef, $profile) or
@@ -1299,8 +1347,10 @@ sub get_provider_call_cost
 	my $onpeak;
 	my $real_cost = 0;
 
+    my $contract_id = $$r_info{contract_id};
+
 	my %billing_info = ();
-	get_billing_info($cdr->{start_time}, $$r_info{contract_id}, $cdr->{source_ip}, \%billing_info) or
+	get_billing_info($cdr->{start_time}, $contract_id, $cdr->{source_ip}, \%billing_info) or
 		FATAL "Error getting billing info\n";
 	#print Dumper \%billing_info;
 
@@ -1310,7 +1360,7 @@ sub get_provider_call_cost
 	}
 
 	my @balances;
-	get_contract_balance($cdr, $$r_info{contract_id}, \%billing_info, \@balances);
+	get_contract_balance($cdr, $contract_id, \%billing_info, \@balances);
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,
@@ -1612,29 +1662,30 @@ sub main
 
 		my $rated_batch = 0;
 
-		#set the next transaction's isolation level:
-		$billdbh->do('SET TRANSACTION ISOLATION LEVEL READ COMMITTED') or FATAL "Error setting isolation level: ".$billdbh->errstr;
-		#otherwise catchup balances alg won't read contract_balances rows created ...
-
-		$billdbh->begin_work or FATAL "Error starting transaction: ".$billdbh->errstr;
-
-		$acctdbh->begin_work or FATAL "Error starting transaction: ".$acctdbh->errstr;
-		$dupdbh and ($dupdbh->begin_work or FATAL "Error starting transaction: ".$dupdbh->errstr);
-
 		eval
 		{
-			lock_contracts(\@cdrs); # ... while waiting for contracts row locks!
-			foreach my $cdr(@cdrs)
+			foreach my $cdr (@cdrs)
 			{
+			    begin_transaction($billdbh,'READ COMMITTED'); #required to avoid contract_balances duplications during catchup
+			    lock_contracts($cdr); #whenever we have to catchup/lock multiple contracts, we need to do this at once, at the beginning
+			    begin_transaction($acctdbh);
+			    begin_transaction($dupdbh);
+			    
 				INFO "rate cdr #".$cdr->{id}."\n";
-				rate_cdr($cdr, $type)
-					&& update_cdr($cdr);
+				rate_cdr($cdr, $type) && update_cdr($cdr);
 				$rated_batch++;
+				
+				#we would need a XA/transaction manager for this:
+				commit_transaction($billdbh);
+        		commit_transaction($acctdbh);
+				commit_transaction($dupdbh);
+				
 				check_shutdown() and last;
 			}
 		};
 		if($@)
 		{
+		    my $error = $@;
 			if(defined $DBI::err)
 			{
 				INFO "Caught DBI:err ".$DBI::err, "\n";
@@ -1642,6 +1693,9 @@ sub main
 				{
 					INFO "DB connection gone, retrying...";
 					# disconnect from all of them so transactions are on par
+        			eval { rollback_transaction($billdbh); };
+        			eval { rollback_transaction($acctdbh); };
+        			eval { rollback_transaction($dupdbh); };
 					$billdbh->disconnect;
 					$acctdbh->disconnect;
 					$dupdbh and ($dupdbh->disconnect);
@@ -1649,18 +1703,17 @@ sub main
 				}
 				if ($DBI::err == 1213) {
 					INFO "Transaction concurrency problem, rolling back and retrying...";
-					$billdbh->rollback;
-					$acctdbh->rollback;
-					$dupdbh and ($dupdbh->rollback);
+        			eval { rollback_transaction($billdbh); };
+        			eval { rollback_transaction($acctdbh); };
+        			eval { rollback_transaction($dupdbh); };					
 					next;
 				}
 			}
-			FATAL "Error rating CDR batch: " . $@;
+			eval { rollback_transaction($billdbh); };
+			eval { rollback_transaction($acctdbh); };
+			eval { rollback_transaction($dupdbh); };			
+			FATAL "Error rating CDR batch: " . $error;
 		}
-
-		$billdbh->commit or FATAL "Error committing cdrs: ".$billdbh->errstr;
-		$acctdbh->commit or FATAL "Error committing cdrs: ".$acctdbh->errstr;
-		$dupdbh and ($dupdbh->commit or FATAL "Error committing cdrs: ".$dupdbh->errstr);
 
 		$rated += $rated_batch;
 		INFO "$rated CDRs rated so far.\n";
@@ -1706,7 +1759,6 @@ sub main
 	$sth_prepaid_costs->finish;
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
-	#$sth_get_profile_package->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 
 
