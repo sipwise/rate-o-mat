@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da6255ed_0e614b39",
+        "filename": "t/Utils/Api.pm",
+        "patchSetId": 6
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 1000009
+      },
+      "writtenOn": "2015-09-18T04:29:07Z",
+      "side": 1,
+      "message": "Couldn\u0027t we use here NGCP::Panel::Utils::DateTime?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
