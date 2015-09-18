@@ -2,6 +2,176 @@
   "comments": [
     {
       "key": {
+        "uuid": "da6255ed_ae723fe3",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 100,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "I\u0027m just wondering, is there any special reason why those variables aren\u0027t sorted alphabetically?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_8e777bd4",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "Unneeded code should be removed IMHO, we can easily restore from version control repository if needed.",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_6e7447cf",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 538,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "The indention here looks different than above.\nThis applies also to the several modified lines/functions below.",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_4e81838e",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 628,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "drop?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_2e7e4faf",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 675,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "there\u0027s a mixture of tabs vs. tabs for indention, IMO that should be unified (actually for the whole file :))",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_ee4f1791",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1011,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "trailing whitespace :)",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_0e4b8b88",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1012,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "Drop?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_8e5e5b44",
+        "filename": "t/Utils/Api.pm",
+        "patchSetId": 6
+      },
+      "lineNbr": 20,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "I\u0027d sort them alphabetically",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_4e586356",
+        "filename": "t/Utils/Api.pm",
+        "patchSetId": 6
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "Drop?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_2e552f1d",
+        "filename": "t/Utils/Api.pm",
+        "patchSetId": 6
+      },
+      "lineNbr": 169,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "Trailing whitespace (and several times below as well) :)",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "da6255ed_0e614b39",
         "filename": "t/Utils/Api.pm",
         "patchSetId": 6
@@ -13,6 +183,23 @@
       "writtenOn": "2015-09-18T04:29:07Z",
       "side": 1,
       "message": "Couldn\u0027t we use here NGCP::Panel::Utils::DateTime?",
+      "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_0e326b10",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 6
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2015-09-18T10:00:11Z",
+      "side": 1,
+      "message": "Sort alphabetically?",
       "revId": "e5cc770fc8b1462fb58a83c764e13c72114a016d",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
