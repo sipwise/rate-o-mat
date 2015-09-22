@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da6255ed_9a0c5544",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 12
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2015-09-22T04:04:55Z",
+      "side": 1,
+      "message": "what is the point of commenting password check?",
+      "revId": "2b9f5b500822aa531c6d2789a3a48e07edeb3fbd",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_7a09a130",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 12
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2015-09-22T04:04:55Z",
+      "side": 1,
+      "message": "what is the point of commenting password check?",
+      "revId": "2b9f5b500822aa531c6d2789a3a48e07edeb3fbd",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da6255ed_5a06dd21",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 12
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2015-09-22T04:04:55Z",
+      "side": 1,
+      "message": "what is the point of commenting password check?",
+      "revId": "2b9f5b500822aa531c6d2789a3a48e07edeb3fbd",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
