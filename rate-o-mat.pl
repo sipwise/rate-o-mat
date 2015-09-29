@@ -9,6 +9,7 @@ use Sys::Syslog;
 use NetAddr::IP;
 use Data::Dumper;
 use DateTime;
+use Getopt::Long;
 
 $0 = 'rate-o-mat';
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
@@ -33,20 +34,20 @@ my @lnp_order_by = ();
 my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
 my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
 my $BillDB_Port = $ENV{RATEOMAT_BILLING_DB_PORT} ? int $ENV{RATEOMAT_BILLING_DB_PORT} : 3306;
-my $BillDB_User = $ENV{RATEOMAT_BILLING_DB_USER} || die "Missing billing DB user setting.";
-my $BillDB_Pass = $ENV{RATEOMAT_BILLING_DB_PASS}; # || die "Missing billing DB password setting.";
+my $BillDB_User = $ENV{RATEOMAT_BILLING_DB_USER};
+my $BillDB_Pass = $ENV{RATEOMAT_BILLING_DB_PASS};
 # accounting database
 my $AcctDB_Name = $ENV{RATEOMAT_ACCOUNTING_DB_NAME} || 'accounting';
 my $AcctDB_Host = $ENV{RATEOMAT_ACCOUNTING_DB_HOST} || 'localhost';
 my $AcctDB_Port = $ENV{RATEOMAT_ACCOUNTING_DB_PORT} ? int $ENV{RATEOMAT_ACCOUNTING_DB_PORT} : 3306;
-my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER} || die "Missing accounting DB user setting.";
-my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS}; # || die "Missing accounting DB password setting.";
+my $AcctDB_User = $ENV{RATEOMAT_ACCOUNTING_DB_USER};
+my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS};
 # provisioning database
 my $ProvDB_Name = $ENV{RATEOMAT_PROVISIONING_DB_NAME} || 'provisioning';
 my $ProvDB_Host = $ENV{RATEOMAT_PROVISIONING_DB_HOST} || 'localhost';
 my $ProvDB_Port = $ENV{RATEOMAT_PROVISIONING_DB_PORT} ? int $ENV{RATEOMAT_PROVISIONING_DB_PORT} : 3306;
-my $ProvDB_User = $ENV{RATEOMAT_PROVISIONING_DB_USER} || die "Missing provisioning DB user setting.";
-my $ProvDB_Pass = $ENV{RATEOMAT_PROVISIONING_DB_PASS}; # || die "Missing provisioning DB password setting.";
+my $ProvDB_User = $ENV{RATEOMAT_PROVISIONING_DB_USER};
+my $ProvDB_Pass = $ENV{RATEOMAT_PROVISIONING_DB_PASS};
 # duplication database
 my $DupDB_Name = $ENV{RATEOMAT_DUPLICATE_DB_NAME} || 'accounting';
 my $DupDB_Host = $ENV{RATEOMAT_DUPLICATE_DB_HOST} || 'localhost';
@@ -110,6 +111,25 @@ foreach my $gpp_idx(0 .. 9) {
 	push @cdr_fields, ("source_gpp$gpp_idx", "destination_gpp$gpp_idx");
 }
 
+sub Usage {
+    print <<USAGE;
+==
+    Rating daemon for the NGCP
+==
+$0 [options]
+Options:
+    --help|-h|-?          -- this help
+    --verbose|-v          -- verbose mode
+    --check-config|-c     -- check config
+USAGE
+    exit 0;
+}
+
+GetOptions("h|?|help"      => \&Usage,
+           "v|verbose"     => \$debug,
+           "c|check-config" => \&check_config,
+          ) or die Usage();
+
 main;
 exit 0;
 
@@ -148,6 +168,16 @@ sub WARNING
 	chomp $msg;
 	print "WARNING: $msg\n" if($fork != 1);
 	syslog('warning', $msg);
+}
+
+sub check_config {
+	die "Missing provisioning DB user setting." unless $ProvDB_User;
+	die "Missing provisioning DB password setting." unless $ProvDB_Pass;
+	die "Missing accounting DB user setting." unless $AcctDB_User;
+	die "Missing accounting DB password setting." unless $AcctDB_Pass;
+	die "Missing billing DB user setting." unless $BillDB_User;
+	die "Missing billing DB password setting." unless $BillDB_Pass;
+	exit 0;
 }
 
 sub sql_time {

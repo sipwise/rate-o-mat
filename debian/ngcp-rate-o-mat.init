@@ -41,14 +41,24 @@ fi
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
+
+do_check()
+{
+	if ! ${DAEMON} -c ; then
+		log_progress_msg "check config" "failed"
+		log_end_msg 0
+		exit 0
+	fi
+}
+
 #
 # Function that starts the daemon/service
 #
 do_start()
 {
 	if [ "$RATEOMAT_RUN" = "no" ];then
-		echo "$NAME disabled. Not starting."
-		exit 0
+		log_progress_msg "$NAME disabled. Not starting."
+		log_end_msg 0
 	fi
 
 	if [ -x "/usr/sbin/ngcp-check_active" ]; then
@@ -56,14 +66,16 @@ do_start()
 	  status=$?
 	  case "${status}" in
 	    0|3)
-	      echo "Active node or transition."
+	      log_progress_msg "Active node or transition."
 	      ;;
 	    *)
-	      echo "Ignored start action in inactive node ($status)"
-	      exit 0
+	      log_progress_msg "Ignored start action in inactive node ($status)"
+	      log_end_msg 0
 	      ;;
 	  esac
 	fi
+
+	do_check
 
 	# Return
 	#   0 if daemon has been started
