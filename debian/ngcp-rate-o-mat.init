@@ -41,6 +41,15 @@ fi
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
+
+do_check()
+{
+	if ! ${DAEMON} -c ; then
+		log_daemon_msg "check config failed"
+		exit 0
+	fi
+}
+
 #
 # Function that starts the daemon/service
 #
@@ -64,6 +73,8 @@ do_start()
 	      ;;
 	  esac
 	fi
+
+	do_check
 
 	# Return
 	#   0 if daemon has been started
