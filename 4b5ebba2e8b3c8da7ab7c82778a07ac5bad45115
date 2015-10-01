@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da6255ed_d39ab313",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 197,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2015-10-01T06:51:23Z",
+      "side": 1,
+      "message": "maybe INFO \"No provisioningdb config detected\" will be nice here",
+      "revId": "4b5ebba2e8b3c8da7ab7c82778a07ac5bad45115",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
