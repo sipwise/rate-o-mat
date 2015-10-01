@@ -2143,15 +2143,19 @@ sub main
 		undef($prepaid_costs);
 
 		my @cdrs = ();
-		eval {
-			get_unrated_cdrs(\@cdrs);
-		};
-		if($@) {
-			if($DBI::err == 2006) {
-				INFO "DB connection gone, retrying...";
-				next;
+		if ($billdbh && $acctdbh && $provdbh) {
+			eval {
+				get_unrated_cdrs(\@cdrs);
+			};
+			if($@) {
+				if($DBI::err == 2006) {
+					INFO "DB connection gone, retrying...";
+					next;
+				}
+				FATAL "Error getting next bunch of CDRs: " . $@;
 			}
-			FATAL "Error getting next bunch of CDRs: " . $@;
+		} else {
+			WARNING "no-op loop since not all mandatory db connections are available";
 		}
 
 		$shutdown and last;
