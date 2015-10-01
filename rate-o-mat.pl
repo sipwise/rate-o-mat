@@ -45,8 +45,8 @@ my $AcctDB_Pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS}; # || die "Missing accountin
 my $ProvDB_Name = $ENV{RATEOMAT_PROVISIONING_DB_NAME} || 'provisioning';
 my $ProvDB_Host = $ENV{RATEOMAT_PROVISIONING_DB_HOST} || 'localhost';
 my $ProvDB_Port = $ENV{RATEOMAT_PROVISIONING_DB_PORT} ? int $ENV{RATEOMAT_PROVISIONING_DB_PORT} : 3306;
-my $ProvDB_User = $ENV{RATEOMAT_PROVISIONING_DB_USER} || die "Missing provisioning DB user setting.";
-my $ProvDB_Pass = $ENV{RATEOMAT_PROVISIONING_DB_PASS}; # || die "Missing provisioning DB password setting.";
+my $ProvDB_User = $ENV{RATEOMAT_PROVISIONING_DB_USER};
+my $ProvDB_Pass = $ENV{RATEOMAT_PROVISIONING_DB_PASS};
 # duplication database
 my $DupDB_Name = $ENV{RATEOMAT_DUPLICATE_DB_NAME} || 'accounting';
 my $DupDB_Host = $ENV{RATEOMAT_DUPLICATE_DB_HOST} || 'localhost';
@@ -194,6 +194,12 @@ sub connect_acctdbh
 
 sub connect_provdbh
 {
+	unless ($ProvDB_User) {
+		undef $dupdbh;
+		WARNING "No provisioning db credentials, disabled.";
+		return;
+	}
+
 	do {
 		INFO "Trying to connect to provisioning db...";
 		$provdbh = DBI->connect("dbi:mysql:database=$ProvDB_Name;host=$ProvDB_Host;port=$ProvDB_Port", $ProvDB_User, $ProvDB_Pass, {AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
@@ -206,7 +212,11 @@ sub connect_provdbh
 
 sub connect_dupdbh
 {
-	$DupDB_User && $DupDB_Pass or return;
+	unless ($DupDB_User) {
+		undef $dupdbh;
+		WARNING "No duplication db credentials, disabled.";
+		return;
+	}
 
 	do {
 		INFO "Trying to connect to duplication db...";
@@ -540,24 +550,26 @@ EOS
 		"INSERT INTO billing.billing_mappings (contract_id, billing_profile_id, network_id, product_id, start_date) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create billing mappings statement: ".$billdbh->errstr;
 
-	$sth_get_provisioning_voip_subscribers = $provdbh->prepare(
-		"SELECT id FROM provisioning.voip_subscribers WHERE uuid = ?"
-	) or FATAL "Error preparing get provisioning voip subscribers statement: ".$provdbh->errstr;
-	$sth_get_usr_preference_attribute = $provdbh->prepare(
-		"SELECT id FROM provisioning.voip_preferences WHERE attribute = ? AND usr_pref = 1"
-	) or FATAL "Error preparing get usr preference attribute statement: ".$provdbh->errstr;
-	$sth_get_usr_preference_value = $provdbh->prepare(
-		"SELECT id,value FROM provisioning.voip_usr_preferences WHERE attribute_id = ? AND subscriber_id = ?"
-	) or FATAL "Error preparing get usr preference value statement: ".$provdbh->errstr;
-	$sth_create_usr_preference_value = $provdbh->prepare(
-		"INSERT INTO provisioning.voip_usr_preferences (subscriber_id, attribute_id, value) VALUES (?, ?, ?)"
-	) or FATAL "Error preparing create usr preference value statement: ".$provdbh->errstr;
-	$sth_update_usr_preference_value = $provdbh->prepare(
-		"UPDATE provisioning.voip_usr_preferences SET value = ? WHERE id = ?"
-	) or FATAL "Error preparing update usr preference value statement: ".$provdbh->errstr;
-	$sth_delete_usr_preference_value = $provdbh->prepare(
-		"DELETE FROM provisioning.voip_usr_preferences WHERE id = ?"
-	) or FATAL "Error preparing delete usr preference value statement: ".$provdbh->errstr;
+	if ($provdbh) {
+		$sth_get_provisioning_voip_subscribers = $provdbh->prepare(
+			"SELECT id FROM provisioning.voip_subscribers WHERE uuid = ?"
+		) or FATAL "Error preparing get provisioning voip subscribers statement: ".$provdbh->errstr;
+		$sth_get_usr_preference_attribute = $provdbh->prepare(
+			"SELECT id FROM provisioning.voip_preferences WHERE attribute = ? AND usr_pref = 1"
+		) or FATAL "Error preparing get usr preference attribute statement: ".$provdbh->errstr;
+		$sth_get_usr_preference_value = $provdbh->prepare(
+			"SELECT id,value FROM provisioning.voip_usr_preferences WHERE attribute_id = ? AND subscriber_id = ?"
+		) or FATAL "Error preparing get usr preference value statement: ".$provdbh->errstr;
+		$sth_create_usr_preference_value = $provdbh->prepare(
+			"INSERT INTO provisioning.voip_usr_preferences (subscriber_id, attribute_id, value) VALUES (?, ?, ?)"
+		) or FATAL "Error preparing create usr preference value statement: ".$provdbh->errstr;
+		$sth_update_usr_preference_value = $provdbh->prepare(
+			"UPDATE provisioning.voip_usr_preferences SET value = ? WHERE id = ?"
+		) or FATAL "Error preparing update usr preference value statement: ".$provdbh->errstr;
+		$sth_delete_usr_preference_value = $provdbh->prepare(
+			"DELETE FROM provisioning.voip_usr_preferences WHERE id = ?"
+		) or FATAL "Error preparing delete usr preference value statement: ".$provdbh->errstr;
+	}
 
 	if ($dupdbh) {
 		$sth_duplicate_cdr = $dupdbh->prepare(
@@ -670,6 +682,15 @@ sub set_subscriber_first_int_attribute_value {
 	my $changed = 0;
 	my $attr_id = undef;
 	my $sth;
+
+	unless ($sth_get_provisioning_voip_subscribers &&
+		$sth_get_usr_preference_attribute &&
+		$sth_get_usr_preference_value &&
+		$sth_create_usr_preference_value &&
+		$sth_update_usr_preference_value &&
+		$sth_delete_usr_preference_value) {
+		return $changed;
+	}
 
 	$sth_get_billing_voip_subscribers->execute($contract_id)
 		or FATAL "Error executing get billing voip subscribers statement: ".
@@ -2117,7 +2138,7 @@ sub main
 	{
 		$billdbh->ping || init_db;
 		$acctdbh->ping || init_db;
-		$provdbh->ping || init_db;
+		$provdbh and ($provdbh->ping || init_db);
 		$dupdbh and ($dupdbh->ping || init_db);
 		undef($prepaid_costs);
 
@@ -2186,7 +2207,7 @@ sub main
 					eval { rollback_transaction($acctdbh); };
 					eval { rollback_transaction($dupdbh); };
 					$billdbh->disconnect;
-					$provdbh->disconnect;
+					$provdbh and ($provdbh->disconnect);
 					$acctdbh->disconnect;
 					$dupdbh and ($dupdbh->disconnect);
 					next;
@@ -2257,18 +2278,18 @@ sub main
 	$sth_get_billing_voip_subscribers->finish;
 	$sth_get_package_profile_sets->finish;
 	$sth_create_billing_mappings->finish;
-	$sth_get_provisioning_voip_subscribers->finish;
-	$sth_get_usr_preference_attribute->finish;
-	$sth_get_usr_preference_value->finish;
-	$sth_create_usr_preference_value->finish;
-	$sth_update_usr_preference_value->finish;
-	$sth_delete_usr_preference_value->finish;
+	$sth_get_provisioning_voip_subscribers and $sth_get_provisioning_voip_subscribers->finish;
+	$sth_get_usr_preference_attribute and $sth_get_usr_preference_attribute->finish;
+	$sth_get_usr_preference_value and $sth_get_usr_preference_value->finish;
+	$sth_create_usr_preference_value and $sth_create_usr_preference_value->finish;
+	$sth_update_usr_preference_value and $sth_update_usr_preference_value->finish;
+	$sth_delete_usr_preference_value and $sth_delete_usr_preference_value->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 
 
 	$billdbh->disconnect;
 	$provdbh->disconnect;
-	$acctdbh->disconnect;
+	$provdbh and $acctdbh->disconnect;
 	$dupdbh and $dupdbh->disconnect;
 	closelog;
 	close $PID;
