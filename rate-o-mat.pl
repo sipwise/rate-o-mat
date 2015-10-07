@@ -489,13 +489,13 @@ EOS
 	$sth_new_cbalance = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
-		") VALUES (?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
+		") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_infinite_future = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
-		") VALUES (?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
+		") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance_w_underrun_profiles_lock = $billdbh->prepare(
