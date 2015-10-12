@@ -1,3 +1,26 @@
+ngcp-rate-o-mat (1.14.1.0+0~mr4.1.1.0) unstable; urgency=medium
+
+  [ Andreas Granig ]
+  * [a694b63] MT#13903 Add daily intervals, fix month wrap
+
+  [ Rene Krenn ]
+  * [71067d0] MT#13903 contract balances catchup alg for ratomat
+  * [b6164ad] MT#13903 fix errors found when porting to libswrate
+  * [2305060] MT#13903 catchup alg fix #1
+  * [4632ff4] MT#13903 catchup alg fix #2
+  * [0bba915] MT#14301 fix to capture infinite-end balance intervals
+  * [a93e33c] MT#14255 underrun logic and testing framework for ratomat
+  * [5d45297] MT#15463 work without provisioning db connection
+  * [d5bcd76] MT#15463 do no-op loops during upgrades
+  * [cbf6c16] MT#14255 correct underrun_* timestamps
+
+  [ Richard Fuchs ]
+  * [a86f951] MT#13903 fix missing spaces in SQL stmts
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 12 Oct 2015 15:45:12 +0200
+
 ngcp-rate-o-mat (1.14.0.0+0~mr4.1.0.0) unstable; urgency=low
 
   [ Michael Prokop ]
