@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.14.2.0+0~mr4.1.2.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [03f04a9] MT#15759 fix contract_balance catchup DST problem
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 14 Oct 2015 23:40:59 +0200
+
 ngcp-rate-o-mat (1.14.1.0+0~mr4.1.1.0) unstable; urgency=medium
 
   [ Andreas Granig ]
