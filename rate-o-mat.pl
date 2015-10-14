@@ -3,12 +3,12 @@ use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
 use DBI;
 use POSIX qw(setsid mktime);
+use Time::Local qw(timegm timelocal); #for calculating the DST offset
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
 use Sys::Syslog;
 use NetAddr::IP;
 use Data::Dumper;
-use DateTime;
 
 $0 = 'rate-o-mat';
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
@@ -85,6 +85,7 @@ my $sth_update_cbalance;
 my $sth_new_cbalance;
 my $sth_new_cbalance_infinite_future;
 my $sth_get_last_cbalance;
+my $sth_get_cbalance;
 my $sth_get_first_cbalance;
 my $sth_get_last_topup_cbalance,
 my $sth_lnp_number;
@@ -265,9 +266,31 @@ sub is_infinite_unix {
 }
 
 sub last_day_of_month {
-	my $dt = shift;
-	return DateTime->last_day_of_month(year => $dt->year, month => $dt->month,
-									   time_zone => DateTime::TimeZone->new(name => 'local'))->day;
+	my $t = shift;
+	my ($month,$year) = (localtime($t))[4,5];
+	$month++;
+	$year += 1900;
+	if (1 == $month || 3 == $month || 5 == $month || 7 == $month || 8 == $month || 10 == $month || 12 == $month) {
+		return 31;
+	} elsif (2 == $month) {
+		my $is_leap_year = 0;
+		if ($year % 4 == 0) {
+			$is_leap_year = 1;
+		}
+		if ($year % 100 == 0) {
+			$is_leap_year = 0;
+		}
+		if ($year % 400 == 0) {
+			$is_leap_year = 1;
+		}
+		if ($is_leap_year) {
+			return 29;
+		} else {
+			return 28;
+		}
+	} else {
+		return 30;
+	}
 }
 
 sub init_db
@@ -303,6 +326,14 @@ sub init_db
 		"WHERE contract_id = ? ".
 		"ORDER BY end DESC LIMIT 1"
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
+
+	$sth_get_cbalance = $billdbh->prepare(
+		"SELECT id, UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end), cash_balance, cash_balance_interval, ".
+		"free_time_balance, free_time_balance_interval, topup_count, timely_topup_count ".
+		"FROM billing.contract_balances ".
+		"WHERE id = ?"
+	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
+
 	$sth_get_first_cbalance = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(start) ".
 		"FROM billing.contract_balances ".
@@ -647,30 +678,73 @@ sub lock_contracts {
 	return $lock_count;
 }
 
+sub align_dst {
+	my $from_time = shift;
+	my $to_time = shift;
+	my @from = localtime($from_time);
+	my $from_is_dst = pop @from;
+	my @to = localtime($to_time);
+	my $to_is_dst = pop @to;
+	if ($from_is_dst != $to_is_dst) {
+		# if the balance interval spans over a winter->summer or summer->winter DST transition,
+		# e.g. a 30day interval will result as something like
+		#  2015-10-13 00:00:00-2015-11-11 22:59:59
+		# but we want DateTime's behaviour for day-based intervals, to get
+		#  2015-10-13 00:00:00-2015-11-11 23:59:59
+		# instead.
+		# see http://search.cpan.org/~drolsky/DateTime-1.21/lib/DateTime.pm#Adding_a_Duration_to_a_Datetime
+
+		#calculate the DST offset in seconds:
+		my $gmt_offset_from = timegm(@from) - timelocal(@from);
+		my $gmt_offset_to = timegm(@to) - timelocal(@to);
+		my $dst_offset = $gmt_offset_from - $gmt_offset_to;
+
+		$to_time += $dst_offset;
+	}
+	return $to_time;
+}
+
 sub add_interval {
-	my ($unit,$count,$from,$align_eom,$src) = @_; #all DateTimes here
-	my $to;
-	my $delta;
+	my ($unit,$count,$from_time,$align_eom_time,$src) = @_;
+	my $to_time;
 	if($unit eq "day") {
-		$to = $from->clone->add(days => $count);
+		$to_time = $from_time + 24*60*60 * $count;
+		$to_time = align_dst($from_time,$to_time);
 	} elsif($unit eq "hour") {
-		$to = $from->clone->add(hours => $count);
+		$to_time = $from_time + 60*60 * $count;
 	} elsif($unit eq "week") {
-		$to = $from->clone->add(weeks => $count);
+		$to_time = $from_time + 7*24*60*60 * $count;
+		$to_time = align_dst($from_time,$to_time);
 	} elsif($unit eq "month") {
-		$to = $from->clone->add(months => $count, end_of_month => 'preserve');
+		my ($from_year,$from_month,$from_day,$from_hour,$from_minute,$from_second) = (localtime($from_time))[5,4,3,2,1,0];
+		$from_month += $count;
+		while ($from_month >= 12) {
+			$from_month -= 12;
+			$from_year++;
+		}
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day,$from_month,$from_year);
 		#DateTime's "preserve" mode would get from 30.Jan to 30.Mar, when adding 2 months
 		#When adding 1 month two times, we get 28.Mar or 29.Mar, so we adjust:
-		if (defined $align_eom
-			&& $to->day > $align_eom->day
-			&& $from->day == last_day_of_month($from)) {
-			$delta = last_day_of_month($align_eom) - $align_eom->day;
-			$to->set(day => last_day_of_month($to) - $delta);
+		if (defined $align_eom_time) {
+			my $align_eom_day = (localtime($align_eom_time))[3]; #local or not is irrelavant here
+			my $to_day = (localtime($to_time))[3]; #local or not is irrelavant here
+			if ($to_day > $align_eom_day
+				&& $from_day == last_day_of_month($from_time)) {
+				my $delta = last_day_of_month($align_eom_time) - $align_eom_day;
+				$to_day = last_day_of_month($to_time) - $delta;
+				$to_time = mktime($from_second,$from_minute,$from_hour,$to_day,$from_month,$from_year);
+			}
 		}
 	} else {
 		FATAL "Invalid interval unit '$unit' in $src";
 	}
-	return $to;
+	return $to_time;
+}
+
+sub truncate_day {
+	my $t = shift;
+	my ($year,$month,$day,$hour,$minute,$second) = (localtime($t))[5,4,3,2,1,0];
+	return mktime(0,0,0,$day,$month,$year);
 }
 
 sub set_subscriber_first_int_attribute_value {
@@ -815,13 +889,12 @@ sub get_notopup_expiration {
 	my $last_start_time = shift;
 	my $notopup_discard_intervals = shift;
 	my $interval_unit = shift;
-	my $align_eom = shift;
+	my $align_eom_time = shift;
 	my $package_id = shift;
 
 	my $sth;
 	my $notopup_expiration = undef;
 	my $last_topup_start_time;
-	my $last_topup_start;
 	if ($notopup_discard_intervals) { #get notopup_expiration:
 		if (defined $last_start_time) {
 			$last_topup_start_time = $last_start_time;
@@ -839,10 +912,8 @@ sub get_notopup_expiration {
 			$notopup_discard_intervals += 1;
 		}
 		if ($last_topup_start_time) {
-			$last_topup_start = DateTime->from_epoch(epoch => $last_topup_start_time,
-				time_zone => DateTime::TimeZone->new(name => 'local'));
 			$notopup_expiration = add_interval($interval_unit, $notopup_discard_intervals,
-				$last_topup_start, $align_eom, "package id " . $package_id)->epoch;
+				$last_topup_start_time, $align_eom_time, "package id " . $package_id);
 		}
 	}
 	return $notopup_expiration;
@@ -858,17 +929,12 @@ sub get_timely_end {
 	my $carry_over_mode = shift;
 	my $package_id = shift;
 
-	my $from;
-	my $timely_end;
 	my $timely_end_time = undef;
 
 	if ("carry_over_timely" eq $carry_over_mode) {
-		$from = DateTime->from_epoch(epoch => $last_start_time,
-					time_zone => DateTime::TimeZone->new(name => 'local'));
-		$timely_end = add_interval($interval_unit, $interval_value,
-					$from, undef, "package id " . $package_id);
-		$timely_end->subtract(seconds => 1);
-		$timely_end_time = $timely_end->epoch;
+		$timely_end_time = add_interval($interval_unit, $interval_value,
+					$last_start_time, undef, "package id " . $package_id);
+		$timely_end_time--;
 	}
 
 	return $timely_end_time;
@@ -908,15 +974,12 @@ sub catchup_contract_balance {
 	my $next_start;
 	my $profile;
 	my ($stime,$etime);
-	my ($from,$to);
-	my $align_eom;
+	my $align_eom_time;
 	if ("create" eq $start_mode && defined $create_time) {
-		$align_eom = DateTime->from_epoch(epoch => $create_time,
-			time_zone => DateTime::TimeZone->new(name => 'local'));
+		$align_eom_time = $create_time;
 	} #no eom preserve, since we don't have the begin of the first topup interval
 	#} elsif ("topup_interval" eq $start_mode && defined x) {
-	#    $align_eom = DateTime->from_epoch(epoch => x,
-	#        time_zone => DateTime::TimeZone->new(name => 'local'));
+	#    $align_eom_time = x;
 	#}
 	my $ratio;
 	my $old_free_cash;
@@ -939,7 +1002,7 @@ sub catchup_contract_balance {
 
 		if ($has_package && $balances_count == 0) {
 			#we have two queries here, so do it only if really creating contract_balances
-			$notopup_expiration = get_notopup_expiration($contract_id,undef,$notopup_discard_intervals,$interval_unit,$align_eom,$package_id);
+			$notopup_expiration = get_notopup_expiration($contract_id,undef,$notopup_discard_intervals,$interval_unit,$align_eom_time,$package_id);
 		}
 
 		#profile of last and next interval:
@@ -960,16 +1023,12 @@ PREPARE_BALANCE_CATCHUP:
 		$interval_unit = $has_package ? $interval_unit : ($profile->{int_unit} // 'month'); #backward-defaults
 		$interval_value = $has_package ? $interval_value : ($profile->{int_count} // 1);
 
-		$from = DateTime->from_epoch(epoch => $next_start,
-			time_zone => DateTime::TimeZone->new(name => 'local'));
+		$stime = $next_start;
 		if ("topup" eq $start_mode) {
-			$stime = $from->epoch;
 			$etime = undef;
 		} else {
-			$to = add_interval($interval_unit, $interval_value, $from, $align_eom, $has_package ? "package id " . $package_id : "profile id " . $profile->{profile_id});
-			$to->subtract(seconds => 1);
-			$stime = $from->epoch;
-			$etime = $to->epoch;
+			$etime = add_interval($interval_unit, $interval_value, $next_start, $align_eom_time, $has_package ? "package id " . $package_id : "profile id " . $profile->{profile_id});
+			$etime--;
 		}
 
 		#balance values:
@@ -979,8 +1038,7 @@ PREPARE_BALANCE_CATCHUP:
 
 			$ratio = 1.0;
 			if($create_time > $last_start and $create_time < $last_end) {
-				$create_time_aligned = DateTime->from_epoch(epoch => $create_time,
-					time_zone => DateTime::TimeZone->new(name => 'local'))->clone->truncate(to => 'day')->epoch;
+				$create_time_aligned = truncate_day($create_time);
 				$create_time_aligned = $create_time if $create_time_aligned < $stime;
 				$ratio = ($last_end + 1 - $create_time_aligned) / ($last_end + 1 - $last_start);
 			}
@@ -1036,9 +1094,11 @@ PREPARE_BALANCE_CATCHUP:
 		$sth->finish;
 		$balances_count++;
 
-		#avoid reloading created balance:
-		($last_id                    ,$last_start,$last_end,$last_topups,$last_timely_topups) =
-		($billdbh->{'mysql_insertid'},$stime     ,$etime   ,0           ,0);
+		#reload the contract balance to have mysql's local timezone applied to $last_start, $last_end by UNIX_TIMESTAMP:
+		$sth = $sth_get_cbalance;
+		$sth->execute($billdbh->{'mysql_insertid'}) or FATAL "Error executing reload contract balance statement: ".$sth->errstr;
+		($last_id,$last_start,$last_end,$last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int,$last_topups,$last_timely_topups) = $sth->fetchrow_array();
+		$sth->finish;
 
 		$bal = {
 			id => $last_id,
@@ -1066,7 +1126,7 @@ PREPARE_BALANCE_CATCHUP:
 	#  2. we have the "carry_over_timely" mode, and the current/call time is beyond
 	#  the timely end already
 	if ($has_package && defined $last_id && is_infinite_unix($last_end)) {
-		$notopup_expiration = get_notopup_expiration($contract_id,$last_start,$notopup_discard_intervals,$interval_unit,$align_eom,$package_id);
+		$notopup_expiration = get_notopup_expiration($contract_id,$last_start,$notopup_discard_intervals,$interval_unit,$align_eom_time,$package_id);
 		$timely_end = get_timely_end($last_start,$interval_value,$interval_unit,$carry_over_mode,$package_id);
 		if ((defined $notopup_expiration && $call_start_time >= $notopup_expiration)
 			|| (defined $timely_end && $call_start_time > $timely_end)) {
@@ -2271,6 +2331,7 @@ sub main
 	$sth_new_cbalance->finish;
 	$sth_new_cbalance_infinite_future->finish;
 	$sth_get_last_cbalance->finish;
+	$sth_get_cbalance->finish;
 	$sth_get_first_cbalance->finish;
 	$sth_get_last_topup_cbalance->finish;
 	$sth_lnp_number->finish;
