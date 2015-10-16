@@ -3,7 +3,6 @@ use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
 use DBI;
 use POSIX qw(setsid mktime);
-use Time::Local qw(timegm timelocal); #for calculating the DST offset
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
 use Sys::Syslog;
@@ -678,51 +677,18 @@ sub lock_contracts {
 	return $lock_count;
 }
 
-sub align_dst {
-	my $from_time = shift;
-	my $to_time = shift;
-	my @from = localtime($from_time);
-	my $from_is_dst = pop @from;
-	my @to = localtime($to_time);
-	my $to_is_dst = pop @to;
-	if ($from_is_dst != $to_is_dst) {
-		# if the balance interval spans over a winter->summer or summer->winter DST transition,
-		# e.g. a 30day interval will result as something like
-		#  2015-10-13 00:00:00-2015-11-11 22:59:59
-		# but we want DateTime's behaviour for day-based intervals, to get
-		#  2015-10-13 00:00:00-2015-11-11 23:59:59
-		# instead.
-		# see http://search.cpan.org/~drolsky/DateTime-1.21/lib/DateTime.pm#Adding_a_Duration_to_a_Datetime
-
-		#calculate the DST offset in seconds:
-		my $gmt_offset_from = timegm(@from) - timelocal(@from);
-		my $gmt_offset_to = timegm(@to) - timelocal(@to);
-		my $dst_offset = $gmt_offset_from - $gmt_offset_to;
-
-		$to_time += $dst_offset;
-	}
-	return $to_time;
-}
-
 sub add_interval {
 	my ($unit,$count,$from_time,$align_eom_time,$src) = @_;
 	my $to_time;
+	my ($from_year,$from_month,$from_day,$from_hour,$from_minute,$from_second) = (localtime($from_time))[5,4,3,2,1,0];
 	if($unit eq "day") {
-		$to_time = $from_time + 24*60*60 * $count;
-		$to_time = align_dst($from_time,$to_time);
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);
 	} elsif($unit eq "hour") {
-		$to_time = $from_time + 60*60 * $count;
+		$to_time = mktime($from_second,$from_minute,$from_hour + $count,$from_day,$from_month,$from_year);
 	} elsif($unit eq "week") {
-		$to_time = $from_time + 7*24*60*60 * $count;
-		$to_time = align_dst($from_time,$to_time);
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + 7*$count,$from_month,$from_year);
 	} elsif($unit eq "month") {
-		my ($from_year,$from_month,$from_day,$from_hour,$from_minute,$from_second) = (localtime($from_time))[5,4,3,2,1,0];
-		$from_month += $count;
-		while ($from_month >= 12) {
-			$from_month -= 12;
-			$from_year++;
-		}
-		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day,$from_month,$from_year);
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day,$from_month + $count,$from_year);
 		#DateTime's "preserve" mode would get from 30.Jan to 30.Mar, when adding 2 months
 		#When adding 1 month two times, we get 28.Mar or 29.Mar, so we adjust:
 		if (defined $align_eom_time) {
@@ -736,7 +702,7 @@ sub add_interval {
 			}
 		}
 	} else {
-		FATAL "Invalid interval unit '$unit' in $src";
+		die("Invalid interval unit '$unit' in $src");
 	}
 	return $to_time;
 }
