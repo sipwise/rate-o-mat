@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba57610f_4f0f5ee2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 683,
+      "author": {
+        "id": 1000005
+      },
+      "writtenOn": "2015-10-19T15:54:16Z",
+      "side": 1,
+      "message": "this is probably historical, or to be explicit. But imho could also be\n\nmy ($from_second,$from_minute,$from_hour,$from_day,$from_month,$from_year) \u003d localtime($from_time)",
+      "revId": "60c6908872fe6fabb0df7253750bb21ecb20e4fb",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba57610f_ef1cd215",
+        "filename": "t/add_interval.t",
+        "patchSetId": 2
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 1000005
+      },
+      "writtenOn": "2015-10-19T15:54:16Z",
+      "side": 1,
+      "message": "??",
+      "revId": "60c6908872fe6fabb0df7253750bb21ecb20e4fb",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
