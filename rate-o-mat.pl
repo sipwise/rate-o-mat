@@ -519,13 +519,13 @@ EOS
 	$sth_new_cbalance = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
-		") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
+		") VALUES (?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_infinite_future = $billdbh->prepare(
 		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, cash_balance_interval, free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
-		") VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
+		") VALUES (?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance_w_underrun_profiles_lock = $billdbh->prepare(
@@ -1053,7 +1053,7 @@ PREPARE_BALANCE_CATCHUP:
 			sprintf("%.0f",$free_time_balance), sprintf("%.0f",$free_time_balance_interval));
 		my @bind_parms = ($contract_id,
 			$last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int,
-			$underrun_profiles_time,$underrun_lock_time,$stime);
+			((defined $underrun_profiles_time ? $underrun_profiles_time : 0)) x 2,((defined $underrun_lock_time ? $underrun_lock_time : 0)) x 2,$stime);
 		push(@bind_parms,$etime) if defined $etime;
 		$sth->execute(@bind_parms)
 			or FATAL "Error executing new contract balance statement: ".$sth->errstr;
