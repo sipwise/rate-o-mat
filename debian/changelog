@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (1.14.1.2+0~mr4.1.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [a23f26a] MT#15759 use localtime and posix mktime only
+  * [2ad2ecf] MT#14557 fix '1970-01-...' lock detection timestamps
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 22 Oct 2015 13:36:44 +0200
+
 ngcp-rate-o-mat (1.14.1.1+0~mr4.1.1.1) unstable; urgency=medium
 
   [ Rene Krenn ]
