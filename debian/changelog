@@ -1,3 +1,22 @@
+ngcp-rate-o-mat (1.13.3.0+0~mr4.0.3.0) unstable; urgency=medium
+
+  [ Andreas Granig ]
+  * [5ecf949] MT#13903 Add daily intervals, fix month wrap
+
+  [ Rene Krenn ]
+  * [2bfe060] MT#13903 contract balances catchup alg for ratomat
+  * [9ecd292] MT#13903 fix errors found when porting to libswrate
+  * [ac01fee] MT#13903 catchup alg fix #1
+  * [c2e3b97] MT#13903 catchup alg fix #2
+  * [effbb9b] MT#14301 fix to capture infinite-end balance intervals
+
+  [ Richard Fuchs ]
+  * [c149c57] MT#13903 fix missing spaces in SQL stmts
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 16 Nov 2015 14:42:47 +0100
+
 ngcp-rate-o-mat (1.13.2.0+0~mr4.0.2.0) unstable; urgency=medium
 
   * New release.
