@@ -1141,7 +1141,7 @@ PREPARE_BALANCE_CATCHUP:
 				underrun_profile_time => undef,
 				underrun_lock_time => undef,
 			};
-			if (!$underrun_lock_applied && defined $underrun_lock_threshold && $last_cash_balance >= $underrun_lock_threshold && 0 < $underrun_lock_threshold) {
+			if (!$underrun_lock_applied && defined $underrun_lock_threshold && $last_cash_balance >= $underrun_lock_threshold && 0.0 < $underrun_lock_threshold) {
 				$underrun_lock_applied = 1;
 				DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold";
 				if (defined $underrun_lock_level) {
@@ -1150,7 +1150,7 @@ PREPARE_BALANCE_CATCHUP:
 				}
 			}
 
-			if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && 0 < $underrun_profile_threshold) {
+			if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && 0.0 < $underrun_profile_threshold) {
 				$underrun_profiles_applied = 1;
 				DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold";
 				if (add_profile_mappings($contract_id,$call_start_time,$package_id,'underrun') > 0) {
