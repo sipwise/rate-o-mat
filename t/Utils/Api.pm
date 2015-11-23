@@ -682,7 +682,8 @@ sub setup_provider {
 		my $profile_fee = {};
 		($profile_fee->{profile},
 		 $profile_fee->{zone},
-		 $profile_fee->{fee}) = _setup_customer_fees($provider->{reseller},
+		 $profile_fee->{fee},
+		 $profile_fee->{fees}) = _setup_customer_fees($provider->{reseller},
 			%$rate
 		);
 		push(@{$provider->{profiles}},$profile_fee);
@@ -708,14 +709,25 @@ sub _setup_customer_fees {
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},
 	);
-	my $fee = create_billing_fee(
-		billing_profile_id => $profile->{id},
-		billing_zone_id => $zone->{id},
-		direction               => "out",
-		destination             => ".",
-		%params,
-	);
-	return ($profile,$zone,$fee);
+	my @fees = ();
+	if (exists $params{fees}) {
+		foreach my $fee (@{ $params{fees} }) {
+			push(@fees,create_billing_fee(
+				billing_profile_id => $profile->{id},
+				billing_zone_id => $zone->{id},
+				%$fee,
+			));
+		}
+	} else {
+		push(@fees,create_billing_fee(
+			billing_profile_id => $profile->{id},
+			billing_zone_id => $zone->{id},
+			direction               => "out",
+			destination             => ".",
+			%params,
+		));
+	}
+	return ($profile,$zone,$fees[0],\@fees);
 }
 
 1;

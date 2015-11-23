@@ -1098,9 +1098,10 @@ PREPARE_BALANCE_CATCHUP:
 			|| (defined $timely_end && $call_start_time > $timely_end)) {
 			DEBUG "discarding cash balance (mode '$carry_over_mode'".($timely_end ? ", timely end " . $timely_end : "").
 				($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")";
+			$cash_balance = 0;
 			$bal = {
 				id => $last_id,
-				cash_balance => 0,
+				cash_balance => $cash_balance,
 				cash_balance_interval => $last_cash_balance_int,
 				free_time_balance => $last_free_balance,
 				free_time_balance_interval => $last_free_balance_int,
