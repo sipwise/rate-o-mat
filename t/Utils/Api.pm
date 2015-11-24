@@ -46,6 +46,7 @@ our @EXPORT_OK = qw(
 	setup_provider
 	setup_subscriber
 	setup_package
+	to_pretty_json
 );
 
 my ($netloc) = ($uri =~ m!^https?://(.*)/?.*$!);
@@ -178,6 +179,17 @@ sub _get_entity_map {
 	return $entity_maps{$resource};
 }
 
+sub _ua_request {
+	my $req = shift;
+	my $res = $ua->request($req);
+	log_request($req,$res);
+	return $res;
+}
+
+sub log_request {
+	my ($req,$res) = @_;
+}
+
 sub _create_item {
 	my ($resource,@params) = @_;
 	my $map = _get_entity_map($resource);
@@ -189,11 +201,11 @@ sub _create_item {
 	$req->content(JSON::to_json({
 		@params
 	}));
-	$res = $ua->request($req);
+	$res = _ua_request($req);
 	if (is($res->code, 201, "create $resource $n")) {
 		$req = HTTP::Request->new('GET', $uri.$res->header('Location'));
 		$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
-		$res = $ua->request($req);
+		$res = _ua_request($req);
 		my $entity = JSON::from_json($res->decoded_content);
 		$map->{$entity->{id}} = $entity;
 		$resource_map{$entity->{_links}->{self}->{href}} = $resource;
@@ -219,7 +231,7 @@ sub update_item {
 	$req->content(JSON::to_json(
 		[ map { { op => 'replace', path => '/'.$_ , value => $params{$_} }; } keys %params ]
 	));
-	$res = $ua->request($req);
+	$res = _ua_request($req);
 	if (is($res->code, 200, "patch $resource id ".$entity->{id})) {
 		$entity = JSON::from_json($res->decoded_content);
 		$map->{$entity->{id}} = $entity;
@@ -349,7 +361,7 @@ sub set_cash_balance {
 	$req->content(JSON::to_json(
 		[ { op => 'replace', path => '/cash_balance', value => $new_cash_balance } ]
 	));
-	$res = $ua->request($req);
+	$res = _ua_request($req);
 	if (!is($res->code, 200, "setting customer id " . $customer->{id} . " cash_balance to " . $new_cash_balance * 100.0 . ' cents')) {
 		eval {
 			diag(JSON::from_json($res->decoded_content)->{message});
@@ -362,7 +374,7 @@ sub get_subscriber_preferences {
 	my ($subscriber) = @_;
 	$req = HTTP::Request->new('GET', $uri.'/api/subscriberpreferences/'.$subscriber->{id});
 	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
-	$res = $ua->request($req);
+	$res = _ua_request($req);
 	if (is($res->code, 200, "fetch subscriber id " . $subscriber->{id} . " preferences")) {
 		return JSON::from_json($res->decoded_content);
 	} else {
@@ -394,7 +406,7 @@ sub check_interval_history {
 	do {
 		$req = HTTP::Request->new('GET',$nexturi);
 		$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
-		$res = $ua->request($req);
+		$res = _ua_request($req);
 		is($res->code, 200, $label . "fetch customer id " . $customer_id . " balance intervals collection page");
 		my $collection = JSON::from_json($res->decoded_content);
 
@@ -490,7 +502,7 @@ sub perform_topup {
 		subscriber_id => $subscriber->{id},
 	};
 	$req->content(JSON::to_json($req_data));
-	$res = $ua->request($req);
+	$res = _ua_request($req);
 	if (!is($res->code, 204, "perform topup with amount " . $amount * 100.0 . " cents, " . ($package ? 'package id ' . $package->{id} : 'no package'))) {
 		eval {
 			diag(JSON::from_json($res->decoded_content)->{message});
@@ -682,7 +694,8 @@ sub setup_provider {
 		my $profile_fee = {};
 		($profile_fee->{profile},
 		 $profile_fee->{zone},
-		 $profile_fee->{fee}) = _setup_customer_fees($provider->{reseller},
+		 $profile_fee->{fee},
+		 $profile_fee->{fees}) = _setup_customer_fees($provider->{reseller},
 			%$rate
 		);
 		push(@{$provider->{profiles}},$profile_fee);
@@ -708,14 +721,29 @@ sub _setup_customer_fees {
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},
 	);
-	my $fee = create_billing_fee(
-		billing_profile_id => $profile->{id},
-		billing_zone_id => $zone->{id},
-		direction               => "out",
-		destination             => ".",
-		%params,
-	);
-	return ($profile,$zone,$fee);
+	my @fees = ();
+	if (exists $params{fees}) {
+		foreach my $fee (@{ $params{fees} }) {
+			push(@fees,create_billing_fee(
+				billing_profile_id => $profile->{id},
+				billing_zone_id => $zone->{id},
+				%$fee,
+			));
+		}
+	} else {
+		push(@fees,create_billing_fee(
+			billing_profile_id => $profile->{id},
+			billing_zone_id => $zone->{id},
+			direction               => "out",
+			destination             => ".",
+			%params,
+		));
+	}
+	return ($profile,$zone,$fees[0],\@fees);
+}
+
+sub to_pretty_json {
+    return JSON::to_json(shift, {pretty => 1}); # =~ s/(^\s*{\s*)|(\s*}\s*$)//rg =~ s/\n   /\n/rg;
 }
 
 1;
