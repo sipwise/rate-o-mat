@@ -707,11 +707,13 @@ sub align_dst {
 sub add_interval {
 	my ($unit,$count,$from_time,$align_eom_time,$src) = @_;
 	my $to_time;
-	if($unit eq "day") {
-		$to_time = $from_time + 24*60*60 * $count;
-		$to_time = align_dst($from_time,$to_time);
+	my ($from_year,$from_month,$from_day,$from_hour,$from_minute,$from_second) = (localtime($from_time))[5,4,3,2,1,0];
+	if($unit eq "minute") {
+		$to_time = mktime($from_second,$from_minute + $count,$from_hour,$from_day,$from_month,$from_year);
 	} elsif($unit eq "hour") {
-		$to_time = $from_time + 60*60 * $count;
+		$to_time = mktime($from_second,$from_minute,$from_hour + $count,$from_day,$from_month,$from_year);
+	} elsif($unit eq "day") {
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);		
 	} elsif($unit eq "week") {
 		$to_time = $from_time + 7*24*60*60 * $count;
 		$to_time = align_dst($from_time,$to_time);
