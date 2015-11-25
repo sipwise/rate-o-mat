@@ -559,10 +559,12 @@ sub _get_interval_start {
 
 sub _add_interval {
 	my ($from,$interval_unit,$interval_value,$align_eom_dt) = @_;
-	if ('day' eq $interval_unit) {
-		return $from->clone->add(days => $interval_value);
+	if ('minute' eq $interval_unit) {
+		return $from->clone->add(minutes => $interval_value);	
 	} elsif ('hour' eq $interval_unit) {
 		return $from->clone->add(hours => $interval_value);
+	} elsif ('day' eq $interval_unit) {
+		return $from->clone->add(days => $interval_value);		
 	} elsif ('week' eq $interval_unit) {
 		return $from->clone->add(weeks => $interval_value);
 	} elsif ('month' eq $interval_unit) {
