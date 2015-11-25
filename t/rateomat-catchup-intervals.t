@@ -5,7 +5,7 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 use Data::Dumper;
-
+#goto SKIP;
 { #no package:
 	my $now = Utils::Api::get_now();
 	my $begin = $now->clone->subtract(months => 3);
@@ -72,7 +72,8 @@ use Data::Dumper;
 	my %stats = ();
 	#start_mode/interval units matrix:
 	foreach my $start_mode ('create','1st','topup','topup_interval') {
-		foreach my $unit ('hours','days','weeks','months') {
+		foreach my $unit ('minutes','hours','days','weeks','months') {
+			next if (('create' eq $start_mode or '1st' eq $start_mode) and ('minutes' eq $unit or 'hours' eq $unit));
 			my $num_intervals = 3;
 			my $begin = Utils::Api::get_now->subtract($unit => $num_intervals);
 
@@ -265,6 +266,75 @@ use Data::Dumper;
 				is($interval->{cash_balance},0,$label."last interval cash balance is 0");
 			}
 		}
+	}
+}
+#SKIP:
+{
+	my $begin = Utils::Api::get_now->subtract(minutes => 5);
+
+	Utils::Api::set_time($begin);
+
+	my $rate_interval = 60;
+	#provider contract needs to be created in the past as well:
+	my $provider = create_provider($rate_interval);
+
+	Utils::Api::setup_package($provider,
+		[ #initial:
+			$provider->{profiles}->[0]->{profile}
+		],
+		[ #topup:
+
+		],
+		[ #underrun:
+
+		],
+		balance_interval_start_mode => 'topup_interval',
+		balance_interval_value => 1,
+		balance_interval_unit => 'minute',
+		carry_over_mode => 'carry_over',
+	);
+
+	my $call_minutes = 3;
+	my $amount = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
+		$provider->{profiles}->[0]->{fee}->{onpeak_init_interval} +
+		$provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
+		$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} * ($call_minutes*60 - 1))/100.0;
+	my $profiles_setup = $provider->{packages}->[0]->{package};
+	my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '1<n>', sn => '<t>' });
+	my $callee = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
+
+	Utils::Api::perform_topup($caller->{subscriber},$amount);
+
+	my $call_ts = Utils::Api::get_now()->add(seconds => 5);
+
+	Utils::Api::set_time();
+
+	my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
+		Utils::Rateomat::prepare_cdr($caller->{subscriber},undef,$caller->{reseller},
+				$callee->{subscriber},undef,$callee->{reseller},
+				'192.168.0.1',$call_ts->epoch,$call_minutes*60),
+	]) };
+
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+		ok(Utils::Rateomat::check_cdrs('',
+			$cdr_ids[0] => {
+				id => $cdr_ids[0],
+				rating_status => 'ok',
+			},
+		 ),'cdrs were all processed');
+		my $label = 'call spanning multiple intervals/cost propagation: ';
+		my $balance_intervals = Utils::Api::get_interval_history($label,$caller->{customer}->{id});
+		shift(@$balance_intervals);
+		my $total_costs = 0;
+		for (my $i = 0; $i < scalar @$balance_intervals; $i++) {
+			my $interval = $balance_intervals->[$i];
+			my $costs = ($i > 0 ? ($i < $call_minutes ? $provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
+				$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} : 0) :
+				$provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
+				$provider->{profiles}->[0]->{fee}->{onpeak_init_interval});
+			$total_costs += $costs;
+			is($interval->{cash_balance},($amount*100-$total_costs)/100, $label."interval cash balance $interval->{cash_balance} is " . ($amount*100-$total_costs)/100);
+		}		
 	}
 }
 
