@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a4e6583_9f8fcbcc",
+        "filename": "t/rateomat-catchup-intervals.t",
+        "patchSetId": 3
+      },
+      "lineNbr": 8,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-11-26T17:46:40Z",
+      "side": 1,
+      "message": "?",
+      "revId": "2c5f3fe62d12be7dd67057f33ddc34492e64c073",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
