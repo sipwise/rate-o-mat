@@ -1,5 +1,7 @@
 package Utils::Rateomat;
 
+use threads 'exit' => 'threads_only';
+
 use strict;
 use DBI;
 use Test::More;
@@ -7,10 +9,12 @@ use Test::More;
 use Data::Dumper;
 use Time::HiRes qw();
 
+
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
 	run_rateomat
+	run_rateomat_threads
 	create_cdrs
 	get_cdrs
 	prepare_cdr
@@ -72,6 +76,54 @@ sub run_rateomat {
 		return 0;
 	}
 	return 1;
+}
+
+sub run_rateomat_threads {
+	my ($num_of_threads,$timeout) = @_;
+	$timeout //= $rateomat_timeout;
+	$num_of_threads //= 1;
+	my @workers = ();
+	foreach my $i (0..$num_of_threads - 1) {
+		push(@workers,threads->create(sub {
+				my $tid = threads->tid();
+				diag("running rate-o-mat at $rateomat_pl as thread $tid" . ($timeout ? ' for '.$timeout.' secs' : ''));
+				local $SIG{KILL} = sub {
+						diag("timeout for rate-o-mat thread $tid");
+						threads->exit();
+					} if defined $timeout;
+				eval {
+					die($!) if !defined do $rateomat_pl;
+					return 1;
+				};
+				if ($@) {
+					diag("rate-o-mat thread $tid: " . $@);
+					return 0;
+				}
+				return 1;
+			}));
+	}
+	my @threads = @workers;
+	push(@threads,threads->create(sub {
+		my $tid = threads->tid();
+		#diag("timeout thread $tid started");
+		#for (my $i = $timeout; $i > 0; $i--) {
+		#	sleep(1);
+		#	diag("timeout thread $tid: $i secs left");
+		#}
+		sleep($timeout);
+		foreach my $w (@workers) {
+			$w->kill('KILL');
+			#diag('rate-o-mat thread ' . $w->tid() . ' killed');
+		}
+		return 1;
+	})) if defined $timeout;
+	my $result = 1;
+	foreach my $t (@threads) {
+		my $t_result = $t->join();
+		$result &= (defined $t_result ? $t_result : 1);
+		#diag('thread ' . $t->tid() . ' joined');
+	}
+	return $result;
 }
 
 sub create_cdrs {
