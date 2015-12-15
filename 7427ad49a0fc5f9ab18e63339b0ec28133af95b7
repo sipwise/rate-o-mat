@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "7a96c907_28f50483",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 497,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-12-15T13:16:13Z",
+      "side": 1,
+      "message": "Right, that\u0027s nicer.",
+      "parentUuid": "7a96c907_25ce8d5b",
+      "range": {
+        "startLine": 496,
+        "startChar": 2,
+        "endLine": 497,
+        "endChar": 105
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7a96c907_c5fb2946",
         "filename": "rate-o-mat.pl",
         "patchSetId": 7
@@ -82,6 +106,30 @@
       "writtenOn": "2015-12-15T11:47:15Z",
       "side": 1,
       "message": "i really would use a hashref from the beginning here, as code becomes more clear as well",
+      "range": {
+        "startLine": 2151,
+        "startChar": 5,
+        "endLine": 2151,
+        "endChar": 22
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_689eac58",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 2151,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-12-15T13:16:13Z",
+      "side": 1,
+      "message": "I don\u0027t see how you could without changing the details of the get_*_cost() function calls. These functions expect to place the rating duration into a scalar reference. I don\u0027t see how this could go straight into a hash key.",
+      "parentUuid": "7a96c907_a59a9d12",
       "range": {
         "startLine": 2151,
         "startChar": 5,
