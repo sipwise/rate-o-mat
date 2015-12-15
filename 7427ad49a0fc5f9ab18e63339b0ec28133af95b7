@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a96c907_25ce8d5b",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 497,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2015-12-15T11:47:15Z",
+      "side": 1,
+      "message": "my %exclude_fragment_fields \u003d map { $_ \u003d\u003e 1;} qw(start_time duration is_fragmented);\nmy @fragment_fields \u003d grep { not $exclude_fragment_fields{$_}; } @cdr_fields;",
+      "range": {
+        "startLine": 496,
+        "startChar": 2,
+        "endLine": 497,
+        "endChar": 105
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_c5fb2946",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 1982,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2015-12-15T11:47:15Z",
+      "side": 1,
+      "message": "why not using a hash here from the beginning?",
+      "range": {
+        "startLine": 1982,
+        "startChar": 1,
+        "endLine": 1982,
+        "endChar": 22
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_e5f8a54b",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 2051,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2015-12-15T11:47:15Z",
+      "side": 1,
+      "message": "ok, reference, to n+1-th element",
+      "range": {
+        "startLine": 2051,
+        "startChar": 7,
+        "endLine": 2051,
+        "endChar": 44
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_a59a9d12",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 2151,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2015-12-15T11:47:15Z",
+      "side": 1,
+      "message": "i really would use a hashref from the beginning here, as code becomes more clear as well",
+      "range": {
+        "startLine": 2151,
+        "startChar": 5,
+        "endLine": 2151,
+        "endChar": 22
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
