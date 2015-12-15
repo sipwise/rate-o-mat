@@ -163,6 +163,30 @@
       "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_7b0518c1",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 7
+      },
+      "lineNbr": 2151,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2015-12-15T14:32:55Z",
+      "side": 1,
+      "message": "Can you give an example? Only way I can imagine is to spell out each variable in each location, which would make for rather long code and is prone to mistakes if anything is ever changed or added. I thought collecting all rating durations in a single location is quite a clean approach.",
+      "parentUuid": "7a96c907_1b6f3494",
+      "range": {
+        "startLine": 2151,
+        "startChar": 5,
+        "endLine": 2151,
+        "endChar": 22
+      },
+      "revId": "7427ad49a0fc5f9ab18e63339b0ec28133af95b7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
