@@ -1,3 +1,17 @@
+ngcp-rate-o-mat (1.16.0.0+0~mr4.3.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [7cbbc93] MT#15759 fix contract_balance catchup DST problem
+  * [60c6908] MT#15759 use localtime and posix mktime only
+  * [08b1842] MT#14557 fix '1970-01-...' lock detection timestamps
+  * [f9e2211] MT#16511 force float comparison for underrun thresholds
+  * [f65c54b] MT#12061 negative call fees for callee testcase
+  * [88aaba3] MT#16655 support "minute" balance intervals
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 16 Dec 2015 09:31:28 +0100
+
 ngcp-rate-o-mat (1.15.0.0+0~mr4.2.0.0) unstable; urgency=medium
 
   [ Andreas Granig ]
