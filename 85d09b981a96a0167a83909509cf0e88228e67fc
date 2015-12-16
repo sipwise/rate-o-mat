@@ -1,0 +1,123 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a96c907_d919d423",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Or you could use something like:\nforeach my $i (0..$num_of_threads)",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_f91610f1",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Trailing space.",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_99d34c38",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Ditto.",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_b9d88854",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Should the commented code be left in?",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_19f97cc8",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Mainly stylistic, but I\u0027d use an actual variable here instead of implicitly using the topic variable, because you have to end up using it explicitly anyway, so there is no much benefit from the magic.",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_f9edb0f0",
+        "filename": "t/Utils/Rateomat.pm",
+        "patchSetId": 2
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Same comment re topic var.",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_59b4e4f1",
+        "filename": "t/rateomat-parallel.t",
+        "patchSetId": 2
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2015-12-16T10:20:24Z",
+      "side": 1,
+      "message": "Missing use warnings",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
