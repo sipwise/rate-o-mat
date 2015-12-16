@@ -118,6 +118,24 @@
       "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a96c907_f9c0502c",
+        "filename": "t/rateomat-parallel.t",
+        "patchSetId": 2
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2015-12-16T11:31:06Z",
+      "side": 1,
+      "message": "not so easy to fix, need to debug the suite again since this was left out intentionally (also in other *.t files). iirc the basic reason i did this was to allow using uninitialized hash values.",
+      "parentUuid": "7a96c907_59b4e4f1",
+      "revId": "85d09b981a96a0167a83909509cf0e88228e67fc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
