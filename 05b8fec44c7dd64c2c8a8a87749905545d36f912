@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba65a107_bee2afd3",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 9
+      },
+      "lineNbr": 518,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2016-01-17T18:45:37Z",
+      "side": 1,
+      "message": "bm.start_date DESC\n!!! also in swrate !!!",
+      "range": {
+        "startLine": 518,
+        "startChar": 12,
+        "endLine": 518,
+        "endChar": 25
+      },
+      "revId": "05b8fec44c7dd64c2c8a8a87749905545d36f912",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba65a107_dec3e336",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 9
+      },
+      "lineNbr": 532,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2016-01-17T18:45:37Z",
+      "side": 1,
+      "message": "bm.start_date DESC\n!!! also in swrate !!!",
+      "range": {
+        "startLine": 532,
+        "startChar": 12,
+        "endLine": 532,
+        "endChar": 25
+      },
+      "revId": "05b8fec44c7dd64c2c8a8a87749905545d36f912",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba65a107_7eec17c8",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 9
+      },
+      "lineNbr": 2157,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2016-01-17T18:45:37Z",
+      "side": 1,
+      "message": "would call it \"consistent\"",
+      "range": {
+        "startLine": 2157,
+        "startChar": 28,
+        "endLine": 2157,
+        "endChar": 34
+      },
+      "revId": "05b8fec44c7dd64c2c8a8a87749905545d36f912",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
