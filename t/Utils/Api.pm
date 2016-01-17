@@ -14,7 +14,8 @@ use Data::Dumper;
 
 my $uri = $ENV{CATALYST_SERVER} // 'https://127.0.0.1:443';
 my $user = $ENV{API_USER} // 'administrator';
-my $pass = $ENV{API_USER} // 'administrator';
+my $pass = $ENV{API_PASS} // 'administrator';
+my $split_peak_parts = $ENV{RATEOMAT_SPLIT_PEAK_PARTS} // 0;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -560,11 +561,11 @@ sub _get_interval_start {
 sub _add_interval {
 	my ($from,$interval_unit,$interval_value,$align_eom_dt) = @_;
 	if ('minute' eq $interval_unit) {
-		return $from->clone->add(minutes => $interval_value);	
+		return $from->clone->add(minutes => $interval_value);
 	} elsif ('hour' eq $interval_unit) {
 		return $from->clone->add(hours => $interval_value);
 	} elsif ('day' eq $interval_unit) {
-		return $from->clone->add(days => $interval_value);		
+		return $from->clone->add(days => $interval_value);
 	} elsif ('week' eq $interval_unit) {
 		return $from->clone->add(weeks => $interval_value);
 	} elsif ('month' eq $interval_unit) {
@@ -671,7 +672,7 @@ sub setup_subscriber {
 }
 
 sub setup_provider {
-	my ($domain_name,$rates,$networks) = @_;
+	my ($domain_name,$rates,$networks,$provider_rate) = @_;
 	my $provider = {};
 	$provider->{contact} = create_systemcontact();
 	$provider->{contract} = create_contract(
@@ -681,9 +682,22 @@ sub setup_provider {
 	$provider->{reseller} = create_reseller(
 		contract_id => $provider->{contract}->{id},
 	);
-	$provider->{profile} = create_billing_profile(
-		reseller_id => $provider->{reseller}->{id},
-	);
+	if (defined $provider_rate) {
+		my $profile_fee = {};
+		($profile_fee->{profile},
+		 $profile_fee->{zone},
+		 $profile_fee->{fee},
+		 $profile_fee->{fees}) = _setup_fees($provider->{reseller},
+			%$provider_rate
+		);
+		$provider->{profile} = $profile_fee->{profile};
+		$provider->{provider_fee} = $profile_fee;
+	} else {
+		ok(!$split_peak_parts,'provider rate required for split cdrs');
+		$provider->{profile} = create_billing_profile(
+			reseller_id => $provider->{reseller}->{id},
+		);
+	}
 	$provider->{contract} = update_item($provider->{contract},
 		billing_profile_id => $provider->{profile}->{id},
 	);
@@ -691,16 +705,16 @@ sub setup_provider {
 		reseller_id => $provider->{reseller}->{id},
 		domain => $domain_name.'.<t>',
 	);
-	$provider->{profiles} = [];
+	$provider->{subscriber_fees} = [];
 	foreach my $rate (@$rates) {
 		my $profile_fee = {};
 		($profile_fee->{profile},
 		 $profile_fee->{zone},
 		 $profile_fee->{fee},
-		 $profile_fee->{fees}) = _setup_customer_fees($provider->{reseller},
+		 $profile_fee->{fees}) = _setup_fees($provider->{reseller},
 			%$rate
 		);
-		push(@{$provider->{profiles}},$profile_fee);
+		push(@{$provider->{subscriber_fees}},$profile_fee);
 	}
 	$provider->{networks} = [];
 	foreach my $network_blocks (@$networks) {
@@ -713,12 +727,16 @@ sub setup_provider {
 	return $provider;
 }
 
-sub _setup_customer_fees {
+sub _setup_fees {
 	my ($reseller,%params) = @_;
 	my $prepaid = delete $params{prepaid};
+	my $peaktime_weekdays = delete $params{peaktime_weekdays};
+	my $peaktime_specials = delete $params{peaktime_special};
 	my $profile = create_billing_profile(
 		reseller_id => $reseller->{id},
 		(defined $prepaid ? (prepaid => $prepaid) : ()),
+		(defined $peaktime_weekdays ? (peaktime_weekdays => $peaktime_weekdays) : ()),
+		(defined $peaktime_specials ? (peaktime_special => $peaktime_specials) : ()),
 	);
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},
