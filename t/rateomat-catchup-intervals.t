@@ -16,7 +16,7 @@ use Data::Dumper;
 	my $provider = create_provider();
 
 	my $balance = 5;
-	my $profiles_setup = $provider->{profiles}->[0]->{profile};
+	my $profiles_setup = $provider->{subscriber_fees}->[0]->{profile};
 	my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
 	my $callee = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '2<n>', sn => '<t>' });
 
@@ -45,8 +45,8 @@ use Data::Dumper;
 				rating_status => 'ok',
 			},
 		),'cdrs were all processed');
-		my $costs = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-					   $provider->{profiles}->[0]->{fee}->{onpeak_init_interval})/100.0;
+		my $costs = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+					   $provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval})/100.0;
 		Utils::Api::check_interval_history('',$caller->{customer}->{id},[
 			{ start => Utils::Api::datetime_to_string($begin->truncate(to => 'month')),
 			  stop  => Utils::Api::datetime_to_string($begin->add(months => 1)->clone->subtract(seconds => 1)),
@@ -84,7 +84,7 @@ use Data::Dumper;
 
 			Utils::Api::setup_package($provider,
 				[ #initial:
-					$provider->{profiles}->[0]->{profile}
+					$provider->{subscriber_fees}->[0]->{profile}
 				],
 				[ #topup:
 
@@ -137,8 +137,8 @@ use Data::Dumper;
 						rating_status => 'ok',
 					},
 				 ),'cdrs were all processed');
-				my $costs = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-							   $provider->{profiles}->[0]->{fee}->{onpeak_init_interval})/100.0;
+				my $costs = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+							   $provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval})/100.0;
 				my $label = $start_mode . '/' . $unit . ': ';
 				$stats{$label} = ($t2 - $t1) . ' secs';
 				my $balance_intervals = Utils::Api::get_interval_history($label,$caller->{customer}->{id});
@@ -207,7 +207,7 @@ use Data::Dumper;
 
 	Utils::Api::setup_package($provider,
 		[ #initial:
-			$provider->{profiles}->[0]->{profile}
+			$provider->{subscriber_fees}->[0]->{profile}
 		],
 		[ #topup:
 
@@ -222,10 +222,10 @@ use Data::Dumper;
 	);
 
 	my $call_minutes = 3*60;
-	my $amount = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-		$provider->{profiles}->[0]->{fee}->{onpeak_init_interval} +
-		$provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
-		$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} * ($call_minutes - 1))/100.0;
+	my $amount = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval} +
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_rate} *
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval} * ($call_minutes - 1))/100.0;
 	my $profiles_setup = $provider->{packages}->[0]->{package};
 	my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '1<n>', sn => '<t>' });
 	my $callee = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
@@ -254,12 +254,12 @@ use Data::Dumper;
 		shift(@$balance_intervals);
 		is(scalar @$balance_intervals,4,$label."number of balance intervals ".(scalar @$balance_intervals)." = 4");
 		my @minutes_per_interval = (44,60,60,15);
-		my $costs = $provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-				$provider->{profiles}->[0]->{fee}->{onpeak_init_interval};
+		my $costs = $provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+				$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval};
 		for (my $i = 0; $i < (scalar @$balance_intervals); $i++) {
 			my $interval = $balance_intervals->[$i];
-			$costs += $provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
-				$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} * $minutes_per_interval[$i];
+			$costs += $provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_rate} *
+				$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval} * $minutes_per_interval[$i];
 			if ($i < ((scalar @$balance_intervals) - 1)) {
 				ok(is_approx($interval->{cash_balance},($amount*100-$costs)/100,1.2),$label."interval cash balance $interval->{cash_balance} ~ ".($amount*100-$costs)/100);
 			} else {
@@ -280,7 +280,7 @@ use Data::Dumper;
 
 	Utils::Api::setup_package($provider,
 		[ #initial:
-			$provider->{profiles}->[0]->{profile}
+			$provider->{subscriber_fees}->[0]->{profile}
 		],
 		[ #topup:
 
@@ -295,10 +295,10 @@ use Data::Dumper;
 	);
 
 	my $call_minutes = 3;
-	my $amount = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-		$provider->{profiles}->[0]->{fee}->{onpeak_init_interval} +
-		$provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
-		$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} * ($call_minutes*60 - 1))/100.0;
+	my $amount = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval} +
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_rate} *
+		$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval} * ($call_minutes*60 - 1))/100.0;
 	my $profiles_setup = $provider->{packages}->[0]->{package};
 	my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '1<n>', sn => '<t>' });
 	my $callee = Utils::Api::setup_subscriber($provider,$profiles_setup,undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
@@ -328,13 +328,13 @@ use Data::Dumper;
 		my $total_costs = 0;
 		for (my $i = 0; $i < scalar @$balance_intervals; $i++) {
 			my $interval = $balance_intervals->[$i];
-			my $costs = ($i > 0 ? ($i < $call_minutes ? $provider->{profiles}->[0]->{fee}->{onpeak_follow_rate} *
-				$provider->{profiles}->[0]->{fee}->{onpeak_follow_interval} : 0) :
-				$provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-				$provider->{profiles}->[0]->{fee}->{onpeak_init_interval});
+			my $costs = ($i > 0 ? ($i < $call_minutes ? $provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_rate} *
+				$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval} : 0) :
+				$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+				$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval});
 			$total_costs += $costs;
 			is($interval->{cash_balance},($amount*100-$total_costs)/100, $label."interval cash balance $interval->{cash_balance} is " . ($amount*100-$total_costs)/100);
-		}		
+		}
 	}
 }
 

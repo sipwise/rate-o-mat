@@ -17,6 +17,7 @@ our @EXPORT_OK = qw(
 	run_rateomat_threads
 	create_cdrs
 	get_cdrs
+	get_cdrs_by_call_id
 	prepare_cdr
 	check_cdr
 	check_cdrs
@@ -322,6 +323,20 @@ sub get_cdrs {
 	return $result;
 }
 
+sub get_cdrs_by_call_id {
+	my $call_id = shift;
+	my $result = [];
+	eval {
+		my $dbh = _connect_accounting_db();
+		$result = _get_cdrs_by_callid($dbh,$call_id,1);
+		_disconnect_db($dbh);
+	};
+	if ($@) {
+		diag($@);
+	}
+	return $result;
+}
+
 sub delete_cdrs {
 	my $ids = shift;
 	my $is_ary = 'ARRAY' eq ref $ids;
@@ -404,6 +419,24 @@ sub _get_cdrs {
 		my $sth = $dbh->prepare('SELECT * FROM accounting.cdr WHERE id IN ('.substr(',?' x scalar @$ids,1).') ORDER BY id')
 				or die("Error preparing select cdrs statement: ".$dbh->errstr);
 		$sth->execute(@$ids);
+		$cdrs = $sth->fetchall_arrayref({});
+		$sth->finish();
+		if ($created) {
+			foreach my $cdr (@$cdrs) {
+				$cdr_map{$cdr->{id}} = $cdr;
+			}
+		}
+	}
+	return $cdrs;
+}
+
+sub _get_cdrs_by_callid {
+	my ($dbh,$call_id,$created) = @_;
+	my $cdrs = [];
+	if ($dbh) {
+		my $sth = $dbh->prepare('SELECT * FROM accounting.cdr WHERE call_id = ? ORDER BY id')
+				or die("Error preparing select cdrs by call id statement: ".$dbh->errstr);
+		$sth->execute($call_id);
 		$cdrs = $sth->fetchall_arrayref({});
 		$sth->finish();
 		if ($created) {

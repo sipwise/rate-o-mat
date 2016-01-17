@@ -9,14 +9,14 @@ use Storable qw();
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
 my $provider = create_provider();
-my $callee = Utils::Api::setup_subscriber($provider,$provider->{profiles}->[0]->{profile},undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
+my $callee = Utils::Api::setup_subscriber($provider,$provider->{subscriber_fees}->[0]->{profile},undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
 Utils::Api::set_time();
 
 my $amount = 5;
-my $costs = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-	$provider->{profiles}->[0]->{fee}->{onpeak_init_interval})/100.0;
-my $underrun_costs = ($provider->{profiles}->[1]->{fee}->{onpeak_init_rate} *
-	$provider->{profiles}->[1]->{fee}->{onpeak_init_interval})/100.0;
+my $costs = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+	$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval})/100.0;
+my $underrun_costs = ($provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_rate} *
+	$provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_interval})/100.0;
 my $interval_days = 30;
 my $timely_days = $interval_days / 3;
 
@@ -26,7 +26,7 @@ foreach my $start_mode ('create','1st') {
 		my $begin = Utils::Api::get_now->subtract(days => (3 * $interval_days + 1));
 		my $profiles_setup = Utils::Api::setup_package($provider,
 			[ #initial:
-				$provider->{profiles}->[0]->{profile}
+				$provider->{subscriber_fees}->[0]->{profile}
 			],
 			[ #topup:
 
@@ -162,16 +162,16 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 	@cash_values = ( [ cash => $amount - $costs, debit => 0 ], [ cash => $amount - $costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over' eq $carry_over_mode;
 	@cash_values = ( [ cash => $amount - $costs, debit => 0 ], [ cash => 0, debit => $underrun_costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over_timely' eq $carry_over_mode;
 	foreach my $start_mode ('topup','topup_interval') {
-	
+
 		my $profiles_setup = Utils::Api::setup_package($provider,
 			[ #initial:
-				$provider->{profiles}->[0]->{profile}
+				$provider->{subscriber_fees}->[0]->{profile}
 			],
 			[ #topup:
-		
+
 			],
 			[ #underrun:
-				$provider->{profiles}->[1]->{profile}
+				$provider->{subscriber_fees}->[1]->{profile}
 			],
 			balance_interval_start_mode => $start_mode,
 			balance_interval_value => $interval_days,
@@ -185,30 +185,30 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 			underrun_profile_threshold => 1,
 			underrun_lock_level => 4,
 		)->{package};
-	
+
 		my $label = $start_mode . '/' . $carry_over_mode .': ';
 		my $i = 0;
-		
+
 		foreach my $begin (Utils::Api::get_now->subtract(days => ($interval_days / 2)),
 						   Utils::Api::get_now->subtract(days => (1.5*$interval_days)),
 						   Utils::Api::get_now->subtract(days => (2.5*$interval_days))) {
-		
+
 			Utils::Api::set_time($begin);
-		
+
 			my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,$amount,{ cc => 888, ac => '1<n>', sn => '<t>' });
 			is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},undef,$label.'subscriber is not locked initially');
 			is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0],undef,$label.'subscriber is not prepaid initially');
-			
+
 			Utils::Api::set_time();
-			
+
 			my $call_time = Utils::Api::get_now->subtract(minutes => 3);
-			
+
 			my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
 				Utils::Rateomat::prepare_cdr($caller->{subscriber},undef,$caller->{reseller},
 						$callee->{subscriber},undef,$callee->{reseller},
 						'192.168.0.1',$call_time->epoch,1),
 			]) };
-		
+
 			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
 				ok(Utils::Rateomat::check_cdrs('',
 					map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
@@ -222,13 +222,13 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 					is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},4,$label.'subscriber is locked now');
 					is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
 				}
-				
+
 			}
 			$i++;
 		}
 	}
 }
-	
+
 done_testing();
 exit;
 
@@ -255,7 +255,7 @@ sub create_provider {
 				offpeak_init_interval    => 60,
 				offpeak_follow_rate      => 2,
 				offpeak_follow_interval  => 30,
-			},			
+			},
 		],
 		[ #billing networks:
 		]

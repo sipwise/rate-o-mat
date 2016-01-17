@@ -71,9 +71,9 @@ my $provider = Utils::Api::setup_provider('test.com',
 
 my $balance = 5;
 my $profiles_setup = [
-	$provider->{profiles}->[0]->{profile},
-	[ $provider->{profiles}->[1]->{profile}, $provider->{networks}->[0] ],
-	[ $provider->{profiles}->[2]->{profile}, $provider->{networks}->[1] ],
+	$provider->{subscriber_fees}->[0]->{profile},
+	[ $provider->{subscriber_fees}->[1]->{profile}, $provider->{networks}->[0] ],
+	[ $provider->{subscriber_fees}->[2]->{profile}, $provider->{networks}->[1] ],
 ];
 my $caller1 = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
 my $caller2 = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
@@ -111,16 +111,16 @@ if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat exec
 		},
 	),'cdrs were all processed');
 	Utils::Api::check_interval_history('',$caller1->{customer}->{id},[
-		{ cash => (100.0 * $balance - $provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-				   $provider->{profiles}->[0]->{fee}->{onpeak_init_interval})/100.0 },
+		{ cash => (100.0 * $balance - $provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+				   $provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval})/100.0 },
 	]);
 	Utils::Api::check_interval_history('',$caller2->{customer}->{id},[
-		{ cash => (100.0 * $balance - $provider->{profiles}->[1]->{fee}->{onpeak_init_rate} *
-				   $provider->{profiles}->[1]->{fee}->{onpeak_init_interval})/100.0 },
+		{ cash => (100.0 * $balance - $provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_rate} *
+				   $provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_interval})/100.0 },
 	]);
 	Utils::Api::check_interval_history('',$caller3->{customer}->{id},[
-		{ cash => (100.0 * $balance - $provider->{profiles}->[2]->{fee}->{onpeak_init_rate} *
-				   $provider->{profiles}->[2]->{fee}->{onpeak_init_interval})/100.0 },
+		{ cash => (100.0 * $balance - $provider->{subscriber_fees}->[2]->{fee}->{onpeak_init_rate} *
+				   $provider->{subscriber_fees}->[2]->{fee}->{onpeak_init_interval})/100.0 },
 	]);
 }
 

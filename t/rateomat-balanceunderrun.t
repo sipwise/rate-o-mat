@@ -8,14 +8,14 @@ use Test::More;
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
 my $provider = create_provider();
-my $callee = Utils::Api::setup_subscriber($provider,$provider->{profiles}->[0]->{profile},undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
+my $callee = Utils::Api::setup_subscriber($provider,$provider->{subscriber_fees}->[0]->{profile},undef,{ cc => 888, ac => '2<n>', sn => '<t>' });
 Utils::Api::set_time();
 
 my $amount = 5;
-my $costs_initial = ($provider->{profiles}->[0]->{fee}->{onpeak_init_rate} *
-	$provider->{profiles}->[0]->{fee}->{onpeak_init_interval})/100.0;
-my $costs_underrun = ($provider->{profiles}->[1]->{fee}->{onpeak_init_rate} *
-	$provider->{profiles}->[1]->{fee}->{onpeak_init_interval})/100.0;
+my $costs_initial = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
+	$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval})/100.0;
+my $costs_underrun = ($provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_rate} *
+	$provider->{subscriber_fees}->[1]->{fee}->{onpeak_init_interval})/100.0;
 my $lock_level = 4;
 
 {
@@ -24,13 +24,13 @@ my $lock_level = 4;
 
 	my $profiles_setup = Utils::Api::setup_package($provider,
 		[ #initial:
-			$provider->{profiles}->[0]->{profile}
+			$provider->{subscriber_fees}->[0]->{profile}
 		],
 		[ #topup:
 
 		],
 		[ #underrun:
-			$provider->{profiles}->[2]->{profile}
+			$provider->{subscriber_fees}->[2]->{profile}
 		],
 		balance_interval_start_mode => 'create',
 		balance_interval_value => 30,
@@ -64,11 +64,11 @@ my $lock_level = 4;
 			{ start => Utils::Api::datetime_to_string($begin->truncate(to => 'day')),
 			  stop => Utils::Api::datetime_to_string($begin->add(days => 30)->clone->subtract(seconds => 1)),
 			  cash => $amount,
-			  profile => $provider->{profiles}->[0]->{profile}->{id} },
+			  profile => $provider->{subscriber_fees}->[0]->{profile}->{id} },
 			{ start => Utils::Api::datetime_to_string($begin),
 			  stop => Utils::Api::datetime_to_string($begin->add(days => 30)->clone->subtract(seconds => 1)),
 			  cash => 0,
-			  profile => $provider->{profiles}->[2]->{profile}->{id}},
+			  profile => $provider->{subscriber_fees}->[2]->{profile}->{id}},
 		]);
 		is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},$lock_level,$label.'subscriber is locked now');
 		is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
@@ -81,13 +81,13 @@ my $lock_level = 4;
 
 	my $profiles_setup = Utils::Api::setup_package($provider,
 		[ #initial:
-			$provider->{profiles}->[0]->{profile}
+			$provider->{subscriber_fees}->[0]->{profile}
 		],
 		[ #topup:
 
 		],
 		[ #underrun:
-			$provider->{profiles}->[1]->{profile}
+			$provider->{subscriber_fees}->[1]->{profile}
 		],
 		balance_interval_start_mode => 'topup',
 		balance_interval_value => 30,
@@ -123,7 +123,7 @@ my $lock_level = 4;
 			{ start => '~'.Utils::Api::datetime_to_string($begin),
 			  stop => Utils::Api::datetime_to_string(Utils::Api::infinite_future()),
 			  cash => $amount - $costs_initial - $costs_underrun,
-			  profile => $provider->{profiles}->[0]->{profile}->{id} },
+			  profile => $provider->{subscriber_fees}->[0]->{profile}->{id} },
 		]);
 		is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},$lock_level,$label.'subscriber is locked now');
 	}
