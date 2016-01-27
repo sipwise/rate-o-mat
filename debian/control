@@ -29,6 +29,7 @@ Package: ngcp-rate-o-mat
 Architecture: all
 Depends: libdbd-mysql-perl,
          libexception-class-perl,
+         libnetaddr-ip-perl,
          ngcp-templates-rate-o-mat,
          perl-modules,
          ${misc:Depends},
