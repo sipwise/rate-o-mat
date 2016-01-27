@@ -1,0 +1,47 @@
+#!/bin/bash
+
+if ! [ -f /.dockerinit ]; then
+  echo "Not running inside docker, exiting to avoid data damage." >&2
+  exit 1
+fi
+
+set -e
+set -u
+
+if [ -z "${1:-}" ] ; then
+  echo "Usage: $0 <testsystem>" >&2
+  echo
+  echo "Usage example: $0 192.168.88.162"
+  exit 1
+fi
+
+SERVER="${1}"
+
+MYSQL_SERVER="${SERVER}"
+MYSQL_PORT="3306"
+MYSQL_USER="root"
+echo "Testing MySQL connection to ${MYSQL_SERVER}:${MYSQL_PORT} ..."
+if !  mysql -u "${MYSQL_USER}" -h "${SERVER}" -P "${MYSQL_PORT}" -e 'select now()' >/dev/null ; then
+  echo "ERROR: Cannot connect to MySQL on ${MYSQL_SERVER}:${MYSQL_PORT} using user '${MYSQL_USER}', cannot continue!" >&2
+  echo "HINTs:"
+  echo " [CE] remove 'skip_networking' from /etc/ngcp-config/templates/etc/mysql/my.cnf.tt2 && ngcpcfg apply 'Allow TCP for MySQL'"
+  echo " [CE/PRO] run: mysql -u root -e \"GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY PASSWORD ''; FLUSH PRIVILEGES;\""
+  exit 1
+fi
+
+echo "################################################################################"
+echo "Finished main setup, now running tests ..."
+
+RC=0
+results="/code/rate-o-mat-unit-test-results.pretty"
+
+CATALYST_SERVER="https://${SERVER}:1443" RATEOMAT_PROVISIONING_DB_HOST="${MYSQL_SERVER}" \
+RATEOMAT_BILLING_DB_HOST="${MYSQL_SERVER}" RATEOMAT_ACCOUNTING_DB_HOST="${MYSQL_SERVER}" \
+RATEOMAT_PL="/usr/sbin/rate-o-mat" prove -v --color -l -IUtils/ ./*.t | tee -a "${results}"
+RC=${PIPESTATUS[0]}
+
+echo "Finished test execution, test execution returned with exit code ${RC}."
+if [ -f "${results}" ] ; then
+  echo "Test results available at ${results}"
+fi
+echo "################################################################################"
