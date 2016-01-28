@@ -29,6 +29,11 @@ if !  mysql -u "${MYSQL_USER}" -h "${SERVER}" -P "${MYSQL_PORT}" -e 'select now(
   exit 1
 fi
 
+echo "NOTE: Please verify on test node '${SERVER}'"
+echo "      1) rate-o-mat must be stopped (remember about monit)"
+echo "      2) config.yml should have: allow_delay_commit=1 ; allow_fake_client_time=1"
+sleep 2
+
 echo "################################################################################"
 echo "Finished main setup, now running tests ..."
 
@@ -37,7 +42,7 @@ results="/code/rate-o-mat-unit-test-results.pretty"
 
 CATALYST_SERVER="https://${SERVER}:1443" RATEOMAT_PROVISIONING_DB_HOST="${MYSQL_SERVER}" \
 RATEOMAT_BILLING_DB_HOST="${MYSQL_SERVER}" RATEOMAT_ACCOUNTING_DB_HOST="${MYSQL_SERVER}" \
-RATEOMAT_PL="/usr/sbin/rate-o-mat" prove -v --color -l -IUtils/ ./*.t | tee -a "${results}"
+RATEOMAT_PL="/usr/sbin/rate-o-mat" RATEOMAT_SPLIT_PEAK_PARTS=1 prove -v --color -l -IUtils/ ./*.t | tee -a "${results}"
 RC=${PIPESTATUS[0]}
 
 echo "Finished test execution, test execution returned with exit code ${RC}."
