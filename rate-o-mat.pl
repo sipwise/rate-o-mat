@@ -713,7 +713,7 @@ sub add_interval {
 	} elsif($unit eq "hour") {
 		$to_time = mktime($from_second,$from_minute,$from_hour + $count,$from_day,$from_month,$from_year);
 	} elsif($unit eq "day") {
-		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);		
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);
 	} elsif($unit eq "week") {
 		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + 7*$count,$from_month,$from_year);
 	} elsif($unit eq "month") {
