@@ -692,15 +692,17 @@ sub setup_provider {
 		);
 		$provider->{profile} = $profile_fee->{profile};
 		$provider->{provider_fee} = $profile_fee;
+		$provider->{contract} = update_item($provider->{contract},
+			billing_profile_id => $provider->{profile}->{id},
+		);
 	} else {
 		ok(!$split_peak_parts,'provider rate required for split cdrs');
-		$provider->{profile} = create_billing_profile(
-			reseller_id => $provider->{reseller}->{id},
-		);
+		#use default billing profile id, which already comes with fees.
+		#$provider->{profile} = create_billing_profile(
+		#	reseller_id => $provider->{reseller}->{id},
+		#);
 	}
-	$provider->{contract} = update_item($provider->{contract},
-		billing_profile_id => $provider->{profile}->{id},
-	);
+
 	$provider->{domain} = create_domain(
 		reseller_id => $provider->{reseller}->{id},
 		domain => $domain_name.'.<t>',
