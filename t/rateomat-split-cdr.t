@@ -5,7 +5,7 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 
-#THIS TEST CASE REQUIRES RATEOMAT_SPLIT_PEAK_PARTS=1 !
+$ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
 
 #use Text::Table;
 #use Text::Wrap;
