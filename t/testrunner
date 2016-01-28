@@ -23,11 +23,16 @@ MYSQL_USER="root"
 echo "Testing MySQL connection to ${MYSQL_SERVER}:${MYSQL_PORT} ..."
 if !  mysql -u "${MYSQL_USER}" -h "${SERVER}" -P "${MYSQL_PORT}" -e 'select now()' >/dev/null ; then
   echo "ERROR: Cannot connect to MySQL on ${MYSQL_SERVER}:${MYSQL_PORT} using user '${MYSQL_USER}', cannot continue!" >&2
-  echo "HINTs:"
+  echo "Hint:"
   echo " [CE] remove 'skip_networking' from /etc/ngcp-config/templates/etc/mysql/my.cnf.tt2 && ngcpcfg apply 'Allow TCP for MySQL'"
   echo " [CE/PRO] run: mysql -u root -e \"GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY PASSWORD ''; FLUSH PRIVILEGES;\""
   exit 1
 fi
+
+echo "NOTE: Please be sure on the test node '${SERVER}':"
+echo "      1) rate-o-mat must be stopped (remember about monit)"
+echo "      2) config.yml should have: allow_delay_commit=1 ; allow_fake_client_time=1"
+sleep 2
 
 echo "################################################################################"
 echo "Finished main setup, now running tests ..."
