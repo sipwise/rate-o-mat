@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a6a9dd7_ef3397f4",
+        "filename": "t/testrunner",
+        "patchSetId": 1
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2016-01-29T12:27:21Z",
+      "side": 1,
+      "message": "Rene, should I remove RATEOMAT_SPLIT_PEAK_PARTS\u003d1 here?\n\nIn light of:\n\n(2016-01-28 18:01:52) alutay@sipwise.com/Work: now test running much longer with a lot of errors :-(\nP.S. I have added  RATEOMAT_SPLIT_PEAK_PARTS\u003d1 before PROVE call\nhttp://paste.mgm.sipwise.com/show/1976/\n(2016-01-28 18:13:52) rkrenn@sipwise.com: --\u003e RATEOMAT_SPLIT_PEAK_PARTS\u003d1  only for ratomat-split-cdr.t\n(2016-01-28 18:14:08) alutay@sipwise.com/Work: hm... how I can do this... \n(2016-01-28 18:14:31) rkrenn@sipwise.com: wait, i should be able to set it withing the .t\n(2016-01-28 18:14:50) alutay@sipwise.com/Work: Yes, it is better.",
+      "revId": "0f867b7e7bdd77a230c0dd89da329ff86654ccac",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
