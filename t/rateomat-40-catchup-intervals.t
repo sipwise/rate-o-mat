@@ -5,6 +5,18 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 use Data::Dumper;
+
+### testcase outline:
+### onnet calls of a caller with and without profile packages to check
+### the correct creation of billing.contract_balance records ("catchup")
+###
+### the tests verify, that a correct history of balance interval records
+### (contract_balance records) are created while rating a cdr. beside the
+### default case of customer with no package, all combinations of interval
+### start modes and interval duration units are covered.
+### note: since it also includes minute-based balance intervals, this tests
+### takes longer time to complete
+
 #goto SKIP;
 { #no package:
 	my $now = Utils::Api::get_now();
@@ -34,7 +46,7 @@ use Data::Dumper;
 				'192.168.0.1',$now->epoch,1),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			$cdr_ids[0] => {
 				id => $cdr_ids[0],
@@ -126,7 +138,7 @@ use Data::Dumper;
 						'192.168.0.1',$last_call_ts->epoch,1),
 			]) };
 
-			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 				ok(Utils::Rateomat::check_cdrs('',
 					$cdr_ids[0] => {
 						id => $cdr_ids[0],
@@ -242,7 +254,7 @@ use Data::Dumper;
 				'192.168.0.1',$call_ts->epoch,$call_minutes*60),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			$cdr_ids[0] => {
 				id => $cdr_ids[0],
@@ -315,7 +327,7 @@ use Data::Dumper;
 				'192.168.0.1',$call_ts->epoch,$call_minutes*60),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			$cdr_ids[0] => {
 				id => $cdr_ids[0],
