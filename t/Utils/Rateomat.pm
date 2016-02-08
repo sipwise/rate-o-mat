@@ -173,7 +173,8 @@ sub prepare_cdr {
 		$dest_reseller,
 		$source_ip,
 		$time,
-		$duration) = @_;
+		$duration,
+		@overrides) = @_;
 	return {
 		#id                                     => ,
 		#update_time                            => ,
@@ -259,6 +260,7 @@ sub prepare_cdr {
 		#rating_status                          => 'unrated',
 		#exported_at                            => ,
 		#export_status                          => ,
+		@overrides
 	};
 }
 

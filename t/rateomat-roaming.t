@@ -95,7 +95,7 @@ my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
 			'10.0.0.97',Utils::Api::current_unix(),1),
 ]) };
 
-if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 	ok(Utils::Rateomat::check_cdrs('',
 		$cdr_ids[0] => {
 			id => $cdr_ids[0],
