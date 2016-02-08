@@ -5,6 +5,14 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 
+### testcase outline:
+### onnet calls that hit negative incoming fees, aka VAS
+### (value added services) numbers
+###
+### this tests verify that rating with negative rates
+### properly increase the destination customer's cash
+### balance.
+
 use Text::Table;
 use Text::Wrap;
 use Storable;
@@ -62,7 +70,7 @@ my $tb = Text::Table->new("request", "response");
 			'192.168.0.1',$now->epoch,61),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 		),'cdrs were all processed');
@@ -78,7 +86,7 @@ my $tb = Text::Table->new("request", "response");
 
 }
 
-print $tb->stringify;
+#print $tb->stringify;
 
 done_testing();
 exit;
@@ -102,6 +110,7 @@ sub create_provider {
                 { #negative:
                     direction => 'in',
                     destination => '.',
+                    source => '.',
                     onpeak_init_rate        => -1*2,
                     onpeak_init_interval    => 60,
                     onpeak_follow_rate      => -1*1,

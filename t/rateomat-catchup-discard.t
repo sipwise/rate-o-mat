@@ -6,6 +6,14 @@ use Utils::Rateomat qw();
 use Test::More;
 use Storable qw();
 
+### testcase outline:
+### onnet calls of a caller with profile packages specifying settings to
+### discard the cash balance.
+###
+### the tests verify, that balance is properly discarded (set to 0 euro)
+### for all combinations of interval start modes and carry over modes,
+### which also depends on topups performed.
+
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
 my $provider = create_provider();
@@ -85,7 +93,7 @@ foreach my $start_mode ('create','1st') {
 						'192.168.0.1',$now->epoch,1),
 		]) };
 
-		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 			ok(Utils::Rateomat::check_cdrs('',
 				map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 			 ),'cdrs were all processed');
@@ -209,7 +217,7 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 						'192.168.0.1',$call_time->epoch,1),
 			]) };
 
-			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 				ok(Utils::Rateomat::check_cdrs('',
 					map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 				 ),'cdrs were all processed');

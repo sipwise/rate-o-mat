@@ -5,6 +5,15 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 
+### testcase outline:
+### onnet calls of callers with profiles using different
+### onpeak/offpeak rates
+###
+### this tests verify that offpeak/onpeak rates are correctly
+### chosen depending call start time. for alternating offpeak/onpeak
+### phases during a single call, another new cdr has to be created
+### per peaktime fragment with each rateomat loop ("split peak parts").
+
 $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
 
 #use Text::Table;
@@ -70,7 +79,7 @@ $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
     my %cdr_id_map = ();
     my $onpeak = 0; #call starts offpeak
     my $i = 1;
-    while (defined $cdr && ok(Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+    while (defined $cdr && ok(Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
         $cdr = Utils::Rateomat::get_cdrs($cdr->{id});
         $cdr_id_map{$cdr->{id}} = $cdr;
         Utils::Rateomat::check_cdr('cdr was processed: ',$cdr->{id},{ rating_status => 'ok' });
