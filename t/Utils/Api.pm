@@ -48,6 +48,7 @@ our @EXPORT_OK = qw(
 	setup_subscriber
 	setup_package
 	to_pretty_json
+	cartesian_product
 );
 
 my ($netloc) = ($uri =~ m!^https?://(.*)/?.*$!);
@@ -457,11 +458,11 @@ sub _compare_interval {
 		}
 	}
 
-	if ($expected->{cash}) {
+	if (defined $expected->{cash}) {
 		$ok = is($got->{cash_balance},$expected->{cash},$label . "check interval " . $got->{id} . " cash balance $got->{cash_balance} = $expected->{cash}") && $ok;
 	}
 
-	if ($expected->{debit}) {
+	if (defined $expected->{debit}) {
 		$ok = is($got->{cash_debit},$expected->{debit},$label . "check interval " . $got->{id} . " cash balance interval $got->{cash_debit} = $expected->{debit}") && $ok;
 	}
 
@@ -469,11 +470,11 @@ sub _compare_interval {
 		$ok = is($got->{billing_profile_id},$expected->{profile},$label . "check interval " . $got->{id} . " billing profile id $got->{billing_profile_id} = $expected->{profile}") && $ok;
 	}
 
-	if ($expected->{topups}) {
+	if (defined $expected->{topups}) {
 		$ok = is($got->{topup_count},$expected->{topups},$label . "check interval " . $got->{id} . " topup count $got->{topup_count} = $expected->{topups}") && $ok;
 	}
 
-	if ($expected->{timely_topups}) {
+	if (defined $expected->{timely_topups}) {
 		$ok = is($got->{timely_topup_count},$expected->{timely_topups},$label . "check interval " . $got->{id} . " timely topup count $got->{timely_topup_count} = $expected->{timely_topups}") && $ok;
 	}
 
@@ -696,7 +697,7 @@ sub setup_provider {
 			billing_profile_id => $provider->{profile}->{id},
 		);
 	} else {
-		ok(!$split_peak_parts,'provider rate required for split cdrs');
+		ok(!$split_peak_parts,'split_peak_parts disabled');
 		#use default billing profile id, which already comes with fees.
 		#$provider->{profile} = create_billing_profile(
 		#	reseller_id => $provider->{reseller}->{id},
@@ -719,10 +720,12 @@ sub setup_provider {
 		push(@{$provider->{subscriber_fees}},$profile_fee);
 	}
 	$provider->{networks} = [];
-	foreach my $network_blocks (@$networks) {
-		push(@{$provider->{networks}},create_billing_network(
-			blocks => $network_blocks,
-		));
+	if (defined $networks) {
+		foreach my $network_blocks (@$networks) {
+			push(@{$provider->{networks}},create_billing_network(
+				blocks => $network_blocks,
+			));
+		}
 	}
 	$provider->{customers} = [];
 	$provider->{packages} = [];
@@ -766,6 +769,64 @@ sub _setup_fees {
 
 sub to_pretty_json {
     return JSON::to_json(shift, {pretty => 1}); # =~ s/(^\s*{\s*)|(\s*}\s*$)//rg =~ s/\n   /\n/rg;
+}
+
+sub cartesian_product {
+
+	#Copyright (c) 2009 Philip R Brenan.
+	#This module is free software. It may be used, redistributed and/or
+	#modified under the same terms as Perl itself.
+
+    my $s = shift;       # Subroutine to call to process each element of the product
+    my @C = @_;          # Lists to be multiplied
+
+    my @c = ();          # Current element of cartesian product
+    my @P = ();          # Cartesian product
+    my $n = 0;           # Number of elements in product
+
+    return 0 if @C == 0; # Empty product
+
+    @C == grep {ref eq 'ARRAY'} @C or die("Arrays of things required by cartesian");
+
+    # Generate each cartesian product when there are no prior cartesian products.
+
+    my $p; $p = sub {
+        if (@c < @C) {
+            for (@{$C[@c]}) {
+                push @c, $_;
+                &$p();
+                pop @c;
+            }
+        } else {
+            my $p = [ @c ];
+            push @P, bless $p if &$s(@$p);
+        }
+    };
+
+    # Generate each cartesian product allowing for prior cartesian products.
+
+    my $q; $q = sub {
+        if (@c < @C) {
+            for (@{$C[@c]}) {
+                push @c, $_;
+                &$q();
+                pop @c;
+            }
+        } else {
+            my $p = [ map {ref $_ eq __PACKAGE__ ? @$_ : $_} @c ];
+            push @P, bless $p if &$s(@$p);
+        }
+    };
+
+    # Determine optimal method of forming cartesian products for this call
+
+    if (grep { grep {ref $_ eq __PACKAGE__ } @$_ } @C) {
+        &$q();
+    } else {
+        &$p();
+    }
+
+    @P;
 }
 
 1;
