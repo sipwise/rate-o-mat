@@ -85,7 +85,7 @@ foreach my $start_mode ('create','1st') {
 						'192.168.0.1',$now->epoch,1),
 		]) };
 
-		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 			ok(Utils::Rateomat::check_cdrs('',
 				map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 			 ),'cdrs were all processed');
@@ -209,7 +209,7 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 						'192.168.0.1',$call_time->epoch,1),
 			]) };
 
-			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 				ok(Utils::Rateomat::check_cdrs('',
 					map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 				 ),'cdrs were all processed');
