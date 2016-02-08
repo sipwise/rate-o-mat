@@ -2,8 +2,13 @@
 use strict;
 #use Time::Local qw(timegm timelocal);
 use POSIX qw(mktime);
-
 use Test::More;
+
+### testcase outline:
+### unit test for rateomat's add_interval sub
+###
+### this tests check the add_interval method in detail,
+### in particular mktime's rollover in cases like month=99
 
 my $t1 = '2015-99-99 99:99:99';
 my $t2 = from_epoch(to_epoch($t1));
@@ -29,10 +34,10 @@ sub to_epoch {
 }
 
 sub from_epoch {
- 
+
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(shift);
   return sprintf "%4d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec;
-    
+
 }
 
 sub add_interval {
@@ -40,11 +45,11 @@ sub add_interval {
 	my $to_time;
     my ($from_year,$from_month,$from_day,$from_hour,$from_minute,$from_second) = (localtime($from_time))[5,4,3,2,1,0];
 	if($unit eq "minute") {
-        $to_time = mktime($from_second,$from_minute + $count,$from_hour,$from_day,$from_month,$from_year);    
+        $to_time = mktime($from_second,$from_minute + $count,$from_hour,$from_day,$from_month,$from_year);
 	} elsif($unit eq "hour") {
         $to_time = mktime($from_second,$from_minute,$from_hour + $count,$from_day,$from_month,$from_year);
     } elsif($unit eq "day") {
-		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);        
+		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + $count,$from_month,$from_year);
 	} elsif($unit eq "week") {
 		$to_time = mktime($from_second,$from_minute,$from_hour,$from_day + 7*$count,$from_month,$from_year);
 	} elsif($unit eq "month") {
