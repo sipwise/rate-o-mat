@@ -70,7 +70,7 @@ $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
     my %cdr_id_map = ();
     my $onpeak = 0; #call starts offpeak
     my $i = 1;
-    while (defined $cdr && ok(Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+    while (defined $cdr && ok(Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
         $cdr = Utils::Rateomat::get_cdrs($cdr->{id});
         $cdr_id_map{$cdr->{id}} = $cdr;
         Utils::Rateomat::check_cdr('cdr was processed: ',$cdr->{id},{ rating_status => 'ok' });

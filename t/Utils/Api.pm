@@ -696,7 +696,7 @@ sub setup_provider {
 			billing_profile_id => $provider->{profile}->{id},
 		);
 	} else {
-		ok(!$split_peak_parts,'provider rate required for split cdrs');
+		ok(!$split_peak_parts,'split_peak_parts disabled');
 		#use default billing profile id, which already comes with fees.
 		#$provider->{profile} = create_billing_profile(
 		#	reseller_id => $provider->{reseller}->{id},
@@ -719,10 +719,12 @@ sub setup_provider {
 		push(@{$provider->{subscriber_fees}},$profile_fee);
 	}
 	$provider->{networks} = [];
-	foreach my $network_blocks (@$networks) {
-		push(@{$provider->{networks}},create_billing_network(
-			blocks => $network_blocks,
-		));
+	if (defined $networks) {
+		foreach my $network_blocks (@$networks) {
+			push(@{$provider->{networks}},create_billing_network(
+				blocks => $network_blocks,
+			));
+		}
 	}
 	$provider->{customers} = [];
 	$provider->{packages} = [];
