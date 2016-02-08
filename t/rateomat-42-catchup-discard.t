@@ -6,6 +6,15 @@ use Utils::Rateomat qw();
 use Test::More;
 use Storable qw();
 
+### testcase outline:
+### onnet calls of a caller with profile packages specifying settings to
+### discard the cash balance.
+###
+### the tests verify, that balance is properly discarded (set to 0 euro)
+### for all combinations of interval start modes and carry over modes,
+### which also depends on topups performed.
+### note: this tests takes longer time to complete
+
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
 my $provider = create_provider();
@@ -54,8 +63,8 @@ foreach my $start_mode ('create','1st') {
 		Utils::Api::set_time($within_first_interval);
 		Utils::Api::perform_topup($caller_topup->{subscriber},$amount);
 
-		my $within_first_topup = $begin->clone->add(days => ($interval_days - $timely_days / 2));
-		Utils::Api::set_time($within_first_topup);
+		my $within_first_timely = $begin->clone->add(days => ($interval_days - $timely_days / 2));
+		Utils::Api::set_time($within_first_timely);
 		Utils::Api::perform_topup($caller_timelytopup->{subscriber},$amount);
 
 		Utils::Api::set_time();
@@ -85,7 +94,7 @@ foreach my $start_mode ('create','1st') {
 						'192.168.0.1',$now->epoch,1),
 		]) };
 
-		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 			ok(Utils::Rateomat::check_cdrs('',
 				map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 			 ),'cdrs were all processed');
@@ -96,12 +105,14 @@ foreach my $start_mode ('create','1st') {
 				stop => Utils::Api::datetime_to_string($begin->add(days => $interval_days)->clone->subtract(seconds => 1)),
 				}; } 1..4;
 			if ('carry_over' eq $carry_over_mode) {
-				Utils::Api::check_interval_history($label . ' no topup: ',$caller_notopup->{customer}->{id},[
+				if (not Utils::Api::check_interval_history($label . ' no topup: ',$caller_notopup->{customer}->{id},[
 					set_cash($intervals[0],$amount - $costs),
 					set_cash($intervals[1],$amount - $costs),
 					set_cash($intervals[2],0),
 					set_cash($intervals[3],0),
-				]);
+				]) ){
+				print "FAIL due to bug";
+				}
 				Utils::Api::check_interval_history($label . ' topup: ',$caller_topup->{customer}->{id},[
 					set_cash($intervals[0],2*$amount - $costs),
 					set_cash($intervals[1],2*$amount - $costs),
@@ -209,7 +220,7 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 						'192.168.0.1',$call_time->epoch,1),
 			]) };
 
-			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+			if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 				ok(Utils::Rateomat::check_cdrs('',
 					map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 				 ),'cdrs were all processed');
