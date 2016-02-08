@@ -49,7 +49,7 @@ if ('Europe/Vienna' eq Utils::Api::get_now->time_zone->name) {
                 '192.168.0.1',$now->epoch,1),
         ]) };
 
-        if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+        if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
             ok(Utils::Rateomat::check_cdrs('',
                 map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
             ),'cdrs were all processed');
@@ -81,7 +81,7 @@ if ('Europe/Vienna' eq Utils::Api::get_now->time_zone->name) {
                 '192.168.0.1',$now->epoch,1),
         ]) };
 
-        if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+        if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
             ok(Utils::Rateomat::check_cdrs('',
                 map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
             ),'cdrs were all processed');
