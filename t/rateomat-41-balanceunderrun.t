@@ -5,6 +5,14 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 
+### testcase outline:
+### onnet calls of a caller with profile packages specifying "underrun"
+### settings.
+###
+### the tests verify, that subscriber underrun lock levels and underrun
+### profile are correctly applied when balance was discarded during catchup,
+### or call costs decrease the balance so it drops below the thresholds.
+
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
 my $provider = create_provider();
@@ -56,7 +64,7 @@ my $lock_level = 4;
 			'192.168.0.1',$now->epoch,1),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 		),'cdrs were all processed');
@@ -115,7 +123,7 @@ my $lock_level = 4;
 			'192.168.0.1',$now->epoch,1),
 	]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 		ok(Utils::Rateomat::check_cdrs('',
 			map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
 		),'cdrs were all processed');

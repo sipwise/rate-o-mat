@@ -5,25 +5,12 @@ use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
 
-#$ENV{CATALYST_SERVER} = https://127.0.0.1:4443
-#$ENV{RATEOMAT_PL} = /home/rkrenn/sipwise/git/rate-o-mat/rate-o-mat.pl
-
-#$ENV{CATALYST_SERVER}
-#$ENV{API_USER}
-#$ENV{API_USER}
-#$ENV{RATEOMAT_PROVISIONING_DB_HOST}
-#$ENV{RATEOMAT_PROVISIONING_DB_PORT}
-#$ENV{RATEOMAT_PROVISIONING_DB_USER}
-#$ENV{RATEOMAT_PROVISIONING_DB_PASS}
-#$ENV{RATEOMAT_BILLING_DB_HOST}
-#$ENV{RATEOMAT_BILLING_DB_PORT}
-#$ENV{RATEOMAT_BILLING_DB_USER}
-#$ENV{RATEOMAT_BILLING_DB_PASS}
-#$ENV{RATEOMAT_ACCOUNTING_DB_HOST}
-#$ENV{RATEOMAT_ACCOUNTING_DB_PORT}
-#$ENV{RATEOMAT_ACCOUNTING_DB_USER}
-#$ENV{RATEOMAT_ACCOUNTING_DB_PASS}
-#$ENV{RATEOMAT_PL}
+### testcase outline:
+### onnet calls of callers with profile + billing
+### network billing mappings
+###
+### this tests verify that rates are correctly choosen
+### depending on the caller (source) ip.
 
 my $provider = Utils::Api::setup_provider('test.com',
 	[ #rates:
@@ -95,7 +82,7 @@ my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
 			'10.0.0.97',Utils::Api::current_unix(),1),
 ]) };
 
-if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat(),'rate-o-mat executed')) {
+if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 	ok(Utils::Rateomat::check_cdrs('',
 		$cdr_ids[0] => {
 			id => $cdr_ids[0],
