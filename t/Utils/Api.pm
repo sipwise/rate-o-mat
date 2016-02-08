@@ -457,11 +457,11 @@ sub _compare_interval {
 		}
 	}
 
-	if ($expected->{cash}) {
+	if (defined $expected->{cash}) {
 		$ok = is($got->{cash_balance},$expected->{cash},$label . "check interval " . $got->{id} . " cash balance $got->{cash_balance} = $expected->{cash}") && $ok;
 	}
 
-	if ($expected->{debit}) {
+	if (defined $expected->{debit}) {
 		$ok = is($got->{cash_debit},$expected->{debit},$label . "check interval " . $got->{id} . " cash balance interval $got->{cash_debit} = $expected->{debit}") && $ok;
 	}
 
@@ -469,11 +469,11 @@ sub _compare_interval {
 		$ok = is($got->{billing_profile_id},$expected->{profile},$label . "check interval " . $got->{id} . " billing profile id $got->{billing_profile_id} = $expected->{profile}") && $ok;
 	}
 
-	if ($expected->{topups}) {
+	if (defined $expected->{topups}) {
 		$ok = is($got->{topup_count},$expected->{topups},$label . "check interval " . $got->{id} . " topup count $got->{topup_count} = $expected->{topups}") && $ok;
 	}
 
-	if ($expected->{timely_topups}) {
+	if (defined $expected->{timely_topups}) {
 		$ok = is($got->{timely_topup_count},$expected->{timely_topups},$label . "check interval " . $got->{id} . " timely topup count $got->{timely_topup_count} = $expected->{timely_topups}") && $ok;
 	}
 
@@ -696,7 +696,7 @@ sub setup_provider {
 			billing_profile_id => $provider->{profile}->{id},
 		);
 	} else {
-		ok(!$split_peak_parts,'provider rate required for split cdrs');
+		ok(!$split_peak_parts,'split_peak_parts disabled');
 		#use default billing profile id, which already comes with fees.
 		#$provider->{profile} = create_billing_profile(
 		#	reseller_id => $provider->{reseller}->{id},
@@ -719,10 +719,12 @@ sub setup_provider {
 		push(@{$provider->{subscriber_fees}},$profile_fee);
 	}
 	$provider->{networks} = [];
-	foreach my $network_blocks (@$networks) {
-		push(@{$provider->{networks}},create_billing_network(
-			blocks => $network_blocks,
-		));
+	if (defined $networks) {
+		foreach my $network_blocks (@$networks) {
+			push(@{$provider->{networks}},create_billing_network(
+				blocks => $network_blocks,
+			));
+		}
 	}
 	$provider->{customers} = [];
 	$provider->{packages} = [];
