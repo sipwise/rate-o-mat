@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (1.14.2.1+0~mr4.1.2.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [f838844] MT#16511 force float comparison for underrun thresholds
+  * [e80671d] MT#16655 support "minute" balance intervals
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 09 Feb 2016 12:26:16 +0100
+
 ngcp-rate-o-mat (1.14.2.0+0~mr4.1.2.0) unstable; urgency=medium
 
   [ Rene Krenn ]
