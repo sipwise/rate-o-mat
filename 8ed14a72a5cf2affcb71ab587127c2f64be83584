@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a6a9dd7_213429dd",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 5
+      },
+      "lineNbr": 1545,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2016-02-11T15:48:27Z",
+      "side": 1,
+      "message": "IMO this should throw an error and cause a rollback - otherwise balances would still be affected double. Maybe check the number of inserted rows for create_cdr_fragment as well in the same way.",
+      "revId": "8ed14a72a5cf2affcb71ab587127c2f64be83584",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a6a9dd7_8165f5e2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 5
+      },
+      "lineNbr": 1745,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2016-02-11T15:48:27Z",
+      "side": 1,
+      "message": "I don\u0027t think this is a good idea. If a call is paid for by existing positive cash_balance, then the cost to the subscriber is zero. Customers might use sum(customer_call_cost) or the balance\u0027s cash_balance_interval to determine how much to charge postpaid subscribers - they would end up overcharging them. With this change, I don\u0027t think there\u0027s a way left to determine how much to charge postpaid subscribers.",
+      "revId": "8ed14a72a5cf2affcb71ab587127c2f64be83584",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
