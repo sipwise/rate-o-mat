@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a6a9dd7_eb936ba1",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1850,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2016-02-12T14:46:21Z",
+      "side": 1,
+      "message": "COUNT() can be quite a slow operation on innodb, especially on large tables. Since this is an exception case, IMO a better approach would be to just run the select with a LIMIT, then see if the limit was hit and fallback to per-call select method if it was.",
+      "revId": "b1e6cb9cc30414ef83a510ea0000180c6308fad3",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
