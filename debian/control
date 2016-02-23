@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends: debhelper (>= 9~),
                libtemplate-perl
-Standards-Version: 3.9.6
+Standards-Version: 3.9.7
 Homepage: http://sipwise.com/
 
 Package: ngcp-templates-ce-rate-o-mat
