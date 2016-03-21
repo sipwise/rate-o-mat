@@ -1,3 +1,28 @@
+ngcp-rate-o-mat (1.17.0.0+0~mr4.4.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [edacb0e] MT#16633 launch multiple rateomat instances in tests
+  * [5f59a14] MT#17261 rateomat test case for cdr splitting
+  * [0c0ada2] MT#17607 tests: use default billing profile for providers by default
+
+  [ Guillem Jover ]
+  * [2081c04] MT#16473 Convert debian/copyright to machine-readable format
+
+  [ Richard Fuchs ]
+  * [aabd020] MT#14457 re-implement onpeak/offpeak CDR fragmentation
+
+  [ Alexander Lutay ]
+  * [243bd0b] MT#17601 Add libnetaddr-ip-perl to ngcp-rate-o-mat dependencies
+  * [9ef94e4] MT#17601 Add Dockerfile to run rate-o-mat tests
+  * [eed6707] MT#17601 Add test preconditions description
+
+  [ Michael Prokop ]
+  * [c2a1c3a] MT#17699 Bump Standards-Version to 3.9.7
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Mar 2016 22:29:57 +0100
+
 ngcp-rate-o-mat (1.16.0.0+0~mr4.3.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
