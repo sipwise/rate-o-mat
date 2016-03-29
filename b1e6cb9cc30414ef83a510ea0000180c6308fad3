@@ -34,6 +34,24 @@
       "revId": "b1e6cb9cc30414ef83a510ea0000180c6308fad3",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dad5f5cf_5fe84d7c",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1850,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2016-03-29T13:01:32Z",
+      "side": 1,
+      "message": "Please avoid using count(*) everywhere, literally. It is a pure evil for the mysql optimiser, count by a named column, the primary key ideally or in this case by the virtual one. \nI know it does not affect performance of this specific case but I am in general as it is easy to make a mistake like select count(*) from cdr where ... compared to select count(id) from cdr where ...",
+      "parentUuid": "dad5f5cf_3fda2979",
+      "revId": "b1e6cb9cc30414ef83a510ea0000180c6308fad3",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
