@@ -16,6 +16,24 @@
       "revId": "b1e6cb9cc30414ef83a510ea0000180c6308fad3",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dad5f5cf_3fda2979",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1850,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2016-03-29T09:51:54Z",
+      "side": 1,
+      "message": "good point, using SELECT count(*) FROM (SELECT id FROM prepaid_costs LIMIT \" . $prepaid_costs_cache_limit . \") AS cnt to be save here.",
+      "parentUuid": "9a6a9dd7_eb936ba1",
+      "revId": "b1e6cb9cc30414ef83a510ea0000180c6308fad3",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
