@@ -7,30 +7,11 @@ Build-Depends: debhelper (>= 9~),
 Standards-Version: 3.9.7
 Homepage: http://sipwise.com/
 
-Package: ngcp-templates-ce-rate-o-mat
-Architecture: all
-Depends: ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: ngcp-templates-pro-rate-o-mat
-Provides: ngcp-templates-rate-o-mat
-Description: Configuration templates for rate-o-mat
- Config file templates for the rate-o-mat rating daemon.
-
-Package: ngcp-templates-pro-rate-o-mat
-Architecture: all
-Depends: ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: ngcp-templates-ce-rate-o-mat
-Provides: ngcp-templates-rate-o-mat
-Description: Configuration templates for rate-o-mat
- Config file templates for the rate-o-mat rating daemon.
-
 Package: ngcp-rate-o-mat
 Architecture: all
 Depends: libdbd-mysql-perl,
          libexception-class-perl,
          libnetaddr-ip-perl,
-         ngcp-templates-rate-o-mat,
          perl-modules,
          ${misc:Depends},
          ${shlibs:Depends}

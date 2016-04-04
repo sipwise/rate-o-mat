@@ -9,18 +9,7 @@
 
 override_dh_clean:
 	dh_clean
-	rm -rf pro ce rate-o-mat
-
-override_dh_auto_build:
-	mkdir -p pro/etc/default ce/etc/default
-	tpage --define PRO=true   ngcp-rate-o-mat.default.tt2 \
-		> pro/etc/default/ngcp-rate-o-mat.tt2
-	tpage ngcp-rate-o-mat.default.tt2 \
-		> ce/etc/default/ngcp-rate-o-mat.tt2
-	tpage --define PRO=true ngcp-rate-o-mat.services \
-		> pro/etc/default/ngcp-rate-o-mat.services
-	tpage ngcp-rate-o-mat.services \
-		> ce/etc/default/ngcp-rate-o-mat.services
+	rm -rf rate-o-mat
 
 override_dh_auto_install:
 	install -m 755 rate-o-mat.pl rate-o-mat
