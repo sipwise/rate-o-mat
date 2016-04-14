@@ -46,6 +46,30 @@
       "revId": "19382e59e1366a904203eb5a74c970acbcddccaa",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bada0100_ed7ba227",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2016-04-14T14:30:20Z",
+      "side": 0,
+      "message": "yes, i just unified those that are kind of \"boolean\" args... i remember there were issues with RATEOMAT_DEBUG, which is seen a boolean in rateomat, but can get empty string or a number string (some dbg level?) passed iirc",
+      "parentUuid": "bada0100_2d09aa2c",
+      "range": {
+        "startLine": 49,
+        "startChar": 54,
+        "endLine": 49,
+        "endChar": 60
+      },
+      "revId": "19382e59e1366a904203eb5a74c970acbcddccaa",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
