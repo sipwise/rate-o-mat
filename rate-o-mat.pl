@@ -18,23 +18,23 @@ my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
 my $PID;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
-my $loop_interval = $ENV{RATEOMAT_LOOP_INTERVAL} ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10;
-my $debug = $ENV{RATEOMAT_DEBUG} ? int $ENV{RATEOMAT_DEBUG} : 0;
+my $loop_interval = ((defined $ENV{RATEOMAT_LOOP_INTERVAL} && $ENV{RATEOMAT_LOOP_INTERVAL}) ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10);
+my $debug = ((defined $ENV{RATEOMAT_DEBUG} && $ENV{RATEOMAT_DEBUG}) ? int $ENV{RATEOMAT_DEBUG} : 0);
 
 my $log_ident = 'rate-o-mat';
 my $log_facility = 'daemon';
 my $log_opts = 'ndely,cons,pid,nowait';
 
 # number of unrated cdrs to fetch at once:
-my $batch_size = $ENV{RATEOMAT_BATCH_SIZE} > 0 ? int $ENV{RATEOMAT_BATCH_SIZE} : 100;
+my $batch_size = ((defined $ENV{RATEOMAT_BATCH_SIZE} && $ENV{RATEOMAT_BATCH_SIZE} > 0) ? int $ENV{RATEOMAT_BATCH_SIZE} : 100);
 
 # if rate-o-mat processes are working on the same accounting.cdr table:
 # set to 1 to minimize collisions (and thus rollbacks)
-my $shuffle_batch = $ENV{RATEOMAT_SHUFFLE_BATCH} // 0;
+my $shuffle_batch = ((defined $ENV{RATEOMAT_SHUFFLE_BATCH} && $ENV{RATEOMAT_SHUFFLE_BATCH}) ? int $ENV{RATEOMAT_SHUFFLE_BATCH} : 0);
 
 # preload the whole prepaid_costs table, if number of records
 # is below this limit:
-my $prepaid_costs_cache_limit = $ENV{RATEOMAT_PREPAID_COSTS_CACHE} > 0 ? int $ENV{RATEOMAT_PREPAID_COSTS_CACHE} : 10000;
+my $prepaid_costs_cache_limit = ((defined $ENV{RATEOMAT_PREPAID_COSTS_CACHE} && $ENV{RATEOMAT_PREPAID_COSTS_CACHE} > 0) ? int $ENV{RATEOMAT_PREPAID_COSTS_CACHE} : 10000);
 
 # if the LNP database is used not just for LNP, but also for on-net
 # billing, special routing or similar things, this should be set to
@@ -46,14 +46,14 @@ my @lnp_order_by = ();
 # if split_peak_parts is set to true, rate-o-mat will create a separate
 # CDR every time a peak time border is crossed for either the customer,
 # the reseller or the carrier billing profile.
-my $split_peak_parts = $ENV{RATEOMAT_SPLIT_PEAK_PARTS} // 0;
+my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMAT_SPLIT_PEAK_PARTS}) ? int $ENV{RATEOMAT_SPLIT_PEAK_PARTS} : 0);
 
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
 # terminate if the same cdr fails $failed_cdr_max_retries + 1 times:
-my $failed_cdr_max_retries = $ENV{RATEOMAT_MAX_RETRIES} >= 0 ? int $ENV{RATEOMAT_MAX_RETRIES} : 2;
-my $failed_cdr_retry_delay = $ENV{RATEOMAT_RETRY_DELAY} >= 0 ? int $ENV{RATEOMAT_RETRY_DELAY} : 30;
+my $failed_cdr_max_retries = ((defined $ENV{RATEOMAT_MAX_RETRIES} && $ENV{RATEOMAT_MAX_RETRIES} >= 0) ? int $ENV{RATEOMAT_MAX_RETRIES} : 2);
+my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOMAT_RETRY_DELAY} >= 0) ? int $ENV{RATEOMAT_RETRY_DELAY} : 30);
 # with 2 retries and 30sec delay, rato-o-mat tolerates a replication
 # lag of around 60secs until it terminates.
 
