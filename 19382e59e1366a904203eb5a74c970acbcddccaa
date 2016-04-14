@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bada0100_fa24b6c7",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2016-04-14T13:37:16Z",
+      "side": 0,
+      "message": "I think the // operator should be safe against undef warnings. Just a note here, can keep the changes anyway.",
+      "range": {
+        "startLine": 49,
+        "startChar": 54,
+        "endLine": 49,
+        "endChar": 60
+      },
+      "revId": "19382e59e1366a904203eb5a74c970acbcddccaa",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
