@@ -22,6 +22,30 @@
       "revId": "19382e59e1366a904203eb5a74c970acbcddccaa",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bada0100_2d09aa2c",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2016-04-14T13:46:49Z",
+      "side": 0,
+      "message": "Current trunk:\n  \nroot@spce:~# /etc/init.d/ngcp-rate-o-mat start\nActive node or transition.\nUse of uninitialized value $ENV{\"RATEOMAT_BATCH_SIZE\"} in numeric gt (\u003e) at /usr/sbin/rate-o-mat line 29.\nUse of uninitialized value $ENV{\"RATEOMAT_PREPAID_COSTS_CACHE\"} in numeric gt (\u003e) at /usr/sbin/rate-o-mat line 37.\nUse of uninitialized value $ENV{\"RATEOMAT_MAX_RETRIES\"} in numeric ge (\u003e\u003d) at /usr/sbin/rate-o-mat line 55.\nUse of uninitialized value $ENV{\"RATEOMAT_MAX_RETRIES\"} in int at /usr/sbin/rate-o-mat line 55.\nUse of uninitialized value $ENV{\"RATEOMAT_RETRY_DELAY\"} in numeric ge (\u003e\u003d) at /usr/sbin/rate-o-mat line 56.\nUse of uninitialized value $ENV{\"RATEOMAT_RETRY_DELAY\"} in int at /usr/sbin/rate-o-mat line 56.\nroot@spce:~# /etc/init.d/ngcp-rate-o-mat status\n[ ok ] rate-o-mat is running.\nroot@spce:~#",
+      "parentUuid": "bada0100_fa24b6c7",
+      "range": {
+        "startLine": 49,
+        "startChar": 54,
+        "endLine": 49,
+        "endChar": 60
+      },
+      "revId": "19382e59e1366a904203eb5a74c970acbcddccaa",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
