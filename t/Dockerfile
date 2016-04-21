@@ -21,11 +21,14 @@ RUN apt-get install --assume-yes \
         libtap-harness-archive-perl \
         libtext-table-perl \
         libtime-warp-perl \
-        ngcp-rate-o-mat \
+        libdbd-mysql-perl \
+        libexception-class-perl \
+        libnetaddr-ip-perl \
+        perl-modules \
         mysql-client
 RUN apt-get clean
 
-RUN echo "cd /code && ./testrunner 1.2.3.4" > /root/.bash_history
+RUN echo "cd /code && ./t/testrunner 1.2.3.4" > /root/.bash_history
 
 WORKDIR /code
 
@@ -34,11 +37,11 @@ WORKDIR /code
 # ----------------------
 # When you want to build the base image from scratch (jump to the next section if you don't want to build yourself!):
 # % docker build --no-cache --tag="rate-o-mat-functional-tests-jessie" .
-# % docker run --rm -i -t -v $(pwd):/code:rw rate-o-mat-functional-tests-jessie:latest bash
+# % docker run --rm -i -t -v $(pwd)/../:/code:rw rate-o-mat-functional-tests-jessie:latest bash
 #
 # Use the existing docker image:
 # % docker pull docker.mgm.sipwise.com/rate-o-mat-functional-tests-jessie
-# % docker run --rm -i -t -v $(pwd):/code:rw docker.mgm.sipwise.com/rate-o-mat-functional-tests-jessie:latest bash
+# % docker run --rm -i -t -v $(pwd)/../:/code:rw docker.mgm.sipwise.com/rate-o-mat-functional-tests-jessie:latest bash
 #
 # Inside docker:
 #   cd /code && ./t/testrunner $IP_OF_NGCP_SYSTEM # IP_OF_NGCP_SYSTEM can be e.g. IP of a `vagrant up ce-trunk` system (eth1)
