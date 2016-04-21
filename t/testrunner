@@ -15,7 +15,36 @@ if [ -z "${1:-}" ] ; then
   exit 1
 fi
 
-SERVER="${1}"
+SERVER="${1:-}"
+SELECT="${2:-all}"
+OUTPUT_DIRECTORY="${3:-/code/}"
+FORMAT="${4:-pretty}"
+
+if [ -z "${SERVER}" ] ; then
+  echo "Usage: $0 <testsystem> [<testset>] [<output_directory>] [junit]" >&2
+  echo
+  echo "Usage example: $0 192.168.88.162"
+  echo "Usage example: $0 192.168.88.162 fast /results/ junit"
+  echo "Possible test set: all, stable, fast, t/api-rest/api-root.t"
+  echo "Default test set: all"
+  exit 1
+fi
+
+cd t
+
+if [ "${SELECT}" = "stable" ] ; then
+  echo "Test selection: ${SELECT}"
+  SELECT=$(echo rateomat-{01-run,10-prepaid-costs}.t)
+elif [ "${SELECT}" = "fast" ] ; then
+  echo "Test selection: ${SELECT}"
+  SELECT=$(echo rateomat-01-run.t)
+elif [ "${SELECT}" = "all" ] ; then
+  echo "Test selection: all"
+  SELECT=$(echo rateomat-*.t)
+else
+  echo "Test selection: ${SELECT}"
+fi
+
 
 MYSQL_SERVER="${SERVER}"
 MYSQL_PORT="3306"
@@ -38,15 +67,34 @@ echo "##########################################################################
 echo "Finished main setup, now running tests ..."
 
 RC=0
-results="/code/rate-o-mat-unit-test-results.pretty"
+result="rate-o-mat-unit-test-results"
 
-CATALYST_SERVER="https://${SERVER}:1443" RATEOMAT_PROVISIONING_DB_HOST="${MYSQL_SERVER}" \
-RATEOMAT_BILLING_DB_HOST="${MYSQL_SERVER}" RATEOMAT_ACCOUNTING_DB_HOST="${MYSQL_SERVER}" \
-RATEOMAT_PL="/usr/sbin/rate-o-mat" prove -v --color -l -IUtils/ ./*.t | tee -a "${results}"
-RC=${PIPESTATUS[0]}
+export CATALYST_SERVER="https://${SERVER}:1443"
+export RATEOMAT_PROVISIONING_DB_HOST="${MYSQL_SERVER}"
+export RATEOMAT_BILLING_DB_HOST="${MYSQL_SERVER}"
+export RATEOMAT_ACCOUNTING_DB_HOST="${MYSQL_SERVER}"
+export RATEOMAT_PL="/code/rate-o-mat.pl"
+
+if [ "${FORMAT}" = "junit" ] ; then
+  # shellcheck disable=SC2086
+  prove --formatter TAP::Formatter::JUnit -l -IUtils/ $SELECT | \
+    tee -a "${OUTPUT_DIRECTORY}/${result}.xml"
+  RC=${PIPESTATUS[0]}
+else
+  # api-threads.t and api-balanceintervals.t are failing with the "-Pretty option" :(
+  # shellcheck disable=SC2086
+  prove -v --color -l -IUtils/ $SELECT | tee -a "${OUTPUT_DIRECTORY}/${result}.pretty"
+  RC=${PIPESTATUS[0]}
+fi
 
 echo "Finished test execution, test execution returned with exit code ${RC}."
-if [ -f "${results}" ] ; then
-  echo "Test results available at ${results}"
-fi
+for file in "${OUTPUT_DIRECTORY}/${result}.pretty" "${OUTPUT_DIRECTORY}/${result}.xml" ; do
+  if [ -f "$file" ] ; then
+    echo "Test results available at ${file}"
+  fi
+done
+
 echo "################################################################################"
+
+exit "${RC}"
+
