@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bada0100_c9c7a411",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2755,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2016-04-22T13:58:19Z",
+      "side": 1,
+      "message": "I would just \"die\" with an error there in all other similar places inside the eval and rollback/etc. just outside of it. more comfy and easier to deal with such \"caught\" errors like that.\n\n};\nif ($EVAL_ERROR) {\n  rollback_all();\n}",
+      "range": {
+        "startLine": 2755,
+        "startChar": 7,
+        "endLine": 2755,
+        "endChar": 22
+      },
+      "revId": "2c740d4520a7840428fbb398ac9e7c6d317f2256",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
