@@ -2752,6 +2752,7 @@ sub main {
 								": " . $error;
 							$failed_counter_map{$cdr_id} = $failed_counter_map{$cdr_id} + 1;
 							$failed += 1;
+							rollback_all();
 							next; #move on to the next cdr of the batch
 						} else {
 							die($error); #rethrow
