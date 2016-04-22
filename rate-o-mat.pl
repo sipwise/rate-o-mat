@@ -572,7 +572,7 @@ EOS
 				    join(',', @fragment_fields).",
 				    start_time + ?,duration - ?,1
 				FROM accounting.cdr
-			       WHERE id = ?
+			       WHERE id = ? AND rating_status = 'unrated'
 			") or FATAL "Error preparing create cdr fragment statement: ".$acctdbh->errstr;
 	}
 
@@ -2752,6 +2752,7 @@ sub main {
 								": " . $error;
 							$failed_counter_map{$cdr_id} = $failed_counter_map{$cdr_id} + 1;
 							$failed += 1;
+							rollback_all();
 							next; #move on to the next cdr of the batch
 						} else {
 							die($error); #rethrow
