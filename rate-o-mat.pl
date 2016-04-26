@@ -90,9 +90,13 @@ foreach my $gpp_idx(0 .. 9) {
 	push @cdr_fields, ("source_gpp$gpp_idx", "destination_gpp$gpp_idx");
 }
 
-my $cash_balance_col_model_key = 1;
-my $time_balance_col_model_key = 2;
-my $relation_col_model_key = 3;
+my $acc_cash_balance_col_model_key = 1;
+my $acc_time_balance_col_model_key = 2;
+my $acc_relation_col_model_key = 3;
+
+my $dup_cash_balance_col_model_key = 11;
+my $dup_time_balance_col_model_key = 12;
+my $dup_relation_col_model_key = 13;
 
 # globals: #############################################################
 
@@ -679,77 +683,11 @@ EOS
 		) or FATAL "Error preparing delete usr preference value statement: ".$provdbh->errstr;
 	}
 
-	prepare_cdr_col_models($cash_balance_col_model_key,'cdr cash balance column model',
-		[ 'direction', 'provider', 'cash_balance' ], # avoid using Tie::IxHash
-		{
-			provider => {
-				sql => 'SELECT * FROM accounting.cdr_provider',
-				description => 'get cdr provider cols',
-			},
-			direction => { # the name "direction" for "source" and "destination" is not ideal
-				sql => 'SELECT * FROM accounting.cdr_direction',
-				description => 'get cdr direction cols',
-			},
-			cash_balance => {
-				sql => 'SELECT * FROM accounting.cdr_cash_balance',
-				description => 'get cdr cash balance cols',
-			},
-		},{
-			sql => "INSERT INTO accounting.cdr_cash_balance_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,cash_balance_id,val_before,val_after) VALUES".
-				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
-				"val_before = ?, val_after = ?",
-			description => 'write cdr cash balance col data',
-		}
-	);
-
-	prepare_cdr_col_models($time_balance_col_model_key,'cdr time balance column model',
-		[ 'direction', 'provider', 'time_balance' ],
-		{
-			provider => {
-				sql => 'SELECT * FROM accounting.cdr_provider',
-				description => 'get cdr provider cols',
-			},
-			direction => {
-				sql => 'SELECT * FROM accounting.cdr_direction',
-				description => 'get cdr direction cols',
-			},
-			time_balance => {
-				sql => 'SELECT * FROM accounting.cdr_time_balance',
-				description => 'get cdr time balance cols',
-			},
-		},{
-			sql => "INSERT INTO accounting.cdr_time_balance_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,time_balance_id,val_before,val_after) VALUES".
-				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
-				"val_before = ?, val_after = ?",
-			description => 'write cdr time balance col data',
-		}
-	);
-
-	prepare_cdr_col_models($relation_col_model_key,'cdr relation column model',
-		[ 'direction', 'provider', 'relation' ],
-		{
-			provider => {
-				sql => 'SELECT * FROM accounting.cdr_provider',
-				description => 'get cdr provider cols',
-			},
-			direction => {
-				sql => 'SELECT * FROM accounting.cdr_direction',
-				description => 'get cdr direction cols',
-			},
-			relation => {
-				sql => 'SELECT * FROM accounting.cdr_relation',
-				description => 'get relation cols',
-			},
-		},{
-			sql => "INSERT INTO accounting.cdr_relation_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,relation_id,val) VALUES".
-				"  (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
-				"val = ?",
-			description => 'write cdr relation col data',
-		}
-	);
+	prepare_cdr_col_models($acctdbh,
+		$acc_cash_balance_col_model_key,
+		$acc_time_balance_col_model_key,
+		$acc_relation_col_model_key,
+		'local');
 
 	if ($dupdbh) {
 		$sth_duplicate_cdr = $dupdbh->prepare(
@@ -759,9 +697,97 @@ EOS
 			join(',', (map {'?'} @cdr_fields)).
 			')'
 		) or FATAL "Error preparing duplicate_cdr statement: ".$dupdbh->errstr;
+
+		prepare_cdr_col_models($dupdbh,
+		$dup_cash_balance_col_model_key,
+		$dup_time_balance_col_model_key,
+		$dup_relation_col_model_key,
+		'duplication');
 	}
 
 	return 1;
+
+}
+
+sub prepare_cdr_col_models {
+
+	my $dbh = shift;
+	my $cash_balance_col_model_key = shift;
+	my $time_balance_col_model_key = shift;
+	my $relation_col_model_key = shift;
+	my $description_prefix = shift;
+
+	prepare_cdr_col_model($dbh,$cash_balance_col_model_key,$description_prefix.' cdr cash balance column model',
+		[ 'direction', 'provider', 'cash_balance' ], # avoid using Tie::IxHash
+		{
+			provider => {
+				sql => 'SELECT * FROM accounting.cdr_provider',
+				description => "get $description_prefix cdr provider cols",
+			},
+			direction => { # the name "direction" for "source" and "destination" is not ideal
+				sql => 'SELECT * FROM accounting.cdr_direction',
+				description => "get $description_prefix cdr direction cols",
+			},
+			cash_balance => {
+				sql => 'SELECT * FROM accounting.cdr_cash_balance',
+				description => "get $description_prefix cdr cash balance cols",
+			},
+		},{
+			sql => "INSERT INTO accounting.cdr_cash_balance_data".
+				"  (cdr_id,cdr_start_time,direction_id,provider_id,cash_balance_id,val_before,val_after) VALUES".
+				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
+				"val_before = ?, val_after = ?",
+			description => "write $description_prefix cdr cash balance col data",
+		}
+	);
+
+	prepare_cdr_col_model($dbh,$time_balance_col_model_key,$description_prefix.' cdr time balance column model',
+		[ 'direction', 'provider', 'time_balance' ],
+		{
+			provider => {
+				sql => 'SELECT * FROM accounting.cdr_provider',
+				description => "get $description_prefix cdr provider cols",
+			},
+			direction => {
+				sql => 'SELECT * FROM accounting.cdr_direction',
+				description => "get $description_prefix cdr direction cols",
+			},
+			time_balance => {
+				sql => 'SELECT * FROM accounting.cdr_time_balance',
+				description => "get $description_prefix cdr time balance cols",
+			},
+		},{
+			sql => "INSERT INTO accounting.cdr_time_balance_data".
+				"  (cdr_id,cdr_start_time,direction_id,provider_id,time_balance_id,val_before,val_after) VALUES".
+				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
+				"val_before = ?, val_after = ?",
+			description => "write $description_prefix cdr time balance col data",
+		}
+	);
+
+	prepare_cdr_col_model($dbh,$relation_col_model_key,$description_prefix.' cdr relation column model',
+		[ 'direction', 'provider', 'relation' ],
+		{
+			provider => {
+				sql => 'SELECT * FROM accounting.cdr_provider',
+				description => "get $description_prefix cdr provider cols",
+			},
+			direction => {
+				sql => 'SELECT * FROM accounting.cdr_direction',
+				description => "get $description_prefix cdr direction cols",
+			},
+			relation => {
+				sql => 'SELECT * FROM accounting.cdr_relation',
+				description => "get $description_prefix relation cols",
+			},
+		},{
+			sql => "INSERT INTO accounting.cdr_relation_data".
+				"  (cdr_id,cdr_start_time,direction_id,provider_id,relation_id,val) VALUES".
+				"  (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
+				"val = ?",
+			description => "write $description_prefix cdr relation col data",
+		}
+	);
 
 }
 
@@ -1690,30 +1716,22 @@ sub update_cdr {
 
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
-		if ($sth_duplicate_cdr) {
+		write_cdr_cols($cdr,$cdr->{id},
+			$acc_cash_balance_col_model_key,
+			$acc_time_balance_col_model_key,
+			$acc_relation_col_model_key);
+		if ($dupdbh) {
 			$sth_duplicate_cdr->execute(@$cdr{@cdr_fields})
 			or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
-			# todo: new eav fields are not duplicated
-		}
-		foreach my $dir (('source', 'destination')) {
-			foreach my $provider (('carrier','reseller','customer')) {
-				write_cdr_col_data($cash_balance_col_model_key,$cdr,
-					{ direction => $dir, provider => $provider, cash_balance => 'cash_balance' },
-					$cdr->{$dir.'_'.$provider."_cash_balance_before"},
-					$cdr->{$dir.'_'.$provider."_cash_balance_after"});
-
-				write_cdr_col_data($time_balance_col_model_key,$cdr,
-					{ direction => $dir, provider => $provider, time_balance => 'free_time_balance' },
-					$cdr->{$dir.'_'.$provider."_free_time_balance_before"},
-					$cdr->{$dir.'_'.$provider."_free_time_balance_after"});
-
-				write_cdr_col_data($relation_col_model_key,$cdr,
-					{ direction => $dir, provider => $provider, relation => 'profile_package_id' },
-					$cdr->{$dir.'_'.$provider."_profile_package_id"});
-
-				write_cdr_col_data($relation_col_model_key,$cdr,
-					{ direction => $dir, provider => $provider, relation => 'contract_balance_id' },
-					$cdr->{$dir.'_'.$provider."_contract_balance_id"});
+			my $dup_cdr_id = $dupdbh->{'mysql_insertid'};
+			if ($dup_cdr_id) {
+				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
+				write_cdr_cols($cdr,$dup_cdr_id,
+					$dup_cash_balance_col_model_key,
+					$dup_time_balance_col_model_key,
+					$dup_relation_col_model_key);
+			} else {
+				FATAL "cdr ID $cdr->{id} and col data could not be duplicated";
 			}
 		}
 	} else {
@@ -1722,6 +1740,38 @@ sub update_cdr {
 	}
 
 	return 1;
+
+}
+
+sub write_cdr_cols {
+
+	my $cdr = shift;
+	my $cdr_id = shift;
+	my $cash_balance_col_model_key = shift;
+	my $time_balance_col_model_key = shift;
+	my $relation_col_model_key = shift;
+
+	foreach my $dir (('source', 'destination')) {
+		foreach my $provider (('carrier','reseller','customer')) {
+			write_cdr_col_data($cash_balance_col_model_key,$cdr,$cdr_id,
+				{ direction => $dir, provider => $provider, cash_balance => 'cash_balance' },
+				$cdr->{$dir.'_'.$provider."_cash_balance_before"},
+				$cdr->{$dir.'_'.$provider."_cash_balance_after"});
+
+			write_cdr_col_data($time_balance_col_model_key,$cdr,$cdr_id,
+				{ direction => $dir, provider => $provider, time_balance => 'free_time_balance' },
+				$cdr->{$dir.'_'.$provider."_free_time_balance_before"},
+				$cdr->{$dir.'_'.$provider."_free_time_balance_after"});
+
+			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
+				{ direction => $dir, provider => $provider, relation => 'profile_package_id' },
+				$cdr->{$dir.'_'.$provider."_profile_package_id"});
+
+			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
+				{ direction => $dir, provider => $provider, relation => 'contract_balance_id' },
+				$cdr->{$dir.'_'.$provider."_contract_balance_id"});
+		}
+	}
 
 }
 
@@ -2073,8 +2123,9 @@ sub drop_prepaid_cost {
 
 }
 
-sub prepare_cdr_col_models {
+sub prepare_cdr_col_model {
 
+	my $dbh = shift;
 	my $col_model_key = shift;
 	#print "prepare: $col_model_key\n";
 	my $model_description = shift;
@@ -2092,15 +2143,15 @@ sub prepare_cdr_col_models {
 		my $stmt = $col_dimension_stmt_map->{$dimension}->{sql};
 		my $description = $col_dimension_stmt_map->{$dimension}->{description};
 		my $get_col = { description => $description, };
-		$get_col->{sth} = $acctdbh->prepare($stmt)
-			or FATAL "Error preparing $description statement: ".$acctdbh->errstr;
+		$get_col->{sth} = $dbh->prepare($stmt)
+			or FATAL "Error preparing $description statement: ".$dbh->errstr;
 		$col_dimension_map{$dimension} = $get_col;
 	}
 	$model->{dimension_sths} = \%col_dimension_map;
 
 	$model->{write_sth} = { description => $write_stmt->{description}, };
-	$model->{write_sth}->{sth} = $acctdbh->prepare($write_stmt->{sql})
-		or FATAL "Error preparing ".$write_stmt->{description}." statement: ".$acctdbh->errstr;
+	$model->{write_sth}->{sth} = $dbh->prepare($write_stmt->{sql})
+		or FATAL "Error preparing ".$write_stmt->{description}." statement: ".$dbh->errstr;
 
 }
 
@@ -2128,11 +2179,12 @@ sub write_cdr_col_data {
 
 	my $col_model_key = shift;
 	my $cdr = shift;
+	my $cdr_id = shift;
 	my $lookup = shift;
 	my @vals = @_;
 	FATAL "unknown column model key $col_model_key" unless exists $cdr_col_models{$col_model_key};
 	my $model = $cdr_col_models{$col_model_key};
-	my @bind_parms = ($cdr->{id},$cdr->{start_time});
+	my @bind_parms = ($cdr_id,$cdr->{start_time});
 	my $virtual_col_name = '';
 	foreach my $dimension (@{$model->{dimensions}}) {
 		my $dimension_value = $lookup->{$dimension};
@@ -2150,7 +2202,7 @@ sub write_cdr_col_data {
 	}
 
 	if ((scalar @vals) == 0 || (scalar grep { defined $_ } @vals) == 0) {
-        DEBUG "empty '$virtual_col_name' col data for cdr id ".$cdr->{id}.', skipping';
+        DEBUG "empty '$virtual_col_name' col data for cdr id ".$cdr_id.', skipping';
 		return 0;
     } else {
 		push(@bind_parms,@vals);
@@ -2163,11 +2215,11 @@ sub write_cdr_col_data {
 		$model->{write_sth}->{description}
 		."statement: ".$sth->errstr;
 	if ($sth->rows == 1) {
-		DEBUG 'col data created or up to date for cdr id '.$cdr->{id}.", column '$virtual_col_name': ".join(', ',@vals);
+		DEBUG 'col data created or up to date for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	} elsif ($sth->rows > 1) {
-		DEBUG 'col data updated for cdr id '.$cdr->{id}.", column '$virtual_col_name': ".join(', ',@vals);
+		DEBUG 'col data updated for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	#} else {
-	#	DEBUG 'no col data written for cdr id '.$cdr->{id}.", column '$virtual_col_name': ".join(', ',@vals);
+	#	DEBUG 'no col data written for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	}
 	return $sth->rows;
 
