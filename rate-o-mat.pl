@@ -410,13 +410,13 @@ sub init_db {
 	) or FATAL "Error preparing get last contract balance statement: ".$billdbh->errstr;
 
 	$sth_get_first_cbalance = $billdbh->prepare(
-		"SELECT UNIX_TIMESTAMP(start) ".
+		"SELECT UNIX_TIMESTAMP(start),UNIX_TIMESTAMP(end) ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? ".
 		"ORDER BY start ASC LIMIT 1"
 	) or FATAL "Error preparing get first contract balance statement: ".$billdbh->errstr;
 	$sth_get_last_topup_cbalance = $billdbh->prepare(
-		"SELECT UNIX_TIMESTAMP(start) ".
+		"SELECT UNIX_TIMESTAMP(start),UNIX_TIMESTAMP(end) ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
 		"topup_count > 0 ".
@@ -1070,21 +1070,26 @@ sub get_notopup_expiration {
 	my $sth;
 	my $notopup_expiration = undef;
 	my $last_topup_start_time;
+	my $last_topup_end_time;
 	if ($notopup_discard_intervals) { #get notopup_expiration:
 		if (defined $last_start_time) {
 			$last_topup_start_time = $last_start_time;
 		} else {
 			$sth = $sth_get_last_topup_cbalance;
 			$sth->execute($contract_id) or FATAL "Error executing get latest contract balance statement: ".$sth->errstr;
-			($last_topup_start_time) = $sth->fetchrow_array();
+			($last_topup_start_time,$last_topup_end_time) = $sth->fetchrow_array();
 			$sth->finish;
 			if (!$last_topup_start_time) {
 				$sth = $sth_get_first_cbalance;
 				$sth->execute($contract_id) or FATAL "Error executing get first contract balance statement: ".$sth->errstr;
-				($last_topup_start_time) = $sth->fetchrow_array();
+				($last_topup_start_time,$last_topup_end_time) = $sth->fetchrow_array();
 				$sth->finish;
 			}
-			$notopup_discard_intervals += 1;
+			if ($last_topup_start_time) {
+				if (!is_infinite_unix($last_topup_end_time)) {
+                    $last_topup_start_time = $last_topup_end_time + 1;
+                }
+			}
 		}
 		if ($last_topup_start_time) {
 			$notopup_expiration = add_interval($interval_unit, $notopup_discard_intervals,
