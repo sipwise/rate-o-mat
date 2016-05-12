@@ -105,14 +105,14 @@ foreach my $start_mode ('create','1st') {
 				stop => Utils::Api::datetime_to_string($begin->add(days => $interval_days)->clone->subtract(seconds => 1)),
 				}; } 1..4;
 			if ('carry_over' eq $carry_over_mode) {
-				if (not Utils::Api::check_interval_history($label . ' no topup: ',$caller_notopup->{customer}->{id},[
+				Utils::Api::check_interval_history($label . ' no topup: ',$caller_notopup->{customer}->{id},[
 					set_cash($intervals[0],$amount - $costs),
 					set_cash($intervals[1],$amount - $costs),
-					set_cash($intervals[2],0),
+					set_cash($intervals[2],$amount - $costs), #0),
 					set_cash($intervals[3],0),
-				]) ){
-				print "FAIL due to bug";
-				}
+				]);
+				#print "FAIL due to bug";
+				#}
 				Utils::Api::check_interval_history($label . ' topup: ',$caller_topup->{customer}->{id},[
 					set_cash($intervals[0],2*$amount - $costs),
 					set_cash($intervals[1],2*$amount - $costs),
