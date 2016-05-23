@@ -1,3 +1,19 @@
+ngcp-rate-o-mat (1.18.0.0+0~mr4.5.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [698ee37] MT#18815 remove templates
+
+  [ Rene Krenn ]
+  * [19382e5] MT#17795 populate balance before/after etc.
+  * [62923a6] MT#17795 avoid 'use of uninitialized ..' warnings for $ENV vars
+  * [02db7c6] MT#17657 txns not rolled back when retrying due to non-dbh errors
+  * [9d49424] MT#17795 duplicate created cdr_*_data table records
+  * [9f9dc0b] MT#19015 correctly use notopup_interval for periodic balance intervals
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 23 May 2016 19:00:56 +0200
+
 ngcp-rate-o-mat (1.17.0.0+0~mr4.4.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
