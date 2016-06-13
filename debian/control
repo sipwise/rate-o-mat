@@ -9,12 +9,12 @@ Homepage: http://sipwise.com/
 
 Package: ngcp-rate-o-mat
 Architecture: all
-Depends: libdbd-mysql-perl,
-         libexception-class-perl,
-         libnetaddr-ip-perl,
-         perl-modules,
-         ${misc:Depends},
-         ${shlibs:Depends}
+Depends:
+ libdbd-mysql-perl,
+ libexception-class-perl,
+ libnetaddr-ip-perl,
+ ${perl:Depends},
+ ${misc:Depends},
 Conflicts: ngcp-ossbss-billing (<= 3)
 Description: Rating daemon for the NGCP
  Perl daemon to rate CDRs in an NGCP.
