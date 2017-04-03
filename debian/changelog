@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (5.2.1.1+0~mr5.2.1.1) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [4e0e3df] TT#13416 Add lsb-base to ngcp-rate-o-mat to fix lintian error
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 03 Apr 2017 14:34:21 +0200
+
 ngcp-rate-o-mat (5.2.1.0+0~mr5.2.1.0) unstable; urgency=medium
 
   * New release.
