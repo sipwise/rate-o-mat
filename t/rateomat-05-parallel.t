@@ -57,7 +57,7 @@ use Test::More;
     my $number_of_calls = ($number_of_providers * $number_of_subscribers_per_provider) * ($number_of_providers * $number_of_subscribers_per_provider - 1);
     $ENV{RATEOMAT_BATCH_SIZE} = $number_of_calls; # ensure all rateomats grab all cdrs at once
 
-    $ENV{RATEOMAT_SHUFFLE_BATCH} = 1; # enable and see the speedup
+    $ENV{RATEOMAT_PARALLEL} = 1; # enable and see the speedup
 
     if (ok((scalar @cdr_ids) == $number_of_calls,'there are '.$number_of_calls.' calls to rate')
         && ok(Utils::Rateomat::run_rateomat_threads($number_of_rateomat_threads, $rateomat_timeout),'rate-o-mat threads executed')) {
