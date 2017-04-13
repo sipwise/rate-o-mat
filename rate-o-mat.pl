@@ -51,6 +51,8 @@ my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMA
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
+my $prevent_provider_contract_locks = 1;
+
 # terminate if the same cdr fails $failed_cdr_max_retries + 1 times:
 my $failed_cdr_max_retries = ((defined $ENV{RATEOMAT_MAX_RETRIES} && $ENV{RATEOMAT_MAX_RETRIES} >= 0) ? int $ENV{RATEOMAT_MAX_RETRIES} : 2);
 my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOMAT_RETRY_DELAY} >= 0) ? int $ENV{RATEOMAT_RETRY_DELAY} : 30);
@@ -119,6 +121,7 @@ my $sth_billing_info_v6;
 my $sth_billing_info_panel;
 my $sth_profile_info;
 my $sth_offpeak_weekdays;
+my $sth_has_nonzero_fees;
 my $sth_offpeak_special;
 my $sth_unrated_cdrs;
 my $sth_update_cdr;
@@ -514,6 +517,14 @@ EOS
 		"LIMIT 1"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
+	$sth_has_nonzero_fees = $billdbh->prepare(
+		"SELECT count(cnt.id) FROM (SELECT id ".
+		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
+		"AND bf_id IS NOT NULL AND type = ? ".
+		"AND (onpeak_init_rate > 0 OR onpeak_follow_rate > 0 ".
+		"AND offpeak_init_rate > 0 OR offpeak_follow_rate > 0) LIMIT 1) AS cnt"
+	) or FATAL "Error preparing non-zero fee count statement: ".$billdbh->errstr;
+
 	$sth_offpeak_weekdays = $billdbh->prepare( # TODO: optimize lines 4 and 10 below
 		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
 		"FROM billing.billing_peaktime_weekdays ".
@@ -819,7 +830,9 @@ sub lock_contracts {
 		$sth->execute(@pcids)
 		 	 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
 		while (my @res = $sth->fetchrow_array) {
-			$lock_cids{$res[0]} = 1;
+			if (has_nonzero_fees($res[0],undef,undef)) {
+				$lock_cids{$res[0]} = 1;
+			}
 		}
 		$sth->finish;
 	}
@@ -853,7 +866,7 @@ sub lock_contracts {
 		$sth->execute(@cids)
 		     or FATAL "Error executing contract row lock statement: ".$sth->errstr;
 		$sth->finish;
-		DEBUG "$lock_count contract(s) locked: ".join(', ',@cids);
+		DEBUG sub { "$lock_count contract(s) locked: ".join(', ',@cids) };
 	}
 
 	return $lock_count;
@@ -953,7 +966,7 @@ sub set_subscriber_first_int_attribute_value {
 					if ($old_value != $new_value) {
                         WARNING "'$attribute' usr preference value ID $val_id should be '$new_value' instead of '$old_value'";
                     } else {
-						DEBUG "'$attribute' usr preference value ID $val_id value '$new_value' is correct";
+						DEBUG sub { "'$attribute' usr preference value ID $val_id value '$new_value' is correct" };
 					}
 				} else {
 					if ($new_value == 0) {
@@ -961,13 +974,13 @@ sub set_subscriber_first_int_attribute_value {
 						$sth->execute($val_id)
 							or FATAL "Error executing delete '$attribute' usr preference value statement: ".$sth->errstr;
 						$changed++;
-						DEBUG "'$attribute' usr preference value ID $val_id with value '$old_value' deleted";
+						DEBUG sub { "'$attribute' usr preference value ID $val_id with value '$old_value' deleted" };
 					} else {
 						$sth = $sth_update_usr_preference_value;
 						$sth->execute($new_value,$val_id)
 							or FATAL "Error executing update usr preference value statement: ".$sth->errstr;
 						$changed++;
-						DEBUG "'$attribute' usr preference value ID $val_id updated from old value '$old_value' to new value '$new_value'";
+						DEBUG sub { "'$attribute' usr preference value ID $val_id updated from old value '$old_value' to new value '$new_value'" };
 					}
 				}
 			} elsif ($new_value > 0) {
@@ -978,10 +991,10 @@ sub set_subscriber_first_int_attribute_value {
 					$sth->execute($prov_subs_id,$attr_id,$new_value)
 						or FATAL "Error executing create usr preference value statement: ".$sth->errstr;
 					$changed++;
-					DEBUG "'$attribute' usr preference value ID ".$provdbh->{'mysql_insertid'}." with value '$new_value' created";
+					DEBUG sub { "'$attribute' usr preference value ID ".$provdbh->{'mysql_insertid'}." with value '$new_value' created" };
 				}
 			} else {
-				DEBUG "'$attribute' usr preference value does not exists and no value is to be set";
+				DEBUG sub { "'$attribute' usr preference value does not exists and no value is to be set" };
 			}
 			$sth->finish if $sth;
 		}
@@ -1033,7 +1046,7 @@ sub add_profile_mappings {
 	while (my @res = $sth_get_package_profile_sets->fetchrow_array) {
 		($profile_id,$network_id) = @res;
 		if ($readonly) {
-            DEBUG "Adding profile mappings skipped";
+            DEBUG sub { "Adding profile mappings skipped" };
         } else {
 			unless (defined $profile) {
 				$profile = {};
@@ -1048,7 +1061,7 @@ sub add_profile_mappings {
 	}
 	$sth_get_package_profile_sets->finish;
 	if ($update_prepaid_preference && $mappings_added > 0) {
-		DEBUG "$mappings_added '$profiles' profile mappings added";
+		DEBUG sub { "$mappings_added '$profiles' profile mappings added" };
 		get_billing_info($now, $contract_id, undef, $profile) or
 			FATAL "Error getting billing info for date '".$now."' and contract_id $contract_id\n";
 		switch_prepaid($contract_id,$profile->{prepaid},$readonly);
@@ -1128,7 +1141,7 @@ sub catchup_contract_balance {
 	my $contract_id = shift;
 	my $r_package_info = shift;
 
-	DEBUG "catching up contract ID $contract_id balance rows";
+	DEBUG sub { "catching up contract ID $contract_id balance rows" };
 
 	my $sth = $sth_get_contract_info;
 	$sth->execute($contract_id) or FATAL "Error executing get info statement: ".$sth->errstr;
@@ -1236,7 +1249,7 @@ PREPARE_BALANCE_CATCHUP:
 			#free time corrections can take place here once..
 			#$last_profile->{int_free_time} ...
 		} else {
-			DEBUG "discarding cash balance (mode '$carry_over_mode'".($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")";
+			DEBUG sub { "discarding cash balance (mode '$carry_over_mode'".($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")" };
 		}
 		$ratio = 1.0;
 		$free_cash = $ratio * ($profile->{int_free_cash} // 0.0); #backward-defaults
@@ -1249,7 +1262,7 @@ PREPARE_BALANCE_CATCHUP:
 
 		if (!$underrun_lock_applied && defined $underrun_lock_threshold && $last_cash_balance >= $underrun_lock_threshold && $cash_balance < $underrun_lock_threshold) {
 			$underrun_lock_applied = 1;
-			DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold";
+			DEBUG sub { "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold" };
 			if (defined $underrun_lock_level) {
 				set_subscriber_lock_level($contract_id,$underrun_lock_level,0);
 				$underrun_lock_time = $now;
@@ -1258,7 +1271,7 @@ PREPARE_BALANCE_CATCHUP:
 
 		if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && $cash_balance < $underrun_profile_threshold) {
 			$underrun_profiles_applied = 1;
-			DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold";
+			DEBUG sub { "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold" };
 			if (add_profile_mappings($contract_id,$stime,$package_id,'underrun',0) > 0) {
 				$underrun_profiles_time = $now;
 				goto PREPARE_BALANCE_CATCHUP;
@@ -1315,8 +1328,8 @@ PREPARE_BALANCE_CATCHUP:
 		$timely_end = get_timely_end($last_start,$interval_value,$interval_unit,$carry_over_mode,$package_id);
 		if ((defined $notopup_expiration && $call_start_time >= $notopup_expiration)
 			|| (defined $timely_end && $call_start_time > $timely_end)) {
-			DEBUG "discarding cash balance (mode '$carry_over_mode'".($timely_end ? ", timely end " . $timely_end : "").
-				($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")";
+			DEBUG sub { "discarding cash balance (mode '$carry_over_mode'".($timely_end ? ", timely end " . $timely_end : "").
+				($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")" };
 			$bal = {
 				id => $last_id,
 				cash_balance => 0,
@@ -1328,7 +1341,7 @@ PREPARE_BALANCE_CATCHUP:
 			};
 			if (!$underrun_lock_applied && defined $underrun_lock_threshold && $last_cash_balance >= $underrun_lock_threshold && 0.0 < $underrun_lock_threshold) {
 				$underrun_lock_applied = 1;
-				DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold";
+				DEBUG sub { "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold" };
 				if (defined $underrun_lock_level) {
 					set_subscriber_lock_level($contract_id,$underrun_lock_level,0);
 					$bal->{underrun_lock_time} = $now;
@@ -1337,7 +1350,7 @@ PREPARE_BALANCE_CATCHUP:
 
 			if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && 0.0 < $underrun_profile_threshold) {
 				$underrun_profiles_applied = 1;
-				DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold";
+				DEBUG sub { "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold" };
 				if (add_profile_mappings($contract_id,$call_start_time,$package_id,'underrun',0) > 0) {
 					$underrun_profiles_time = $now;
 					$bal->{underrun_profile_time} = $now;
@@ -1355,7 +1368,7 @@ PREPARE_BALANCE_CATCHUP:
 	$r_package_info->{underrun_lock_applied} = $underrun_lock_applied;
 	$r_package_info->{underrun_profiles_applied} = $underrun_profiles_applied;
 
-	DEBUG "$balances_count contract balance rows created";
+	DEBUG sub { "$balances_count contract balance rows created" };
 
 	return $balances_count;
 
@@ -1490,7 +1503,7 @@ sub get_billing_info {
 	$r_info->{int_unit} = $res[7];
 	$r_info->{int_count} = $res[8];
 
-	DEBUG "contract ID $contract_id billing mapping ($r_info->{class}) is profile id $r_info->{profile_id} for time $start from $label";
+	DEBUG sub { "contract ID $contract_id billing mapping ($r_info->{class}) is profile id $r_info->{profile_id} for time $start from $label" };
 
 	$sth->finish;
 
@@ -1553,6 +1566,40 @@ sub get_profile_info {
 	$sth->finish;
 
 	return 1;
+}
+
+sub has_nonzero_fees {
+
+    my $contract_id = shift;
+	my $bpid = shift;
+	my $type = shift;
+
+	my $res;
+	if ($prevent_provider_contract_locks) {
+		$res = 1; #make the mechanism inactive
+	} elsif (not defined $contract_id) {
+		$res = 1; #transparent for this error
+	} elsif (not exists $provider_fee_counts->{$contract_id}) {
+	    if (defined $bpid and defined $type) {
+			$sth_has_nonzero_fees->execute($bpid, $type)
+				or FATAL "Error executing non-zero fee count statement: ".$sth_has_nonzero_fees->errstr;
+			($res) = $sth_has_nonzero_fees->fetchrow_array();
+			$provider_fee_counts->{$contract_id} = $res;
+			if ($res) {
+				DEBUG sub { "non-zero fees found for provider contract ID $contract_id" };
+			}
+		} else {
+			#assume there are non-zero fees, so a full
+			#rating cylcle including balance catchup will
+			#be performed the very first time.
+			$res = 1;
+		}
+	} else {
+		$res = $provider_fee_counts->{$contract_id};
+	}
+
+	return $res;
+
 }
 
 sub get_offpeak_weekdays {
@@ -1720,7 +1767,7 @@ sub update_cdr {
 		or FATAL "Error executing update cdr statement: ".$sth->errstr;
 
 	if ($sth->rows > 0) {
-		DEBUG "cdr ID $cdr->{id} updated";
+		DEBUG sub { "cdr ID $cdr->{id} updated" };
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
@@ -1730,7 +1777,7 @@ sub update_cdr {
 			or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
 			my $dup_cdr_id = $dupdbh->{'mysql_insertid'};
 			if ($dup_cdr_id) {
-				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
+				DEBUG sub { "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id" };
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
@@ -1802,13 +1849,13 @@ sub get_call_cost {
 	my $dst_user = $cdr->{destination_user_in};
 	my $dst_user_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 
-	DEBUG "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
-		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain";
+	DEBUG sub { "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
+		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain" };
 
 	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain,
 		$r_profile_info, $cdr->{start_time})) {
-		DEBUG "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
-			"src_user_domain $src_user, dst_user_domain $dst_user";
+		DEBUG sub { "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
+			"src_user_domain $src_user, dst_user_domain $dst_user" };
 		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user,
 			$r_profile_info, $cdr->{start_time})) {
 			# we gracefully ignore missing profile infos for inbound direction
@@ -1866,7 +1913,7 @@ sub get_call_cost {
 	}
 
 	while ($duration > 0) {
-		DEBUG "try to rate remaining duration of $duration secs";
+		DEBUG sub { "try to rate remaining duration of $duration secs" };
 
 		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special)) {
 			#print "offset $offset is offpeak-special\n";
@@ -1885,7 +1932,7 @@ sub get_call_cost {
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ?
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
-			DEBUG "add init rate $rate per sec to costs";
+			DEBUG sub { "add init rate $rate per sec to costs" };
 		} else {
 			last if $split_peak_parts and defined($$r_onpeak) and $$r_onpeak != $onpeak
                                 and !defined $cdr->{rating_duration};
@@ -1894,26 +1941,29 @@ sub get_call_cost {
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
 			$rate = $onpeak == 1 ?
 				$r_profile_info->{on_follow_rate} : $r_profile_info->{off_follow_rate};
-			DEBUG "add follow rate $rate per sec to costs";
+			DEBUG sub { "add follow rate $rate per sec to costs" };
 		}
 		$$r_onpeak = $onpeak;
 		$rate *= $interval;
-		DEBUG "interval is $interval, so rate for this interval is $rate";
+		DEBUG sub { "interval is $interval, so rate for this interval is $rate" };
 
 		#my @bals = grep {($_->{start_unix} + $offset) <= $cdr->{start_time}} @$r_balances;
 		my $current_call_time = int($cdr->{start_time} + $offset);
-		my @bals = grep {
-			$_->{start_unix} <= $current_call_time &&
-			($current_call_time <= $_->{end_unix} || is_infinite_unix($_->{end_unix}))
-		} @$r_balances;
-		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
-		WARNING "overlapping contract balances for CDR $cdr->{id} found: ".(Dumper \@bals) if (scalar @bals) > 1;
-		foreach my $bal (@bals) {
-			delete $bal_map{$bal->{id}};
+		my $bal;
+		if ((scalar @$r_balances) > 0) {
+			my @bals = grep {
+				$_->{start_unix} <= $current_call_time &&
+				($current_call_time <= $_->{end_unix} || is_infinite_unix($_->{end_unix}))
+			} @$r_balances;
+			@bals or FATAL "No contract balance for CDR $cdr->{id} found";
+			WARNING "overlapping contract balances for CDR $cdr->{id} found: ".(Dumper \@bals) if (scalar @bals) > 1;
+			foreach my $bal (@bals) {
+				delete $bal_map{$bal->{id}};
+			}
+			@bals = @{ sort_contract_balances(\@bals) };
+			$bal = $bals[0];
+			$last_bal = $bal;
 		}
-		@bals = @{ sort_contract_balances(\@bals) };
-		my $bal = $bals[0];
-		$last_bal = $bal;
 
 		if (defined $prev_bal_id) {
 			if ($bal->{id} != $prev_bal_id) { #contract balance transition
@@ -1927,17 +1977,17 @@ sub get_call_cost {
 						$cash_balance_rate_sum += $cash_balance_rate;
 					}
 				}
-				DEBUG "carry over costs - rates of $cash_balance_rate_sum so far were subtracted from cash balance $prev_cash_balance";
+				DEBUG sub { "carry over costs - rates of $cash_balance_rate_sum so far were subtracted from cash balance $prev_cash_balance" };
 				$prev_bal_id = $bal->{id};
 			}
-		} else {
+		} elsif (defined $bal) {
 			DEBUG sub { "starting with contract balance: ".(Dumper $bal) };
 			$prev_bal_id = $bal->{id};
 			$prev_cash_balance = $bal->{cash_balance};
 		}
 
-		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} >= $interval) {
-			DEBUG "subtracting $interval sec from free_time_balance $$bal{free_time_balance} and skip costs for this interval";
+		if (defined $bal && $r_profile_info->{use_free_time} && $bal->{free_time_balance} >= $interval) {
+			DEBUG sub { "subtracting $interval sec from free_time_balance $$bal{free_time_balance} and skip costs for this interval" };
 			$$r_rating_duration += $interval;
 			$duration -= $interval;
 			$bal->{free_time_balance} -= $interval;
@@ -1946,8 +1996,8 @@ sub get_call_cost {
 			next;
 		}
 
-		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} > 0) {
-			DEBUG "using $$bal{free_time_balance} sec free time for this interval and calculate cost for remaining interval chunk";
+		if (defined $bal && $r_profile_info->{use_free_time} && $bal->{free_time_balance} > 0) {
+			DEBUG sub { "using $$bal{free_time_balance} sec free time for this interval and calculate cost for remaining interval chunk" };
 			$$r_free_time += $bal->{free_time_balance};
 			$$r_rating_duration += $bal->{free_time_balance};
 			$duration -= $bal->{free_time_balance};
@@ -1955,17 +2005,17 @@ sub get_call_cost {
 			$rate *= 1.0 - ($bal->{free_time_balance} / $interval);
 			$interval -= $bal->{free_time_balance};
 			$bal->{free_time_balance} = 0;
-			DEBUG "calculate cost for remaining interval chunk $interval";
+			DEBUG sub { "calculate cost for remaining interval chunk $interval" };
 		}
 
-		if ($rate <= $bal->{cash_balance}) {
-			DEBUG "we still have cash balance $$bal{cash_balance} left, subtract rate $rate from that";
+		if (defined $bal && $rate <= $bal->{cash_balance}) {
+			DEBUG sub { "we still have cash balance $$bal{cash_balance} left, subtract rate $rate from that" };
 			$bal->{cash_balance} -= $rate;
 			push(@cash_balance_rates,$rate);
 		} else {
-			DEBUG "add current interval cost $rate to total cost $$r_cost";
+			DEBUG sub { "add current interval cost $rate to total cost $$r_cost" };
 			$$r_cost += $rate;
-			$bal->{cash_balance_interval} += $rate;
+			$bal->{cash_balance_interval} += $rate if defined $bal;
 		}
 
 		$$r_real_cost += $rate;
@@ -1989,7 +2039,7 @@ sub get_call_cost {
 					$cash_balance_rate_sum += $cash_balance_rate;
 				}
 			}
-			DEBUG "carry over costs - rates of $cash_balance_rate_sum so far were subtracted from cash balance $prev_cash_balance";
+			DEBUG sub { "carry over costs - rates of $cash_balance_rate_sum so far were subtracted from cash balance $prev_cash_balance" };
 		}
 	}
 
@@ -1997,7 +2047,7 @@ sub get_call_cost {
 		my $now = time;
 		if (!$underrun_lock_applied && defined $r_package_info->{underrun_lock_threshold} && $prev_cash_balance >= $r_package_info->{underrun_lock_threshold} && $last_bal->{cash_balance} < $r_package_info->{underrun_lock_threshold}) {
 			$underrun_lock_applied = 1;
-			DEBUG "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun lock threshold $r_package_info->{underrun_lock_threshold}";
+			DEBUG sub { "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun lock threshold $r_package_info->{underrun_lock_threshold}" };
 			if (defined $r_package_info->{underrun_lock_level}) {
 				set_subscriber_lock_level($contract_id,$r_package_info->{underrun_lock_level},$readonly);
 				$last_bal->{underrun_lock_time} = $now;
@@ -2006,7 +2056,7 @@ sub get_call_cost {
 
 		if (!$underrun_profiles_applied && defined $r_package_info->{underrun_profile_threshold} && $prev_cash_balance >= $r_package_info->{underrun_profile_threshold} && $last_bal->{cash_balance} < $r_package_info->{underrun_profile_threshold}) {
 			$underrun_profiles_applied = 1;
-			DEBUG "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun profile threshold $r_package_info->{underrun_profile_threshold}";
+			DEBUG sub { "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun profile threshold $r_package_info->{underrun_profile_threshold}" };
 			if (add_profile_mappings($contract_id,$cdr->{start_time} + $cdr->{duration},$r_package_info->{id},'underrun',$readonly) > 0) {
 				$last_bal->{underrun_profile_time} = $now;
 			}
@@ -2067,7 +2117,7 @@ sub get_snapshot_contract_balance {
 sub populate_prepaid_cost_cache {
 
 	if (!defined $prepaid_costs_cache) {
-		DEBUG "empty prepaid_costs cache, populate it";
+		DEBUG sub { "empty prepaid_costs cache, populate it" };
 		$sth_prepaid_costs_count->execute()
 			or FATAL "Error executing get prepaid costs count statement: ".$sth_prepaid_costs_count->errstr;
 		my ($count) = $sth_prepaid_costs_count->fetchrow_array();
@@ -2080,7 +2130,7 @@ sub populate_prepaid_cost_cache {
 			return 1;
 		}
 	} else {
-		DEBUG "prepaid_costs cache already populated";
+		DEBUG sub { "prepaid_costs cache already populated" };
 	}
 	return 0;
 
@@ -2098,7 +2148,7 @@ sub get_prepaid_cost {
 	my $entry = undef;
 	if (defined $prepaid_costs_cache) {
 		if (exists($prepaid_costs_cache->{$cdr->{call_id}})) {
-			DEBUG "prepaid cost record for call ID $cdr->{call_id} found in cache";
+			DEBUG sub { "prepaid cost record for call ID $cdr->{call_id} found in cache" };
 			$entry = $prepaid_costs_cache->{$cdr->{call_id}};
 		}
 	} else {
@@ -2106,7 +2156,7 @@ sub get_prepaid_cost {
 			or FATAL "Error executing get prepaid cost statement: ".$sth_prepaid_cost->errstr;
 		my $prepaid_cost = $sth_prepaid_cost->fetchall_hashref('call_id');
 		if ($prepaid_cost && exists($prepaid_cost->{$cdr->{call_id}})) {
-            DEBUG "prepaid cost record for call ID $cdr->{call_id} fetched";
+            DEBUG sub { "prepaid cost record for call ID $cdr->{call_id} fetched" };
 			$entry = $prepaid_cost->{$cdr->{call_id}};
         }
 	}
@@ -2121,7 +2171,7 @@ sub drop_prepaid_cost {
 		or FATAL "Error executing delete prepaid cost statement: ".$sth_delete_prepaid_cost->errstr;
 	if (defined $prepaid_costs_cache) {
 		if (delete($prepaid_costs_cache->{$entry->{call_id}})) {
-			DEBUG "dropped prepaid cost record for call ID $entry->{call_id}";
+			DEBUG sub { "dropped prepaid cost record for call ID $entry->{call_id}" };
 		}
 	}
 	return $sth_delete_prepaid_cost->rows;
@@ -2211,7 +2261,7 @@ sub write_cdr_col_data {
 	}
 
 	if ((scalar @vals) == 0 || (scalar grep { defined $_ } @vals) == 0) {
-        DEBUG "empty '$virtual_col_name' ".$model->{description_prefix}." col data for cdr id ".$cdr_id.', skipping';
+        DEBUG sub { "empty '$virtual_col_name' ".$model->{description_prefix}." col data for cdr id ".$cdr_id.', skipping' };
 		return 0;
     } else {
 		push(@bind_parms,@vals);
@@ -2271,7 +2321,7 @@ sub get_customer_call_cost {
 
 	unless($billing_info{profile_id}) {
 		$$r_rating_duration = $cdr->{duration};
-		DEBUG "no billing info for ".$dir."customer contract ID $contract_id, skip";
+		DEBUG sub { "no billing info for ".$dir."customer contract ID $contract_id, skip" };
 		return -1;
 	}
 
@@ -2279,7 +2329,7 @@ sub get_customer_call_cost {
 	my $outgoing_prepaid = ($prepaid == 1 && $direction eq "out");
 	my $prepaid_cost_entry = undef;
 	if ($outgoing_prepaid) {
-		DEBUG "billing profile is prepaid";
+		DEBUG sub { "billing profile is prepaid" };
 		populate_prepaid_cost_cache();
 		$prepaid_cost_entry = get_prepaid_cost($cdr);
 	}
@@ -2291,7 +2341,7 @@ sub get_customer_call_cost {
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting ".$dir."customer call cost\n";
 
-	DEBUG "got call cost $$r_cost and free time $$r_free_time";
+	DEBUG sub { "got call cost $$r_cost and free time $$r_free_time" };
 
 	my $snapshot_bal = get_snapshot_contract_balance(\@balances);
 	$cdr->{$dir."customer_cash_balance_before"} = $snapshot_bal->{cash_balance_old};
@@ -2330,10 +2380,10 @@ sub get_customer_call_cost {
 	} else { #postpaid in, postpaid out, prepaid in
 		# we don't do prepaid for termination fees for now, so treat it as post-paid
 		if($prepaid == 1 && $direction eq "in") { #prepaid in
-			DEBUG "treat pre-paid billing profile as post-paid for termination fees";
+			DEBUG sub { "treat pre-paid billing profile as post-paid for termination fees" };
 			$$r_cost = $real_cost;
 		} else { #postpaid in, postpaid out
-			DEBUG "billing profile is post-paid, update contract balance";
+			DEBUG sub { "billing profile is post-paid, update contract balance" };
 		}
 		update_contract_balance(\@balances)
 			or FATAL "Error updating ".$dir."customer contract balance\n";
@@ -2341,7 +2391,7 @@ sub get_customer_call_cost {
 		$cdr->{$dir."customer_free_time_balance_after"} = $snapshot_bal->{free_time_balance};
 	}
 
-	DEBUG "cost for this call is $$r_cost";
+	DEBUG sub { "cost for this call is $$r_cost" };
 
 	return 1;
 
@@ -2370,8 +2420,15 @@ sub get_provider_call_cost {
 
 	unless($provider_info->{billing}->{profile_id}) {
 		$$r_rating_duration = $cdr->{duration};
-		DEBUG "no billing info for ".$dir."provider contract ID $contract_id, skip";
+		DEBUG sub { "no billing info for ".$dir."provider contract ID $contract_id, skip" };
 		return -1;
+	}
+	unless(has_nonzero_fees($contract_id,$provider_info->{billing}->{profile_id},$type)) {
+		#dont touch $$r_rating_duration
+		$$r_cost = 0;
+		$$r_free_time = 0;
+		DEBUG sub { "no fees or only zero fees for ".$dir."provider contract ID $contract_id, skip" };
+		return 1;
 	}
 
 	my $provider_type;
@@ -2423,6 +2480,10 @@ sub get_provider_call_cost {
 
 }
 
+sub get_update_provider_balance {
+
+}
+
 sub rate_cdr {
 
 	my $cdr = shift;
@@ -2445,7 +2506,7 @@ sub rate_cdr {
 	my @rating_durations;
 
 	unless($cdr->{call_status} eq "ok") {
-		DEBUG "cdr #$$cdr{id} has call_status $$cdr{call_status}, skip.";
+		DEBUG sub { "cdr #$$cdr{id} has call_status $$cdr{call_status}, skip." };
 		$cdr->{source_carrier_cost} = $source_carrier_cost;
 		$cdr->{source_reseller_cost} = $source_reseller_cost;
 		$cdr->{source_customer_cost} = $source_customer_cost;
@@ -2461,7 +2522,7 @@ sub rate_cdr {
 		return 1;
 	}
 
-	DEBUG "fetching source provider info for source_provider_id #$$cdr{source_provider_id}";
+	DEBUG sub { "fetching source provider info for source_provider_id #$$cdr{source_provider_id}" };
 	my %source_provider_billing_info = ();
 	my %source_provider_package_info = ();
 	my @source_provider_balances = ();
@@ -2469,8 +2530,10 @@ sub rate_cdr {
 		WARNING "Missing source_provider_id for source_user_id ".$cdr->{source_user_id}." in cdr #".$cdr->{id}."\n";
 	} else {
 		# we have to catchup balances at this point before getting the profile, since underrun profiles could get applied:
-		get_contract_balances($cdr, $cdr->{source_provider_id}, \%source_provider_package_info, \@source_provider_balances)
-			or FATAL "Error getting source provider contract ID $cdr->{source_provider_id} balances\n";
+		if (has_nonzero_fees($cdr->{source_provider_id},undef,undef)) {
+			get_contract_balances($cdr, $cdr->{source_provider_id}, \%source_provider_package_info, \@source_provider_balances)
+				or FATAL "Error getting source provider contract ID $cdr->{source_provider_id} balances\n";
+		}
 		get_billing_info($cdr->{start_time}, $cdr->{source_provider_id}, $cdr->{source_ip}, \%source_provider_billing_info)
 			or FATAL "Error getting source provider billing info for cdr #".$cdr->{id}."\n";
 	}
@@ -2485,7 +2548,7 @@ sub rate_cdr {
 	#   FATAL "Missing billing profile for source_provider_id ".$cdr->{source_provider_id}." for cdr #".$cdr->{id}."\n";
 	#}
 
-	DEBUG "fetching destination provider info for destination_provider_id #$$cdr{destination_provider_id}";
+	DEBUG sub { "fetching destination provider info for destination_provider_id #$$cdr{destination_provider_id}" };
 	my %destination_provider_billing_info = ();
 	my %destination_provider_package_info = ();
 	my @destination_provider_balances = ();
@@ -2493,8 +2556,10 @@ sub rate_cdr {
 		WARNING "Missing destination_provider_id for destination_user_id ".$cdr->{destination_user_id}." in cdr #".$cdr->{id}."\n";
 	} else {
 		# we have to catchup balances at this point before getting the profile, since underrun profiles could get applied:
-		get_contract_balances($cdr, $cdr->{destination_provider_id}, \%destination_provider_package_info, \@destination_provider_balances)
-			or FATAL "Error getting destination provider contract ID $cdr->{destination_provider_id} balances\n";
+		if (has_nonzero_fees($cdr->{destination_provider_id},undef,undef)) {
+			get_contract_balances($cdr, $cdr->{destination_provider_id}, \%destination_provider_package_info, \@destination_provider_balances)
+				or FATAL "Error getting destination provider contract ID $cdr->{destination_provider_id} balances\n";
+		}
 		get_billing_info($cdr->{start_time}, $cdr->{destination_provider_id}, $cdr->{source_ip}, \%destination_provider_billing_info)
 			or FATAL "Error getting destination provider billing info for cdr #".$cdr->{id}."\n";
 	}
@@ -2511,7 +2576,7 @@ sub rate_cdr {
 
 	# call from local subscriber
 	if($cdr->{source_user_id} ne "0") {
-		DEBUG "call from local subscriber, source_user_id is $$cdr{source_user_id}";
+		DEBUG sub { "call from local subscriber, source_user_id is $$cdr{source_user_id}" };
 		# if we have a call from local subscriber, the source provider MUST be a reseller
 		if($source_provider_billing_info{profile_id} && $source_provider_billing_info{class} ne "reseller") {
 			FATAL "The local source_user_id ".$cdr->{source_user_id}." has a source_provider_id ".$cdr->{source_provider_id}.
@@ -2519,7 +2584,7 @@ sub rate_cdr {
 		}
 
 		if($cdr->{destination_user_id} ne "0") {
-			DEBUG "call to local subscriber, destination_user_id is $$cdr{destination_user_id}";
+			DEBUG sub { "call to local subscriber, destination_user_id is $$cdr{destination_user_id}" };
 			# call to local subscriber (on-net)
 
 			# there is no carrier cost for on-net calls
@@ -2527,25 +2592,25 @@ sub rate_cdr {
 			# for calls towards a local user, termination fees might apply if
 			# we find a fee with direction "in"
 			if($destination_provider_billing_info{profile_id}) {
-				DEBUG "destination provider has billing profile $destination_provider_billing_info{profile_id}, get reseller termination cost";
+				DEBUG sub { "destination provider has billing profile $destination_provider_billing_info{profile_id}, get reseller termination cost" };
 				get_provider_call_cost($cdr, $type, "in",
 							$destination_provider_info, \$destination_reseller_cost, \$destination_reseller_free_time,
 							\$rating_durations[@rating_durations])
 					or FATAL "Error getting destination reseller cost for local destination_provider_id ".
 							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
-				DEBUG "destination reseller termination cost is $destination_reseller_cost";
+				DEBUG sub { "destination reseller termination cost is $destination_reseller_cost" };
 			} else {
 				# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
 				# in theory, all resellers MUST have a billing profile, so we could bail out here
-				DEBUG "destination provider $$cdr{destination_provider_id} has no billing profile, skip reseller termination cost";
+				DEBUG sub { "destination provider $$cdr{destination_provider_id} has no billing profile, skip reseller termination cost" };
 			}
-			DEBUG "get customer termination cost for destination_user_id $$cdr{destination_user_id}";
+			DEBUG sub { "get customer termination cost for destination_user_id $$cdr{destination_user_id}" };
 			get_customer_call_cost($cdr, $type, "in",
 						\$destination_customer_cost, \$destination_customer_free_time,
 						\$rating_durations[@rating_durations])
 				or FATAL "Error getting destination customer cost for local destination_user_id ".
 						$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
-			DEBUG "destination customer termination cost is $destination_customer_cost";
+			DEBUG sub { "destination customer termination cost is $destination_customer_cost" };
 
 		} else {
 			# we can't charge termination fees to the callee if it's not local
@@ -2634,6 +2699,9 @@ sub rate_cdr {
 		for my $rd (@rating_durations) {
 			defined($rd) and $rating_durations{$rd} = 1;
 		}
+		if (scalar(keys(%rating_durations)) > 1) {
+		print "blah";
+		}
 		scalar(keys(%rating_durations)) > 1
 			and FATAL "Error getting consistent rating fragment for cdr ".$cdr->{id}.". Rating profiles don't match.";
 		my $rating_duration = (keys(%rating_durations))[0] // $cdr->{duration};
@@ -2643,8 +2711,8 @@ sub rate_cdr {
 			$sth->execute($rating_duration, $rating_duration, $cdr->{id})
 				or FATAL "Error executing create cdr fragment statement: ".$sth->errstr;
 			if ($sth->rows > 0) {
-				DEBUG "cdr ID $cdr->{id} covers $rating_duration secs before crossing coherent onpeak/offpeak. another cdr for remaining " .
-				($cdr->{duration} - $rating_duration) . " secs of call ID $cdr->{call_id} was created";
+				DEBUG sub { "cdr ID $cdr->{id} covers $rating_duration secs before crossing coherent onpeak/offpeak. another cdr for remaining " .
+				($cdr->{duration} - $rating_duration) . " secs of call ID $cdr->{call_id} was created" };
 			} else {
 				$rollback = 1;
 				FATAL "cdr ID $cdr->{id} seems to be already processed by someone else";
@@ -2734,7 +2802,7 @@ sub main {
 
 		my $error;
 		my @cdrs = ();
-		if ($billdbh && $acctdbh && $provdbh) {
+		if ($billdbh && $acctdbh) { # && $provdbh) {
 			eval {
 				get_unrated_cdrs(\@cdrs);
 				INFO "Grabbed ".(scalar @cdrs)." CDRs" if (scalar @cdrs) > 0;
@@ -2772,7 +2840,10 @@ sub main {
 				eval {
 					$t = Time::HiRes::time() if $debug;
 					$cdr_id = $cdr->{id};
-					DEBUG "start rating CDR ID $cdr_id";
+					DEBUG sub { "start rating CDR ID $cdr_id" };
+					if ($cdr_id == 2604544 or $cdr_id == 2604476 or $cdr_id == 2604490 or $cdr_id == 2593194) {
+						print "blah";
+					}
 					# required to avoid contract_balances duplications during catchup:
 					begin_transaction($billdbh,'READ COMMITTED');
 					# row locks are released upon commit/rollback and have to cover
@@ -2882,6 +2953,7 @@ sub main {
 	$sth_billing_info_panel->finish;
 	$sth_profile_info->finish;
 	$sth_offpeak_weekdays->finish;
+	$sth_has_nonzero_fees->finish;
 	$sth_offpeak_special->finish;
 	$sth_unrated_cdrs->finish;
 	$sth_update_cdr->finish;
