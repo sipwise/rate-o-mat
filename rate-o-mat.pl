@@ -51,6 +51,14 @@ my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMA
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
+# control writing cdr relation data:
+# disable it for now until this will be limited to prepaid contracts,
+# as it produces massive amounts of zeroed or unneeded data.
+my $write_cash_balance_before_after = 0;
+my $write_free_time_balance_before_after = 0;
+my $write_profile_package_id = 0;
+my $write_contract_balance_id = 0;
+
 # terminate if the same cdr fails $failed_cdr_max_retries + 1 times:
 my $failed_cdr_max_retries = ((defined $ENV{RATEOMAT_MAX_RETRIES} && $ENV{RATEOMAT_MAX_RETRIES} >= 0) ? int $ENV{RATEOMAT_MAX_RETRIES} : 2);
 my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOMAT_RETRY_DELAY} >= 0) ? int $ENV{RATEOMAT_RETRY_DELAY} : 30);
@@ -1761,20 +1769,20 @@ sub write_cdr_cols {
 			write_cdr_col_data($cash_balance_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, cash_balance => 'cash_balance' },
 				$cdr->{$dir.'_'.$provider."_cash_balance_before"},
-				$cdr->{$dir.'_'.$provider."_cash_balance_after"});
+				$cdr->{$dir.'_'.$provider."_cash_balance_after"}) if $write_cash_balance_before_after;
 
 			write_cdr_col_data($time_balance_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, time_balance => 'free_time_balance' },
 				$cdr->{$dir.'_'.$provider."_free_time_balance_before"},
-				$cdr->{$dir.'_'.$provider."_free_time_balance_after"});
+				$cdr->{$dir.'_'.$provider."_free_time_balance_after"}) if $write_free_time_balance_before_after;
 
 			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, relation => 'profile_package_id' },
-				$cdr->{$dir.'_'.$provider."_profile_package_id"});
+				$cdr->{$dir.'_'.$provider."_profile_package_id"}) if $write_profile_package_id;
 
 			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, relation => 'contract_balance_id' },
-				$cdr->{$dir.'_'.$provider."_contract_balance_id"});
+				$cdr->{$dir.'_'.$provider."_contract_balance_id"}) if $write_contract_balance_id;
 		}
 	}
 
