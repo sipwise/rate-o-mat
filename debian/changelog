@@ -1,3 +1,16 @@
+ngcp-rate-o-mat (5.4.0.0+0~mr5.4.0.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [aac37ec] TT#13416 Add lsb-base to ngcp-rate-o-mat to fix lintian error
+
+  [ Rene Krenn ]
+  * [7cb755c] TT#8162 add source/destination_user_out cols for cdr duplication
+  * [87e0759] TT#15652 disable populating accouting.*_data
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 16 May 2017 21:43:34 +0200
+
 ngcp-rate-o-mat (5.3.0.0+0~mr5.3.0.0) unstable; urgency=medium
 
   * New release.
