@@ -16,6 +16,23 @@
       "revId": "09b9dfd7eb1ed182faeeeeba81a94a51df8e6c6e",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a106d94_e251c3d9",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2727,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2017-05-30T14:35:43Z",
+      "side": 1,
+      "message": "better poll it from the file, in the fetch loop, what you think?",
+      "revId": "09b9dfd7eb1ed182faeeeeba81a94a51df8e6c6e",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
