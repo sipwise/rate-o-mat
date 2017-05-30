@@ -68,6 +68,8 @@ my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOM
 # pause between db connect attempts:
 my $connect_interval = 3;
 
+my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
+
 # billing database
 my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
 my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
@@ -2721,6 +2723,13 @@ sub main {
 		if($fork == 1);
 
 	$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = \&signal_handler;
+
+	if ($maintenance_mode eq 'yes') {
+		while (!$shutdown) {
+			sleep(1);
+		}
+		exit(0);
+	}
 
 	init_db or FATAL "Error initializing database handlers\n";
 	my $rated = 0;
