@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (5.2.2.1+0~mr5.2.2.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [07c11ef] TT#15652 disable populating accouting.*_data
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Jun 2017 15:09:06 +0200
+
 ngcp-rate-o-mat (5.2.2.0+0~mr5.2.2.0) unstable; urgency=medium
 
   [ Alexander Lutay ]
