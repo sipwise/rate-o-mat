@@ -1,3 +1,15 @@
+ngcp-rate-o-mat (5.4.1.0+0~mr5.4.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [09b9dfd] TT#16754 implement do-nothing maintenance mode
+
+  [ Victor Seva ]
+  * [463cfbe] TT#17642 docker: follow policy to include NGCP repository
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 17 Jul 2017 22:47:14 +0200
+
 ngcp-rate-o-mat (5.4.0.0+0~mr5.4.0.0) unstable; urgency=medium
 
   [ Alexander Lutay ]
