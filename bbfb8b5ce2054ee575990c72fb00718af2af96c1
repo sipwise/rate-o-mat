@@ -94,6 +94,30 @@
       "revId": "bbfb8b5ce2054ee575990c72fb00718af2af96c1",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7adec928_4c745dfd",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2699,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2017-07-21T13:30:19Z",
+      "side": 1,
+      "message": "Rene, please +2 here if changes are fine for you.",
+      "parentUuid": "7adec928_0c6a551a",
+      "range": {
+        "startLine": 2699,
+        "startChar": 6,
+        "endLine": 2699,
+        "endChar": 12
+      },
+      "revId": "bbfb8b5ce2054ee575990c72fb00718af2af96c1",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
