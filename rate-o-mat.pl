@@ -2686,8 +2686,8 @@ sub daemonize {
 
 	chdir '/' or FATAL "Can't chdir to /: $!\n";
 	open STDIN, '<', '/dev/null' or FATAL "Can't read /dev/null: $!\n";
-	open STDOUT, "|-", "logger -s -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
-	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
+	open STDOUT, ">", "/dev/null" or FATAL "Can't open /dev/null: $!\n";
+	open STDERR, ">", "/dev/null" or FATAL "Can't open /dev/null: $!\n";
 	open $PID, ">>", "$pidfile" or FATAL "Can't open '$pidfile' for writing: $!\n";
 	flock($PID, LOCK_EX | LOCK_NB) or FATAL "Unable to lock pidfile '$pidfile': $!\n";
 	defined(my $pid = fork) or FATAL "Can't fork: $!\n";
@@ -2696,6 +2696,8 @@ sub daemonize {
 	seek $PID, 0, SEEK_SET;
 	truncate $PID, 0;
 	printflush $PID "$$\n";
+	open STDOUT, "|-", "logger -s -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
+	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
 
 }
 
