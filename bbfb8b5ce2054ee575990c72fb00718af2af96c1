@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+1: Alexander Lutay <alutay@sipwise.com>
+Code-Review+2: Rene Krenn <rkrenn@sipwise.com>
+Submitted-by: Richard Fuchs <rfuchs@sipwise.com>
+Submitted-at: Fri, 21 Jul 2017 15:36:37 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/14480
+Project: rate-o-mat
+Branch: refs/heads/master
