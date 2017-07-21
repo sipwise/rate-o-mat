@@ -70,6 +70,30 @@
       "revId": "bbfb8b5ce2054ee575990c72fb00718af2af96c1",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7adec928_0c6a551a",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2699,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2017-07-21T13:19:58Z",
+      "side": 1,
+      "message": "No, it would not. You\u0027d have to redirect to /dev/null anyway and then make sure nothing ever writes to it.",
+      "parentUuid": "7adec928_ac8321cb",
+      "range": {
+        "startLine": 2699,
+        "startChar": 6,
+        "endLine": 2699,
+        "endChar": 12
+      },
+      "revId": "bbfb8b5ce2054ee575990c72fb00718af2af96c1",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
