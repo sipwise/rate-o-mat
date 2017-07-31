@@ -37,7 +37,7 @@ if [ "${SELECT}" = "stable" ] ; then
   SELECT=$(echo rateomat-{01-run,10-prepaid-costs}.t)
 elif [ "${SELECT}" = "fast" ] ; then
   echo "Test selection: ${SELECT}"
-  SELECT=$(echo rateomat-01-run.t)
+  SELECT="rateomat-01-run.t"
 elif [ "${SELECT}" = "all" ] ; then
   echo "Test selection: all"
   SELECT=$(echo rateomat-*.t)
