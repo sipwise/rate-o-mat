@@ -154,6 +154,8 @@ my $sth_delete_old_prepaid;
 my $sth_get_billing_voip_subscribers;
 my $sth_get_package_profile_sets;
 my $sth_create_billing_mappings;
+my $sth_lock_billing_subscribers;
+my $sth_unlock_billing_subscribers;
 my $sth_get_provisioning_voip_subscribers;
 my $sth_get_usr_preference_attribute;
 my $sth_get_usr_preference_value;
@@ -672,6 +674,14 @@ EOS
 		"INSERT INTO billing.billing_mappings (contract_id, billing_profile_id, network_id, product_id, start_date) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create billing mappings statement: ".$billdbh->errstr;
 
+	$sth_lock_billing_subscribers = $billdbh->prepare(
+		"UPDATE billing.voip_subscriber SET status = 'locked' WHERE contract_id = ? AND status = 'active'"
+	) or FATAL "Error preparing lock billing subscribers statement: ".$billdbh->errstr;
+
+	$sth_unlock_billing_subscribers = $billdbh->prepare(
+		"UPDATE billing.voip_subscriber SET status = 'active' WHERE contract_id = ? AND status = 'locked'"
+	) or FATAL "Error preparing lock billing subscribers statement: ".$billdbh->errstr;
+
 	if ($provdbh) {
 		$sth_get_provisioning_voip_subscribers = $provdbh->prepare(
 			"SELECT id FROM provisioning.voip_subscribers WHERE uuid = ?"
@@ -1013,6 +1023,37 @@ sub set_subscriber_lock_level {
 
 }
 
+sub set_subscriber_status {
+
+	my $contract_id = shift;
+	my $lock_level = shift; #int
+	my $readonly = shift;
+
+	my $changed = 0;
+	my $sth;
+
+	if ($readonly) {
+		#todo: warn about billing subscriber discrepancies
+	} else {
+		if (defined $lock_level && $lock_level > 0) {
+			$sth = $sth_lock_billing_subscribers;
+			$changed = $sth->execute($contract_id);
+			if ($changed) {
+				DEBUG "status of $changed billing subscriber(s) set to 'locked'";
+			}
+		} else {
+			$sth = $sth_unlock_billing_subscribers;
+			$changed = $sth->execute($contract_id);
+			if ($changed) {
+				DEBUG "status of $changed billing subscriber(s) set to 'active'";
+			}
+		}
+	}
+	$sth->finish if $sth;
+	return $changed;
+
+}
+
 sub switch_prepaid {
 
 	my $contract_id = shift;
@@ -1262,6 +1303,7 @@ PREPARE_BALANCE_CATCHUP:
 			DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold";
 			if (defined $underrun_lock_level) {
 				set_subscriber_lock_level($contract_id,$underrun_lock_level,0);
+				set_subscriber_status($contract_id,$underrun_lock_level,0);
 				$underrun_lock_time = $now;
 			}
 		}
@@ -1341,6 +1383,7 @@ PREPARE_BALANCE_CATCHUP:
 				DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun lock threshold $underrun_lock_threshold";
 				if (defined $underrun_lock_level) {
 					set_subscriber_lock_level($contract_id,$underrun_lock_level,0);
+					set_subscriber_status($contract_id,$underrun_lock_level,0);
 					$bal->{underrun_lock_time} = $now;
 				}
 			}
@@ -2010,6 +2053,7 @@ sub get_call_cost {
 			DEBUG "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun lock threshold $r_package_info->{underrun_lock_threshold}";
 			if (defined $r_package_info->{underrun_lock_level}) {
 				set_subscriber_lock_level($contract_id,$r_package_info->{underrun_lock_level},$readonly);
+				set_subscriber_status($contract_id,$r_package_info->{underrun_lock_level},$readonly);
 				$last_bal->{underrun_lock_time} = $now;
 			}
 		}
@@ -2927,6 +2971,8 @@ sub main {
 	$sth_get_billing_voip_subscribers->finish;
 	$sth_get_package_profile_sets->finish;
 	$sth_create_billing_mappings->finish;
+	$sth_lock_billing_subscribers->finish;
+	$sth_unlock_billing_subscribers->finish;
 	$sth_get_provisioning_voip_subscribers and $sth_get_provisioning_voip_subscribers->finish;
 	$sth_get_usr_preference_attribute and $sth_get_usr_preference_attribute->finish;
 	$sth_get_usr_preference_value and $sth_get_usr_preference_value->finish;
