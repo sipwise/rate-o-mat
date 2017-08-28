@@ -16,6 +16,24 @@
       "revId": "e6809334e79308016a800c028860bf28b547b3da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fab399f4_1400aca9",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 501,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-08-28T14:40:34Z",
+      "side": 1,
+      "message": "Well, it\u0027s either this or splitting each line into its own string and joining them with the . operator, which seems less optimal.",
+      "parentUuid": "fab399f4_9414bcf6",
+      "revId": "e6809334e79308016a800c028860bf28b547b3da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
