@@ -1,6 +1,8 @@
 #!/usr/bin/perl -w
 use lib '/usr/share/ngcp-rate-o-mat';
 use strict;
+use warnings;
+
 use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
@@ -13,7 +15,7 @@ use List::Util qw(shuffle);
 
 # constants: ###########################################################
 
-$0 = 'rate-o-mat';
+$0 = 'rate-o-mat'; ## no critic (Variables::RequireLocalizedPunctuationVars)
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
 my $PID;
 my $pidfile = '/var/run/rate-o-mat.pid';
@@ -490,15 +492,16 @@ EOS
 EOS
 	) or FATAL "Error preparing panel billing info statement: ".$billdbh->errstr;
 
-	$sth_lnp_number = $billdbh->prepare("
+	$sth_lnp_number = $billdbh->prepare(<<EOS
 		SELECT lnp_provider_id
 		  FROM billing.lnp_numbers
 		 WHERE ? LIKE CONCAT(number,'%')
 		   AND (start <= FROM_UNIXTIME(?) OR start IS NULL)
 		   AND (end > FROM_UNIXTIME(?) OR end IS NULL)
-	".       join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) ."
-				 LIMIT 1
-	") or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
+EOS
+		. join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) .
+		"LIMIT 1"
+	) or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
 		"SELECT id, source, destination, ".
@@ -577,19 +580,17 @@ EOS
 
 	if ($split_peak_parts) {
 		my @exclude_fragment_fields = qw(start_time duration is_fragmented);
-		my %exclude_fragment_fields = map {$_,1} @exclude_fragment_fields;
+		my %exclude_fragment_fields = map { $_ => 1 } @exclude_fragment_fields;
 		my @fragment_fields = grep {!$exclude_fragment_fields{$_}} @cdr_fields;
 		$sth_create_cdr_fragment = $acctdbh->prepare(
-			"INSERT INTO accounting.cdr
-				    (".
-				    join(',', @fragment_fields, @exclude_fragment_fields).
-				    ")
-			      SELECT ".
-				    join(',', @fragment_fields).",
-				    start_time + ?,duration - ?,1
-				FROM accounting.cdr
-			       WHERE id = ? AND rating_status = 'unrated'
-			") or FATAL "Error preparing create cdr fragment statement: ".$acctdbh->errstr;
+			"INSERT INTO accounting.cdr (".
+			join(',', @fragment_fields, @exclude_fragment_fields).
+			") SELECT ".
+			join(',', @fragment_fields).",".
+			"start_time + ?,duration - ?,1".
+			"FROM accounting.cdr".
+			"WHERE id = ? AND rating_status = 'unrated'"
+		) or FATAL "Error preparing create cdr fragment statement: ".$acctdbh->errstr;
 	}
 
 	$sth_get_cbalances = $billdbh->prepare(
@@ -1941,7 +1942,7 @@ sub get_call_cost {
 			DEBUG "add init rate $rate per sec to costs";
 		} else {
 			last if $split_peak_parts and defined($$r_onpeak) and $$r_onpeak != $onpeak
-                                and !defined $cdr->{rating_duration};
+                                and not defined $cdr->{rating_duration};
 
 			$interval = $onpeak == 1 ?
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
@@ -2768,7 +2769,10 @@ sub main {
 	daemonize($pidfile)
 		if($fork == 1);
 
-	$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = \&signal_handler;
+	local $SIG{TERM} = \&signal_handler;
+	local $SIG{INT} = \&signal_handler;
+	local $SIG{QUIT} = \&signal_handler;
+	local $SIG{HUP} = \&signal_handler;
 
 	if ($maintenance_mode eq 'yes') {
 		while (!$shutdown) {

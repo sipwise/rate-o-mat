@@ -1,8 +1,9 @@
 package Utils::Rateomat;
 
+use strict;
+use warnings;
 use threads 'exit' => 'threads_only';
 
-use strict;
 use DBI;
 use Test::More;
 #use IPC::System::Simple qw(capturex);
@@ -41,6 +42,7 @@ our @EXPORT_OK = qw(
 	get_cdr_relation_data
 );
 
+## no critic (Variables::RequireLocalizedPunctuationVars)
 $ENV{RATEOMAT_BILLING_DB_USER} //= 'root';
 $ENV{RATEOMAT_PROVISIONING_DB_USER} //= 'root';
 $ENV{RATEOMAT_ACCOUNTING_DB_USER} //= 'root';
@@ -330,7 +332,7 @@ sub decimal_to_string {
 	if (defined $value) {
         return sprintf('%6f',$value);
     } else {
-		return undef;
+		return;
 	}
 }
 
@@ -433,7 +435,7 @@ sub _create_cdr {
 		my $id = _insert($dbh,'accounting.cdr',\%values);
 		return _get_cdr($dbh,$id,1) if ok($id,'cdr id '.$id.' created');;
 	}
-	return undef;
+	return;
 }
 
 sub _create_prepaid_costs_cdr {

@@ -1,6 +1,8 @@
 package Utils::Api;
 
 use strict;
+use warnings;
+
 use LWP::UserAgent qw();
 use JSON qw();
 use Test::More;
@@ -217,7 +219,7 @@ sub _create_item {
 			diag(JSON::from_json($res->decoded_content)->{message});
 		};
 	}
-	return undef;
+	return;
 }
 
 sub update_item {
@@ -401,7 +403,7 @@ sub check_interval_history {
 	my $limit = '';
 	my $ok = 1;
 	$page //= 1;
-	$rows //= 10,
+	$rows //= 10;
 	my @intervals;
 	$limit = '&start=' . DateTime::Format::ISO8601->parse_datetime($limit_dt) if defined $limit_dt;
 	my $nexturi = $uri.'/api/balanceintervals/'.$customer_id.'/?page='.$page.'&rows='.$rows.'&order_by_direction=asc&order_by=start'.$limit;
@@ -560,7 +562,7 @@ sub _get_interval_start {
 	} elsif ('topup_interval' eq $start_mode) {
 		return $ctime->clone; #->truncate(to => 'day');
 	}
-	return undef;
+	return;
 }
 
 sub _add_interval {
@@ -585,7 +587,7 @@ sub _add_interval {
 		}
 		return $to;
 	}
-	return undef;
+	return;
 }
 
 sub _last_day_of_month {
@@ -796,6 +798,8 @@ sub cartesian_product {
     return 0 if @C == 0; # Empty product
 
     @C == grep {ref eq 'ARRAY'} @C or die("Arrays of things required by cartesian");
+
+    ## no critic (ClassHierarchies::ProhibitOneArgBless)
 
     # Generate each cartesian product when there are no prior cartesian products.
 
