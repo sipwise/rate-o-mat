@@ -1,5 +1,7 @@
 
 use strict;
+use warnings;
+
 #use Time::Local qw(timegm timelocal);
 use POSIX qw(mktime);
 use Test::More;

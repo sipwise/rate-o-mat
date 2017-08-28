@@ -1,8 +1,9 @@
 package Utils::Rateomat;
 
+use strict;
+use warnings;
 use threads 'exit' => 'threads_only';
 
-use strict;
 use DBI;
 use Test::More;
 #use IPC::System::Simple qw(capturex);

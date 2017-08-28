@@ -1,6 +1,8 @@
 package Utils::Api;
 
 use strict;
+use warnings;
+
 use LWP::UserAgent qw();
 use JSON qw();
 use Test::More;
