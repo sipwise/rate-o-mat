@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fab399f4_445eefea",
+        "filename": "debian/control",
+        "patchSetId": 1
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-09-05T09:08:32Z",
+      "side": 1,
+      "message": "That does not feel right. If this is a test dependency (which it indeed looks like), it should be in Build-Depends and on the Dockerfile )which already has it)?",
+      "revId": "a1d325453f55e7f544116339f4ccd7ab7f8d1ed7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
