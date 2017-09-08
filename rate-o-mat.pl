@@ -499,7 +499,7 @@ EOS
 		   AND (start <= FROM_UNIXTIME(?) OR start IS NULL)
 		   AND (end > FROM_UNIXTIME(?) OR end IS NULL)
 EOS
-		. join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) .
+		. join(", ", "ORDER BY LENGTH(number) DESC ", @lnp_order_by) .
 		"LIMIT 1"
 	) or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
