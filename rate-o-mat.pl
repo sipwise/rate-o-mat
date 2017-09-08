@@ -500,7 +500,7 @@ EOS
 		   AND (end > FROM_UNIXTIME(?) OR end IS NULL)
 EOS
 		. join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) .
-		"LIMIT 1"
+		" LIMIT 1"
 	) or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
@@ -586,9 +586,9 @@ EOS
 			"INSERT INTO accounting.cdr (".
 			join(',', @fragment_fields, @exclude_fragment_fields).
 			") SELECT ".
-			join(',', @fragment_fields).",".
-			"start_time + ?,duration - ?,1".
-			"FROM accounting.cdr".
+			join(',', @fragment_fields). ", " .
+			"start_time + ?,duration - ?,1 " .
+			"FROM accounting.cdr " .
 			"WHERE id = ? AND rating_status = 'unrated'"
 		) or FATAL "Error preparing create cdr fragment statement: ".$acctdbh->errstr;
 	}
