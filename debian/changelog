@@ -1,3 +1,25 @@
+ngcp-rate-o-mat (5.5.1.0+0~mr5.5.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [bbfb8b5] TT#19203 fix daemonizing routine
+
+  [ Alexander Lutay ]
+  * [323f512] TT#19707 Fix shellcheck warning: Useless echo? Instead of 'cmd foo', just use 'cmd foo'. [SC2116]
+  * [1697115] TT#22402 Switch rate-o-mat Dockerfile to Debian stretch
+
+  [ Rene Krenn ]
+  * [836ef31] TT#18765 update billing.voip_subscribers.status
+  * [4989298] TT#22408 copy lnp type fields
+
+  [ Guillem Jover ]
+  * [e680933] TT#19707 Fix perlcritic warnings
+  * [e2ed296] TT#18115 Call start-stop-daemon correctly
+  * [0954e6e] TT#21750 Restore missing spaces in SQL queries
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 02 Oct 2017 23:43:45 +0200
+
 ngcp-rate-o-mat (5.5.0.0+0~mr5.5.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
