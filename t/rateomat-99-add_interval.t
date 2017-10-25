@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 #use Time::Local qw(timegm timelocal);
 use POSIX qw(mktime);
 use Test::More;

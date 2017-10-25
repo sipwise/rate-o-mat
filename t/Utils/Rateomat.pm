@@ -680,6 +680,7 @@ sub _insert {
 	}
 	return $id;
 }
+
 sub _delete_cdrs {
 	my ($dbh,$ids) = @_;
 	my $deleted = [];

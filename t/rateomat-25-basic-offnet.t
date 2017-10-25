@@ -1,6 +1,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -12,6 +16,8 @@ use Test::More;
 ### this tests verify all combinations of prepaid/postpaid subscriber customers with
 ### balance > 0.0/no balance produce correct customer/reseller call cost, cash balance
 ### and cash balance interval values.
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 my $init_secs = 60;
 my $follow_secs = 30;
