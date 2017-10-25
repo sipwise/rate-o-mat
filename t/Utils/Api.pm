@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use LWP::UserAgent qw();
-use JSON qw();
+use JSON::PP qw();
 use Test::More;
 use Time::HiRes qw(); #prevent warning from Time::Warp
 use Time::Warp qw();
@@ -51,6 +51,7 @@ our @EXPORT_OK = qw(
 	setup_package
 	to_pretty_json
 	cartesian_product
+	is_float_approx
 );
 
 my ($netloc) = ($uri =~ m!^https?://(.*)/?.*$!);
@@ -198,11 +199,11 @@ sub _create_item {
 	my ($resource,@params) = @_;
 	my $map = _get_entity_map($resource);
 	my $n = 1 + scalar keys %$map;
-	Data::Rmap::rmap { $_ =~ s/<n>/$n/; $_ =~ s/<i>/$n/; $_ =~ s/<t>/$t/; } @params;
+	Data::Rmap::rmap { $_ =~ s/<n>/$n/ if defined $_; $_ =~ s/<i>/$n/ if defined $_; $_ =~ s/<t>/$t/ if defined $_; } @params;
 	$req = HTTP::Request->new('POST', $uri.'/api/'.$resource.'/');
 	$req->header('Content-Type' => 'application/json');
 	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
-	$req->content(JSON::to_json({
+	$req->content(_to_json({
 		@params
 	}));
 	$res = _ua_request($req);
@@ -210,13 +211,13 @@ sub _create_item {
 		$req = HTTP::Request->new('GET', $uri.$res->header('Location'));
 		$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
 		$res = _ua_request($req);
-		my $entity = JSON::from_json($res->decoded_content);
+		my $entity = _from_json($res->decoded_content);
 		$map->{$entity->{id}} = $entity;
 		$resource_map{$entity->{_links}->{self}->{href}} = $resource;
 		return $entity;
 	} else {
 		eval {
-			diag(JSON::from_json($res->decoded_content)->{message});
+			diag(_from_json($res->decoded_content)->{message});
 		};
 	}
 	return;
@@ -227,22 +228,22 @@ sub update_item {
 	my $self_href = $entity->{_links}->{self}->{href};
 	my $resource = $resource_map{$self_href};
 	my $map = _get_entity_map($resource);
-	Data::Rmap::rmap { $_ =~ s/<t>/$t/; } %params;
+	Data::Rmap::rmap { $_ =~ s/<t>/$t/ if defined $_; } %params;
 	$req = HTTP::Request->new('PATCH', $uri.$self_href);
 	$req->header('Prefer' => 'return=representation');
 	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
 	$req->header('Content-Type' => 'application/json-patch+json');
-	$req->content(JSON::to_json(
+	$req->content(_to_json(
 		[ map { { op => 'replace', path => '/'.$_ , value => $params{$_} }; } keys %params ]
 	));
 	$res = _ua_request($req);
 	if (is($res->code, 200, "patch $resource id ".$entity->{id})) {
-		$entity = JSON::from_json($res->decoded_content);
+		$entity = _from_json($res->decoded_content);
 		$map->{$entity->{id}} = $entity;
 		return $entity;
 	} else {
 		eval {
-			diag(JSON::from_json($res->decoded_content)->{message});
+			diag(_from_json($res->decoded_content)->{message});
 		};
 	}
 	return $entity;
@@ -362,13 +363,13 @@ sub set_cash_balance {
 	$req->header('Prefer' => 'return=representation');
 	$req->header('Content-Type' => 'application/json-patch+json');
 	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
-	$req->content(JSON::to_json(
+	$req->content(_to_json(
 		[ { op => 'replace', path => '/cash_balance', value => $new_cash_balance } ]
 	));
 	$res = _ua_request($req);
 	if (!is($res->code, 200, "setting customer id " . $customer->{id} . " cash_balance to " . $new_cash_balance * 100.0 . ' cents')) {
 		eval {
-			diag(JSON::from_json($res->decoded_content)->{message});
+			diag(_from_json($res->decoded_content)->{message});
 		};
 	}
 
@@ -380,10 +381,10 @@ sub get_subscriber_preferences {
 	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
 	$res = _ua_request($req);
 	if (is($res->code, 200, "fetch subscriber id " . $subscriber->{id} . " preferences")) {
-		return JSON::from_json($res->decoded_content);
+		return _from_json($res->decoded_content);
 	} else {
 		eval {
-			diag(JSON::from_json($res->decoded_content)->{message});
+			diag(_from_json($res->decoded_content)->{message});
 		};
 	}
 }
@@ -412,7 +413,13 @@ sub check_interval_history {
 		$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
 		$res = _ua_request($req);
 		is($res->code, 200, $label . "fetch customer id " . $customer_id . " balance intervals collection page");
-		my $collection = JSON::from_json($res->decoded_content);
+		my $collection;
+		eval {
+			$collection = _from_json($res->decoded_content);
+		};
+		if ($@) {
+			print $@;
+		}
 
 		if (!$first_only && defined $total_count) {
 			$ok = ok($collection->{total_count} == $total_count, $label . "check 'total_count' of collection") && $ok;
@@ -454,7 +461,7 @@ sub _compare_interval {
 	}
 	if ($expected->{stop}) {
 		if (substr($expected->{stop},0,1) eq '~') {
-			$ok = _is_ts_approx($got->{stop},$expected->{stop},$label . "check interval " . $got->{id} . " stop timestamp") && $ok;
+			$ok = _is_ts_approx($got->{stop},substr($expected->{stop},1),$label . "check interval " . $got->{id} . " stop timestamp") && $ok;
 		} else {
 			$ok = is($got->{stop},$expected->{stop},$label . "check interval " . $got->{id} . " stop timestamp $got->{stop} = $expected->{stop}") && $ok;
 		}
@@ -465,7 +472,11 @@ sub _compare_interval {
 	}
 
 	if (defined $expected->{debit}) {
-		$ok = is($got->{cash_debit},$expected->{debit},$label . "check interval " . $got->{id} . " cash balance interval $got->{cash_debit} = $expected->{debit}") && $ok;
+		if (substr($expected->{debit},0,1) eq '~') {
+			$ok = is_float_approx($got->{cash_debit},substr($expected->{debit},1),$label . "check interval " . $got->{id} . " cash balance interval") && $ok;
+		} else {
+			$ok = is($got->{cash_debit},$expected->{debit},$label . "check interval " . $got->{id} . " cash balance interval $got->{cash_debit} = $expected->{debit}") && $ok;
+		}
 	}
 
 	if ($expected->{profile}) {
@@ -498,6 +509,14 @@ sub _is_ts_approx {
 	return ok($got >= $lower && $got <= $upper,$label . ' ' . datetime_to_string($expected) . ' ~ ' . datetime_to_string($got));
 }
 
+sub is_float_approx {
+	my ($got,$expected,$label) = @_;
+	my $epsilon = 1e-6;
+	my $lower = $expected - $epsilon;
+	my $upper = $expected + $epsilon;
+	return ok($got >= $lower && $got <= $upper,$label . ' ' . $expected . ' ~ ' . $got);
+}
+
 sub perform_topup {
 
 	my ($subscriber,$amount,$package) = @_;
@@ -509,11 +528,11 @@ sub perform_topup {
 		package_id => ($package ? $package->{id} : undef),
 		subscriber_id => $subscriber->{id},
 	};
-	$req->content(JSON::to_json($req_data));
+	$req->content(_to_json($req_data));
 	$res = _ua_request($req);
 	if (!is($res->code, 204, "perform topup with amount " . $amount * 100.0 . " cents, " . ($package ? 'package id ' . $package->{id} : 'no package'))) {
 		eval {
-			diag(JSON::from_json($res->decoded_content)->{message});
+			diag(_from_json($res->decoded_content)->{message});
 		};
 	}
 
@@ -703,8 +722,8 @@ sub setup_provider {
 		$provider->{contract} = update_item($provider->{contract},
 			billing_profile_id => $provider->{profile}->{id},
 		);
-	} else {
-		ok(!$split_peak_parts,'split_peak_parts disabled');
+	#} else {
+	#	ok(!$split_peak_parts,'split_peak_parts disabled');
 		#use default billing profile id, which already comes with fees.
 		#$provider->{profile} = create_billing_profile(
 		#	reseller_id => $provider->{reseller}->{id},
@@ -779,7 +798,17 @@ sub _setup_fees {
 }
 
 sub to_pretty_json {
-    return JSON::to_json(shift, {pretty => 1}); # =~ s/(^\s*{\s*)|(\s*}\s*$)//rg =~ s/\n   /\n/rg;
+	my $json = JSON::PP->new;
+	return $json->pretty->encode(shift);
+    #return _to_json(shift, {pretty => 1}); # =~ s/(^\s*{\s*)|(\s*}\s*$)//rg =~ s/\n   /\n/rg;
+}
+
+sub _from_json {
+    return JSON::PP::decode_json(shift);
+}
+
+sub _to_json {
+    return JSON::PP::encode_json(shift);
 }
 
 sub cartesian_product {
