@@ -72,6 +72,19 @@ my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
+$fork=0;
+$debug=1;
+$batch_size=10000;
+$loop_interval=0;
+$split_peak_parts=1;
+$failed_cdr_max_retries=0;
+$ENV{RATEOMAT_BILLING_DB_HOST}='192.168.0.24';
+$ENV{RATEOMAT_BILLING_DB_USER}='root';
+$ENV{RATEOMAT_ACCOUNTING_DB_HOST}='192.168.0.24';
+$ENV{RATEOMAT_ACCOUNTING_DB_USER}='root';
+$ENV{RATEOMAT_PROVISIONING_DB_HOST}='192.168.0.24';
+$ENV{RATEOMAT_PROVISIONING_DB_USER}='root';
+
 # billing database
 my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
 my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
@@ -558,8 +571,9 @@ EOS
 
 	$sth_unrated_cdrs = $acctdbh->prepare(
 		"SELECT * ".
-		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
-		"ORDER BY start_time ASC LIMIT " . $batch_size
+		"from accounting.cdr where id in(2604476)"
+		#"FROM accounting.cdr WHERE rating_status = 'unrated' ".
+		#"ORDER BY start_time ASC LIMIT " . $batch_size
 	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
 
 	$sth_update_cdr = $acctdbh->prepare(
@@ -1897,7 +1911,7 @@ sub get_call_cost {
 	$$r_free_time = 0;
 	my $interval = 0;
 	my $rate = 0;
-	my $offset = 0;
+	my $offset = 0; #xxxxx sum duration
 	my $onpeak = 0;
 	my $init = $cdr->{is_fragmented} // 0;
 	my $duration = (defined $cdr->{rating_duration} and $cdr->{rating_duration} < $cdr->{duration}) ? $cdr->{rating_duration} : $cdr->{duration};
@@ -1941,8 +1955,10 @@ sub get_call_cost {
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
 			DEBUG "add init rate $rate per sec to costs";
 		} else {
-			last if $split_peak_parts and defined($$r_onpeak) and $$r_onpeak != $onpeak
-                                and not defined $cdr->{rating_duration};
+			last if $split_peak_parts #break the cdr, if
+				and defined($$r_onpeak) #init interval was done in prev iteration
+				and $$r_onpeak != $onpeak #is now changed changed
+                and not defined $cdr->{rating_duration}; #is the first cost (provider) to calculate
 
 			$interval = $onpeak == 1 ?
 				$r_profile_info->{on_follow_interval} : $r_profile_info->{off_follow_interval};
@@ -2573,6 +2589,24 @@ sub rate_cdr {
 				" which is not a reseller in cdr #".$cdr->{id}."\n";
 		}
 
+		# get customer cost
+		get_customer_call_cost($cdr, $type, "out",
+					\$source_customer_cost, \$source_customer_free_time,
+					\$rating_durations[@rating_durations])
+			or FATAL "Error getting source customer cost for local source_user_id ".
+					$cdr->{source_user_id}." for cdr ".$cdr->{id}."\n";
+
+		# get reseller cost
+		if($source_provider_billing_info{profile_id}) {
+			get_provider_call_cost($cdr, $type, "out",
+						$source_provider_info, \$source_reseller_cost, \$source_reseller_free_time,
+						\$rating_durations[@rating_durations])
+				 or FATAL "Error getting source reseller cost for cdr ".$cdr->{id}."\n";
+		} else {
+			# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
+			# in theory, all resellers MUST have a billing profile, so we could bail out here
+		}
+
 		if($cdr->{destination_user_id} ne "0") {
 			DEBUG "call to local subscriber, destination_user_id is $$cdr{destination_user_id}";
 			# call to local subscriber (on-net)
@@ -2618,26 +2652,18 @@ sub rate_cdr {
 			}
 		}
 
-		# get reseller cost
-		if($source_provider_billing_info{profile_id}) {
-			get_provider_call_cost($cdr, $type, "out",
-						$source_provider_info, \$source_reseller_cost, \$source_reseller_free_time,
-						\$rating_durations[@rating_durations])
-				 or FATAL "Error getting source reseller cost for cdr ".$cdr->{id}."\n";
-		} else {
-			# up to 2.8, there is one hardcoded reseller id 1, which doesn't have a billing profile, so skip this step here.
-			# in theory, all resellers MUST have a billing profile, so we could bail out here
-		}
 
-		# get customer cost
-		get_customer_call_cost($cdr, $type, "out",
-					\$source_customer_cost, \$source_customer_free_time,
-					\$rating_durations[@rating_durations])
-			or FATAL "Error getting source customer cost for local source_user_id ".
-					$cdr->{source_user_id}." for cdr ".$cdr->{id}."\n";
+
+
 	} else {
 		# call from a foreign caller
 
+		get_customer_call_cost($cdr, $type, "in",
+					\$destination_customer_cost, \$destination_customer_free_time,
+					\$rating_durations[@rating_durations])
+			or FATAL "Error getting destination customer cost for local destination_user_id ".
+					$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
+		
 		# in this case, termination fees for the callee might still apply
 		if($cdr->{destination_user_id} ne "0") {
 			# call to local subscriber
@@ -2669,11 +2695,7 @@ sub rate_cdr {
 				# in theory, all resellers MUST have a billing profile, so we could bail out here
 				WARNING "missing destination profile, so we can't calculate destination_reseller_cost for destination_provider_billing_info ".(Dumper \%destination_provider_billing_info);
 			}
-			get_customer_call_cost($cdr, $type, "in",
-						\$destination_customer_cost, \$destination_customer_free_time,
-						\$rating_durations[@rating_durations])
-				or FATAL "Error getting destination customer cost for local destination_user_id ".
-						$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
+
 		} else {
 			# TODO what about transit calls?
 		}
