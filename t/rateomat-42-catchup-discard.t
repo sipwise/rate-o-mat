@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -15,6 +19,8 @@ use Storable qw();
 ### for all combinations of interval start modes and carry over modes,
 ### which also depends on topups performed.
 ### note: this tests takes longer time to complete
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:

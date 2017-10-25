@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -12,6 +16,8 @@ use Test::More;
 ###
 ### this short tests verify that created contract_balance records show a
 ### correct gap in their hourly balance intervals.
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 if ('Europe/Vienna' eq Utils::Api::get_now->time_zone->name) {
     Utils::Api::set_time(Utils::Api::datetime_from_string('2015-03-01 00:00:00'));

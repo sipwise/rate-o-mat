@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -13,6 +17,8 @@ use Test::More;
 ### this tests verify that rating with negative rates
 ### properly increase the destination customer's cash
 ### balance.
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 use Text::Table;
 use Text::Wrap;
