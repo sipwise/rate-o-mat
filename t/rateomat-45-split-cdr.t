@@ -63,7 +63,7 @@ $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
     my $balance = 0; #no balances, for correct source_customer_cost
     my $caller = Utils::Api::setup_subscriber($provider,$profile,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
     my $callee = Utils::Api::setup_subscriber($provider,$profile,$balance,{ cc => 888, ac => '2<n>', sn => '<t>' });
-    my $caller_costs = $provider->{subscriber_fees}->[0]->{fees}->[0]->{offpeak_init_rate} * 60 +
+    my $caller_costs = $provider->{subscriber_fees}->[0]->{fees}->[0]->{offpeak_init_rate} * 1 +
                        $provider->{subscriber_fees}->[0]->{fees}->[0]->{onpeak_follow_rate} * 60 * int(($call_minutes - 1) / 2 + 0.99) +
                         $provider->{subscriber_fees}->[0]->{fees}->[0]->{offpeak_follow_rate} * 60 * int(($call_minutes - 1) / 2);
     my $caller_provider_costs = $provider->{provider_fee}->{fees}->[0]->{offpeak_init_rate} * 60 +
@@ -156,7 +156,7 @@ sub create_provider {
                     offpeak_init_rate        => 3,
                     offpeak_init_interval    => 60,
                     offpeak_follow_rate      => 1,
-                    offpeak_follow_interval  => 60,
+                    offpeak_follow_interval  => 1/60, #60,
                 },
 			]},
 		],
@@ -173,10 +173,10 @@ sub create_provider {
                     onpeak_init_interval    => 60,
                     onpeak_follow_rate      => 20,
                     onpeak_follow_interval  => 60,
-                    offpeak_init_rate        => 4,
-                    offpeak_init_interval    => 60,
-                    offpeak_follow_rate      => 2,
-                    offpeak_follow_interval  => 60,
+                    offpeak_init_rate        => 4/60,
+                    offpeak_init_interval    => 1, #60,
+                    offpeak_follow_rate      => 2/60,
+                    offpeak_follow_interval  => 1, #60,
                 },
 			]}
 	);
