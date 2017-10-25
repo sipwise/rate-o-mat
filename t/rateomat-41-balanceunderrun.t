@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -13,6 +17,8 @@ use Test::More;
 ### the tests verify, that subscriber underrun lock levels and underrun
 ### profile are correctly applied when balance was discarded during catchup,
 ### or call costs decrease the balance so it drops below the thresholds.
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:

@@ -2,6 +2,10 @@
 use strict;
 use warnings;
 
+use File::Basename;
+use Cwd;
+use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
+
 use Utils::Api qw();
 use Utils::Rateomat qw();
 use Test::More;
@@ -17,6 +21,8 @@ use Data::Dumper;
 ### start modes and interval duration units are covered.
 ### note: since it also includes minute-based balance intervals, this tests
 ### takes longer time to complete
+
+local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 #goto SKIP;
 { #no package:
