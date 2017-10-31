@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dab895d6_0fff9568",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2017-10-31T15:44:15Z",
+      "side": 1,
+      "message": "? :)",
+      "range": {
+        "startLine": 81,
+        "startChar": 0,
+        "endLine": 86,
+        "endChar": 43
+      },
+      "revId": "1af80f2c416e93754be1ebf6eab0875dd2d03694",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
