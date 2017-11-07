@@ -55,10 +55,12 @@ use Test::More;
                             $_->{callee}->{subscriber},undef,$_->{callee}->{reseller},
                             '192.168.0.1',Utils::Api::current_unix(),$_->{caller}->{rate_interval} + 1);
                 } @caller_callee_matrix ]) };
-    my $number_of_calls = ($number_of_providers * $number_of_subscribers_per_provider) * ($number_of_providers * $number_of_subscribers_per_provider - 1);
-    $ENV{RATEOMAT_BATCH_SIZE} = $number_of_calls; # ensure all rateomats grab all cdrs at once
 
-    $ENV{RATEOMAT_SHUFFLE_BATCH} = 1; # enable and see the speedup
+    my $number_of_calls = ($number_of_providers * $number_of_subscribers_per_provider) * ($number_of_providers * $number_of_subscribers_per_provider - 1);
+    # Ensure all rateomats grab all cdrs at once.
+    local $ENV{RATEOMAT_BATCH_SIZE} = $number_of_calls;
+    # Enable and see the speedup.
+    local $ENV{RATEOMAT_SHUFFLE_BATCH} = 1;
 
     if (ok((scalar @cdr_ids) == $number_of_calls,'there are '.$number_of_calls.' calls to rate')
         && ok(Utils::Rateomat::run_rateomat_threads($number_of_rateomat_threads, $rateomat_timeout),'rate-o-mat threads executed')) {

@@ -15,7 +15,7 @@ use Test::More;
 ### phases during a single call, another new cdr has to be created
 ### per peaktime fragment with each rateomat loop ("split peak parts").
 
-$ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
+local $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
 
 #use Text::Table;
 #use Text::Wrap;

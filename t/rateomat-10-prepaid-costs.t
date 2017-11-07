@@ -43,7 +43,7 @@ my $callee = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ c
 
 foreach my $cache_size (($call_count - 1,$call_count)) {
     diag('rateomat prepaid costs cache size: '.$cache_size);
-    $ENV{RATEOMAT_PREPAID_COSTS_CACHE} = $cache_size;
+    local $ENV{RATEOMAT_PREPAID_COSTS_CACHE} = $cache_size;
 
     my @cdr_ids = map { $_->{cdr}->{id}; } @{ Utils::Rateomat::create_prepaid_costs_cdrs([ map {
         Utils::Rateomat::prepare_prepaid_costs_cdr($caller->{subscriber},undef,$caller->{reseller},
