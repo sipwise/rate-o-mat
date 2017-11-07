@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dab895d6_744b85b0",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2017-11-07T20:03:03Z",
+      "side": 1,
+      "message": "well.. so this means returning an empty list implicitly.\nfor construct like\nmy $blah \u003d {\n  foo \u003d\u003e to_epoch($x),\n  bar \u003d\u003e 123,\n  ...\n};\nit\u0027s not obvious but also it\u0027 using list context, so\n\"return;\" will swallow the value for \"foo\" key. i use\nexactly this pattern to consturct hashes often, that\u0027s\nwhy i\u0027m more on \"return undef;\" sinde.\naside, with subs showing several return path\u0027s i usually\ntry to stick with same type (like scalar for this one).",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
