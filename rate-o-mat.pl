@@ -676,11 +676,11 @@ EOS
 	) or FATAL "Error preparing create billing mappings statement: ".$billdbh->errstr;
 
 	$sth_lock_billing_subscribers = $billdbh->prepare(
-		"UPDATE billing.voip_subscriber SET status = 'locked' WHERE contract_id = ? AND status = 'active'"
+		"UPDATE billing.voip_subscribers SET status = 'locked' WHERE contract_id = ? AND status = 'active'"
 	) or FATAL "Error preparing lock billing subscribers statement: ".$billdbh->errstr;
 
 	$sth_unlock_billing_subscribers = $billdbh->prepare(
-		"UPDATE billing.voip_subscriber SET status = 'active' WHERE contract_id = ? AND status = 'locked'"
+		"UPDATE billing.voip_subscribers SET status = 'active' WHERE contract_id = ? AND status = 'locked'"
 	) or FATAL "Error preparing lock billing subscribers statement: ".$billdbh->errstr;
 
 	if ($provdbh) {
