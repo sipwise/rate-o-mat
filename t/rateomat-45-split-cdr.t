@@ -141,11 +141,10 @@ sub create_provider {
                     ],
                 peaktime_special => \@special_peaktimes,
     );
-	return Utils::Api::setup_provider('test<n>.com',
-		[ #rates:
-			{
-                @peaktimes,
-                fees => [
+    return Utils::Api::setup_provider('test<n>.com', [
+        # rates:
+        {
+            fees => [
                 {
                     direction => 'out',
                     destination => '.',
@@ -158,28 +157,29 @@ sub create_provider {
                     offpeak_follow_rate      => 1,
                     offpeak_follow_interval  => 60,
                 },
-			]},
-		],
-		[ #billing networks:
-		],
-        #provider rate
-        {
-                @peaktimes,
-                fees => [
-                {
-                    direction => 'out',
-                    destination => '.',
-                    onpeak_init_rate        => 40,
-                    onpeak_init_interval    => 60,
-                    onpeak_follow_rate      => 20,
-                    onpeak_follow_interval  => 60,
-                    offpeak_init_rate        => 4,
-                    offpeak_init_interval    => 60,
-                    offpeak_follow_rate      => 2,
-                    offpeak_follow_interval  => 60,
-                },
-			]}
-	);
+            ],
+            @peaktimes,
+        },
+    ], [
+        # billing networks:
+    ], {
+        # provider rate
+        fees => [
+            {
+                direction => 'out',
+                destination => '.',
+                onpeak_init_rate        => 40,
+                onpeak_init_interval    => 60,
+                onpeak_follow_rate      => 20,
+                onpeak_follow_interval  => 60,
+                offpeak_init_rate        => 4,
+                offpeak_init_interval    => 60,
+                offpeak_follow_rate      => 2,
+                offpeak_follow_interval  => 60,
+            },
+        ],
+        @peaktimes,
+    });
 }
 
 sub get_interleaved_special_peaktimes {

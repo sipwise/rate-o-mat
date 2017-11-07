@@ -14,12 +14,12 @@ use Test::More;
 
 my $init_secs = 50;
 my $follow_secs = 20;
-my $in_free_time = $init_secs + 20*$follow_secs;
-my $out_free_time = $init_secs + 30*$follow_secs;
+my $in_free_time = $init_secs + 20 * $follow_secs;
+my $out_free_time = $init_secs + 30 * $follow_secs;
 
 {
-   	my $now = Utils::Api::get_now();
-	my $begin = $now->clone->truncate(to => 'month'); # prevent ratio
+    my $now = Utils::Api::get_now();
+    my $begin = $now->clone->truncate(to => 'month'); # prevent ratio
     Utils::Api::set_time($begin);
     my $provider = create_provider($in_free_time,$out_free_time);
     my $balance = 5;
@@ -35,43 +35,40 @@ my $out_free_time = $init_secs + 30*$follow_secs;
     Utils::Api::set_time($begin->clone->add(seconds => $call_duration + 20));
     my $start_time = Utils::Api::current_unix() - $call_duration - 1;
     Utils::Api::set_time();
-	my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
-		Utils::Rateomat::prepare_cdr($caller->{subscriber},undef,$caller->{reseller},
-			$callee->{subscriber},undef,$callee->{reseller},
-			'192.168.0.1',$start_time,$call_duration),
-	]) };
+    my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
+        Utils::Rateomat::prepare_cdr($caller->{subscriber}, undef,
+            $caller->{reseller}, $callee->{subscriber}, undef,
+            $callee->{reseller}, '192.168.0.1', $start_time, $call_duration),
+    ]) };
 
-	if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
-		ok(Utils::Rateomat::check_cdrs('',
-			map { $_ => {
+    if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
+        ok(Utils::Rateomat::check_cdrs('',
+            map { $_ => {
                     id => $_,
                     rating_status => 'ok',
                     source_customer_free_time => $out_free_time,
                     destination_customer_free_time => $in_free_time,
-                  }; } @cdr_ids
-		),'cdrs were all processed');
+                };
+            } @cdr_ids),'cdrs were all processed');
         my $label = 'freetime - caller: ';
         my $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$cdr_ids[0],'source','customer','contract_balance_id');
-		Utils::Api::check_interval_history($label,$caller->{customer}->{id},[
-			{ (($in_free_time < $out_free_time) ? (cash => $balance - $caller_costs) : ()),
-			  profile => $provider->{subscriber_fees}->[0]->{profile}->{id},
-              id => $balance_id,
-            },
-		]);
+        Utils::Api::check_interval_history($label,$caller->{customer}->{id}, [ {
+            profile => $provider->{subscriber_fees}->[0]->{profile}->{id},
+            id => $balance_id,
+            $in_free_time < $out_free_time ? (cash => $balance - $caller_costs) : (),
+        }]);
         Utils::Rateomat::check_cdr_time_balance_data($label,$cdr_ids[0],'source','customer','free_time_balance',
                     { before => $out_free_time, after => 0 });
         $label = 'freetime - callee: ';
         $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$cdr_ids[0],'destination','customer','contract_balance_id');
-		Utils::Api::check_interval_history($label,$callee->{customer}->{id},[
-			{ (($in_free_time > $out_free_time) ? (cash => $balance - $callee_costs) : ()),
-			  profile => $provider->{subscriber_fees}->[1]->{profile}->{id},
-              id => $balance_id,
-            },
-		]);
+        Utils::Api::check_interval_history($label,$callee->{customer}->{id}, [ {
+            profile => $provider->{subscriber_fees}->[1]->{profile}->{id},
+            id => $balance_id,
+            $in_free_time > $out_free_time ? (cash => $balance - $callee_costs) : (),
+        }]);
         Utils::Rateomat::check_cdr_time_balance_data($label,$cdr_ids[0],'destination','customer','free_time_balance',
                     { before => $in_free_time, after => 0 });
-	}
-
+    }
 }
 
 done_testing();
@@ -79,10 +76,12 @@ exit;
 
 sub create_provider {
     my ($free_time_in,$free_time_out) = @_;
-	return Utils::Api::setup_provider('test<n>.com',
-		[ #rates:
-			{   interval_free_time       => $free_time_out,
-                fees => [
+
+    return Utils::Api::setup_provider('test<n>.com', [
+        # rates:
+        {
+            interval_free_time       => $free_time_out,
+            fees => [
                 {
                     direction => 'out',
                     destination => '.',
@@ -96,9 +95,10 @@ sub create_provider {
                     offpeak_follow_interval  => $follow_secs,
                     use_free_time           => 1,
                 },
-            ]},
-            {   interval_free_time       => $free_time_in,
-                fees => [
+            ]
+        }, {
+            interval_free_time       => $free_time_in,
+            fees => [
                 {
                     direction => 'in',
                     destination => '.',
@@ -114,9 +114,9 @@ sub create_provider {
                     interval_free_time       => $free_time_in,
                     use_free_time           => 1,
                 },
-			]},
-		],
-		[ #billing networks:
-		]
-	);
+            ]
+        },
+    ], [
+        # billing networks:
+    ]);
 }
