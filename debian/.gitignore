@@ -1,0 +1,6 @@
+/*.debhelper.log
+/*.substvars
+/.debhelper/
+/files
+/ngcp-rate-o-mat/
+/tmp/
