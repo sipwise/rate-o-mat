@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dab895d6_b4527d11",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 17
+      },
+      "lineNbr": 681,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2017-11-07T13:50:34Z",
+      "side": 1,
+      "message": "this seems like an unrelated bugfix that would be worth backporting on its own",
+      "revId": "aa6b577279acaa92c8f58cdcf8eec44561fb6de7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
