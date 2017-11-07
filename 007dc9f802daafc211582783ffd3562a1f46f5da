@@ -16,6 +16,24 @@
       "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_b4cc3d37",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-07T21:13:05Z",
+      "side": 1,
+      "message": "True, the problem with returning an explicit undef is described here: https://metacpan.org/pod/Perl::Critic::Policy::Subroutines::ProhibitExplicitReturnUndef\n\nI think the policy is nice, because you can always force scalar context (with scalar for example). And it gives us consistent coding style.",
+      "parentUuid": "dab895d6_744b85b0",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
