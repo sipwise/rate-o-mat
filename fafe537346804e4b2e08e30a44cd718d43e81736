@@ -22,6 +22,30 @@
       "revId": "fafe537346804e4b2e08e30a44cd718d43e81736",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_f4407558",
+        "filename": ".gitignore",
+        "patchSetId": 1
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-08T10:43:15Z",
+      "side": 1,
+      "message": "The .pl script gets renamed to this when building.",
+      "parentUuid": "dab895d6_1477a9d5",
+      "range": {
+        "startLine": 2,
+        "startChar": 0,
+        "endLine": 2,
+        "endChar": 11
+      },
+      "revId": "fafe537346804e4b2e08e30a44cd718d43e81736",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
