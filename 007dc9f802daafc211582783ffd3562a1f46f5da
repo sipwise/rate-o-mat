@@ -34,6 +34,24 @@
       "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_32775dd6",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000005
+      },
+      "writtenOn": "2017-11-09T07:31:14Z",
+      "side": 1,
+      "message": "imo, both arguments make sense. anyway, however we do it, when we change this, we need to check for implications, since this can change behavior elsewhere",
+      "parentUuid": "dab895d6_b4cc3d37",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
