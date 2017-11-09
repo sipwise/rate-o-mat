@@ -88,6 +88,24 @@
       "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_ede8a47e",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-09T16:06:38Z",
+      "side": 1,
+      "message": "Indeed, changing those blindly in general can be dangerous, so much care must be taken, but in this case the change seems obviously correct, and it\u0027s in a unit test so not used by anything else. :) So can I get my +2 please, so that we can mark this repo as TAP clean? :D",
+      "parentUuid": "dab895d6_4d37d0e3",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
