@@ -52,6 +52,24 @@
       "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_0d26b8b7",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2017-11-09T08:22:11Z",
+      "side": 1,
+      "message": "But this is a test, so we should notice degradation immediately if any? Isn\u0027t it?",
+      "parentUuid": "dab895d6_32775dd6",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
