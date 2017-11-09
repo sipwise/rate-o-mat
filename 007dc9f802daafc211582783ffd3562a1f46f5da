@@ -70,6 +70,24 @@
       "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_4d37d0e3",
+        "filename": "t/rateomat-99-add_interval.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1000005
+      },
+      "writtenOn": "2017-11-09T08:50:17Z",
+      "side": 1,
+      "message": "true. I mostly meant the change to \"return undef\" in general",
+      "parentUuid": "dab895d6_0d26b8b7",
+      "revId": "007dc9f802daafc211582783ffd3562a1f46f5da",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
