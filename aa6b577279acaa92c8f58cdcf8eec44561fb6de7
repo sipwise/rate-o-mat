@@ -16,6 +16,24 @@
       "revId": "aa6b577279acaa92c8f58cdcf8eec44561fb6de7",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dab895d6_54ada187",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 17
+      },
+      "lineNbr": 681,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2017-11-16T11:32:43Z",
+      "side": 1,
+      "message": "ack, done.",
+      "parentUuid": "dab895d6_b4527d11",
+      "revId": "aa6b577279acaa92c8f58cdcf8eec44561fb6de7",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
