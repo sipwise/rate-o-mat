@@ -319,6 +319,8 @@ sub prepare_prepaid_costs_cdr {
 					cost => $prepaid_cost,
 					free_time_used => $prepaid_free_time_used // 0,
 					timestamp => sprintf("%04d-%02d-%02d %02d:%02d:%02d", $Y + 1900,$m + 1, $d, $H, $M, $S),
+					source_user_id => $cdr->{source_user_id},
+					destination_user_id => $cdr->{destination_user_id},
 				},
 		};
 }
