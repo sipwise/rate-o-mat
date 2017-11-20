@@ -1,0 +1,67 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baada198_ffe6b043",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2163,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-20T12:04:32Z",
+      "side": 1,
+      "message": "why not:\n\n$prepaid_costs_cache-\u003e{$prepaid_cost-\u003e{call_id}} //\u003d {};\n$map \u003d $prepaid_costs_cache-\u003e{$prepaid_cost-\u003e{call_id}};\n\n?",
+      "range": {
+        "startLine": 2158,
+        "startChar": 4,
+        "endLine": 2163,
+        "endChar": 5
+      },
+      "revId": "df889ac645ef3d4809e83c4ce78355c2b67de56f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baada198_dfd9ec84",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2164,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-20T12:04:32Z",
+      "side": 1,
+      "message": "I\u0027d write this as //\u003d {}",
+      "revId": "df889ac645ef3d4809e83c4ce78355c2b67de56f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baada198_1fe4443a",
+        "filename": "t/rateomat-10-prepaid-costs.t",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2017-11-20T12:04:32Z",
+      "side": 1,
+      "message": "debug leftover?",
+      "range": {
+        "startLine": 70,
+        "startChar": 8,
+        "endLine": 70,
+        "endChar": 21
+      },
+      "revId": "df889ac645ef3d4809e83c4ce78355c2b67de56f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
