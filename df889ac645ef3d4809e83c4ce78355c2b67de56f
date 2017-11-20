@@ -42,6 +42,24 @@
     },
     {
       "key": {
+        "uuid": "baada198_9fcf74b0",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2164,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2017-11-20T12:13:23Z",
+      "side": 1,
+      "message": "yes, ack, came from re-writing this stuff over an dover again",
+      "parentUuid": "baada198_dfd9ec84",
+      "revId": "df889ac645ef3d4809e83c4ce78355c2b67de56f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "baada198_1fe4443a",
         "filename": "t/rateomat-10-prepaid-costs.t",
         "patchSetId": 1
