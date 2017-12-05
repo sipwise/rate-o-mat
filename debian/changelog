@@ -1,3 +1,23 @@
+ngcp-rate-o-mat (6.1.0.0+0~mr6.1.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [918c86e] TT#24111 voip_subscriberS typo bugfix
+  * [35341a2] TT#24129 cdr insert throughput test
+  * [de06160] TT#24129 cdr parallel insert - test consecutive ids
+  * [a2795f0] TT#24111 rework splitpeakparts feature
+  * [a7fac31] TT#23271 include subs uuids to select prepaid_costs
+
+  [ Guillem Jover ]
+  * [fafe537] TT#24096 Update .gitignore files
+  * [007dc9f] TT#24096 Do not return an explicit undef
+  * [c667788] TT#24096 Set environment variables with local
+  * [f575864] TT#24096 Reorder code to avoid perlcritic false positives
+  * [de70550] TT#22072 Update packaging
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 06 Dec 2017 00:13:46 +0100
+
 ngcp-rate-o-mat (6.0.0.0+0~mr6.0.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
