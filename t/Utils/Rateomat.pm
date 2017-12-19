@@ -42,6 +42,10 @@ our @EXPORT_OK = qw(
 	get_cdr_relation_data
 );
 
+$ENV{RATEOMAT_BILLING_DB_HOST} = '192.168.0.84';
+$ENV{RATEOMAT_PROVISIONING_DB_HOST} = '192.168.0.84';
+$ENV{RATEOMAT_ACCOUNTING_DB_HOST} = '192.168.0.84';
+
 ## no critic (Variables::RequireLocalizedPunctuationVars)
 $ENV{RATEOMAT_BILLING_DB_USER} //= 'root';
 $ENV{RATEOMAT_PROVISIONING_DB_USER} //= 'root';

@@ -1849,6 +1849,7 @@ sub get_call_cost {
 	my $contract_id = shift;
 	my $profile_id = shift;
 	my $readonly = shift;
+	my $prepaid = shift;
 	my $r_profile_info = shift;
 	my $r_package_info = shift;
 	my $r_cost = shift;
@@ -2024,7 +2025,7 @@ sub get_call_cost {
 			DEBUG "calculate cost for remaining interval chunk $interval";
 		}
 
-		if ($rate <= $bal->{cash_balance}) {
+		if (($rate > 0 || $prepaid) and $rate <= $bal->{cash_balance}) {
 			DEBUG "we still have cash balance $$bal{cash_balance} left, subtract rate $rate from that";
 			$bal->{cash_balance} -= $rate;
 			push(@cash_balance_rates,$rate);
@@ -2399,7 +2400,7 @@ sub get_customer_call_cost {
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,$contract_id,
-		$billing_info{profile_id}, $readonly || ($outgoing_prepaid && defined $prepaid_cost_entry),
+		$billing_info{profile_id}, $readonly || ($outgoing_prepaid && defined $prepaid_cost_entry), $prepaid,
 		\%profile_info, \%package_info, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \@balances)
 		or FATAL "Error getting ".$dir."customer call cost\n";
@@ -2421,7 +2422,7 @@ sub get_customer_call_cost {
 	if ($outgoing_prepaid) { #prepaid out
 		# overwrite the calculated costs with the ones from our table
 		if (defined $prepaid_cost_entry) {
-			$$r_cost = $prepaid_cost_entry->{cost};
+			$$r_cost = $prepaid_cost_entry->{cost}; #prepaid: update balance AND show full costs
 			$$r_free_time = $prepaid_cost_entry->{free_time_used};
 			drop_prepaid_cost($prepaid_cost_entry) unless $readonly;
 
@@ -2438,7 +2439,7 @@ sub get_customer_call_cost {
 				update_contract_balance(\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
-			$$r_cost = $real_cost;
+			$$r_cost = $real_cost; #prepaid: update balance AND show full costs
 			$cdr->{$dir."customer_cash_balance_after"} = $snapshot_bal->{cash_balance};
 			$cdr->{$dir."customer_free_time_balance_after"} = $snapshot_bal->{free_time_balance};
 		}
@@ -2446,7 +2447,7 @@ sub get_customer_call_cost {
 		# we don't do prepaid for termination fees for now, so treat it as post-paid
 		if($prepaid == 1 && $direction eq "in") { #prepaid in
 			DEBUG "treat pre-paid billing profile as post-paid for termination fees";
-			$$r_cost = $real_cost;
+			$$r_cost = $real_cost; #prepaid: update balance AND show full costs
 		} else { #postpaid in, postpaid out
 			DEBUG "billing profile is post-paid, update contract balance";
 		}
@@ -2503,7 +2504,7 @@ sub get_provider_call_cost {
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,$contract_id,
-		$provider_info->{billing}->{profile_id}, $readonly || $prepaid, # no underruns for providers with prepaid profile
+		$provider_info->{billing}->{profile_id}, $readonly || $prepaid, $prepaid, # no underruns for providers with prepaid profile
 		\%profile_info, $provider_info->{package}, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, $provider_info->{balances})
 		or FATAL "Error getting ".$dir."provider call cost\n";

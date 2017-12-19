@@ -14,6 +14,8 @@ use DateTime::Format::ISO8601 qw();
 use Data::Rmap qw();
 use Data::Dumper;
 
+$ENV{CATALYST_SERVER} = 'https://127.0.0.1:1443';
+
 my $uri = $ENV{CATALYST_SERVER} // 'https://127.0.0.1:443';
 my $user = $ENV{API_USER} // 'administrator';
 my $pass = $ENV{API_PASS} // 'administrator';
