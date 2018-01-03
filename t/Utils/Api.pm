@@ -14,10 +14,11 @@ use DateTime::Format::ISO8601 qw();
 use Data::Rmap qw();
 use Data::Dumper;
 
+use Utils::Env qw();
+
 my $uri = $ENV{CATALYST_SERVER} // 'https://127.0.0.1:443';
 my $user = $ENV{API_USER} // 'administrator';
 my $pass = $ENV{API_PASS} // 'administrator';
-my $split_peak_parts = $ENV{RATEOMAT_SPLIT_PEAK_PARTS} // 0;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -36,6 +37,7 @@ our @EXPORT_OK = qw(
 	create_subscriber
 	update_item
 	set_cash_balance
+	get_cash_balance
 	perform_topup
 	is_infinite_future
 	get_subscriber_preferences
@@ -281,11 +283,11 @@ sub current_unix {
 sub _current_local {
 	if ($is_fake_time) {
 		return DateTime->from_epoch(epoch => Time::Warp::time,
-			time_zone => DateTime::TimeZone->new(name => 'local')
+			time_zone => DateTime::TimeZone->new(name => 'local' )
 		);
 	} else {
 		return DateTime->now(
-			time_zone => DateTime::TimeZone->new(name => 'local')
+			time_zone => DateTime::TimeZone->new(name => 'local' )
 		);
 	}
 }
@@ -373,6 +375,20 @@ sub set_cash_balance {
 		};
 	}
 
+}
+
+sub get_cash_balance {
+	my ($customer) = @_;
+	$req = HTTP::Request->new('GET', $uri.'/api/customerbalances/' . $customer->{id});
+	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
+	$res = _ua_request($req);
+	if (is($res->code, 200, "fetch customer id " . $customer->{id} . " customerbalance")) {
+		return _from_json($res->decoded_content);
+	} else {
+		eval {
+			diag(_from_json($res->decoded_content)->{message});
+		};
+	}
 }
 
 sub get_subscriber_preferences {
@@ -468,7 +484,11 @@ sub _compare_interval {
 	}
 
 	if (defined $expected->{cash}) {
-		$ok = is($got->{cash_balance},$expected->{cash},$label . "check interval " . $got->{id} . " cash balance $got->{cash_balance} = $expected->{cash}") && $ok;
+		if (substr($expected->{cash},0,1) eq '~') {
+			$ok = is_float_approx($got->{cash_balance},substr($expected->{cash},1),$label . "check interval " . $got->{id} . " cash balance") && $ok;
+		} else {
+			$ok = is($got->{cash_balance},$expected->{cash},$label . "check interval " . $got->{id} . " cash balance $got->{cash_balance} = $expected->{cash}") && $ok;
+		}
 	}
 
 	if (defined $expected->{debit}) {
@@ -764,14 +784,14 @@ sub _setup_fees {
 	my $peaktime_weekdays = delete $params{peaktime_weekdays};
 	my $peaktime_specials = delete $params{peaktime_special};
 	my $interval_free_time = delete $params{interval_free_time};
-	#my $interval_free_cash = delete $params{interval_free_cash};
+	my $interval_free_cash = delete $params{interval_free_cash};
 	my $profile = create_billing_profile(
 		reseller_id => $reseller->{id},
 		(defined $prepaid ? (prepaid => $prepaid) : ()),
 		(defined $peaktime_weekdays ? (peaktime_weekdays => $peaktime_weekdays) : ()),
 		(defined $peaktime_specials ? (peaktime_special => $peaktime_specials) : ()),
 		(defined $interval_free_time ? (interval_free_time => $interval_free_time) : ()),
-		#(defined $interval_free_cash ? (interval_free_cash => $interval_free_cash) : ()),
+		(defined $interval_free_cash ? (interval_free_cash => $interval_free_cash) : ()),
 	);
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},

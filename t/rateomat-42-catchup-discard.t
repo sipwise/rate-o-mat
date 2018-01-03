@@ -177,8 +177,8 @@ foreach my $start_mode ('create','1st') {
 #SKIP:
 foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 	my @cash_values;
-	@cash_values = ( [ cash => $amount - $costs, debit => 0 ], [ cash => $amount - $costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over' eq $carry_over_mode;
-	@cash_values = ( [ cash => $amount - $costs, debit => 0 ], [ cash => 0, debit => $underrun_costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over_timely' eq $carry_over_mode;
+	@cash_values = ( [ cash => $amount - $costs, debit => $costs ], [ cash => $amount - $costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over' eq $carry_over_mode;
+	@cash_values = ( [ cash => $amount - $costs, debit => $costs ], [ cash => 0, debit => $underrun_costs ], [ cash => 0, debit => $underrun_costs ] ) if 'carry_over_timely' eq $carry_over_mode;
 	foreach my $start_mode ('topup','topup_interval') {
 
 		my $profiles_setup = Utils::Api::setup_package($provider,
