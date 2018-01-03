@@ -101,7 +101,7 @@ foreach my $prepaid ((0,1)) { # prepaid, postpaid
                 my $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$caller_cdr_map->{$contract_id},'source','customer','contract_balance_id');
                 Utils::Api::check_interval_history($label,$contract_id,[
                     { cash => $cash_balance/100.0,
-                      debit => (($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
+                      debit => ($prepaid_costs ? 0.0 : $caller_call_costs)/100.0, #(($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
                       id => $balance_id,
                     },
                 ]);
@@ -113,7 +113,7 @@ foreach my $prepaid ((0,1)) { # prepaid, postpaid
                 $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$caller_cdr_map->{$contract_id},'source','customer','contract_balance_id');
                 Utils::Api::check_interval_history($label,$contract_id,[
                     { cash => $cash_balance/100.0,
-                      debit => (($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
+                      debit => ($prepaid_costs ? 0.0 : $caller_call_costs)/100.0, #(($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
                       id => $balance_id,
                     },
                 ]);
@@ -125,7 +125,7 @@ foreach my $prepaid ((0,1)) { # prepaid, postpaid
                 $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$caller_cdr_map->{$contract_id},'source','customer','contract_balance_id');
                 Utils::Api::check_interval_history($label,$contract_id,[
                     { cash => $cash_balance/100.0,
-                      debit => (($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
+                      debit => ($prepaid_costs ? 0.0 : $caller_call_costs)/100.0, #(($no_balance && !$prepaid_costs) ? $caller_call_costs : 0.0)/100.0,
                       id => $balance_id,
                     },
                 ]);
@@ -138,7 +138,7 @@ foreach my $prepaid ((0,1)) { # prepaid, postpaid
                 $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$cdr_ids[0],'destination','customer','contract_balance_id');
                 Utils::Api::check_interval_history($label,$contract_id,[
                     { cash => $cash_balance/100.0,
-                      debit => ($no_balance ? 3 * $callee_call_costs : 0.0)/100.0,
+                      debit => 3 * $callee_call_costs/100.0, #($no_balance ? 3 * $callee_call_costs : 0.0)/100.0,
                       id => $balance_id,
                     },
                 ]);
