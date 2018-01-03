@@ -117,7 +117,6 @@ sub create_provider {
                     offpeak_init_interval    => $init_secs,
                     offpeak_follow_rate      => 2,
                     offpeak_follow_interval  => $follow_secs,
-                    interval_free_time       => $free_time_in,
                     use_free_time           => 1,
                 },
             ]
