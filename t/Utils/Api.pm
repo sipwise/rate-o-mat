@@ -14,6 +14,8 @@ use DateTime::Format::ISO8601 qw();
 use Data::Rmap qw();
 use Data::Dumper;
 
+$ENV{CATALYST_SERVER} = 'https://127.0.0.1:1443';
+
 my $uri = $ENV{CATALYST_SERVER} // 'https://127.0.0.1:443';
 my $user = $ENV{API_USER} // 'administrator';
 my $pass = $ENV{API_PASS} // 'administrator';
@@ -36,6 +38,7 @@ our @EXPORT_OK = qw(
 	create_subscriber
 	update_item
 	set_cash_balance
+	get_cash_balance
 	perform_topup
 	is_infinite_future
 	get_subscriber_preferences
@@ -373,6 +376,20 @@ sub set_cash_balance {
 		};
 	}
 
+}
+
+sub get_cash_balance {
+	my ($customer) = @_;
+	$req = HTTP::Request->new('GET', $uri.'/api/customerbalances/' . $customer->{id});
+	$req->header('X-Fake-Clienttime' => _get_fake_clienttime_now());
+	$res = _ua_request($req);
+	if (is($res->code, 200, "fetch customer id " . $customer->{id} . " customerbalance")) {
+		return _from_json($res->decoded_content);
+	} else {
+		eval {
+			diag(_from_json($res->decoded_content)->{message});
+		};
+	}
 }
 
 sub get_subscriber_preferences {
@@ -764,14 +781,14 @@ sub _setup_fees {
 	my $peaktime_weekdays = delete $params{peaktime_weekdays};
 	my $peaktime_specials = delete $params{peaktime_special};
 	my $interval_free_time = delete $params{interval_free_time};
-	#my $interval_free_cash = delete $params{interval_free_cash};
+	my $interval_free_cash = delete $params{interval_free_cash};
 	my $profile = create_billing_profile(
 		reseller_id => $reseller->{id},
 		(defined $prepaid ? (prepaid => $prepaid) : ()),
 		(defined $peaktime_weekdays ? (peaktime_weekdays => $peaktime_weekdays) : ()),
 		(defined $peaktime_specials ? (peaktime_special => $peaktime_specials) : ()),
 		(defined $interval_free_time ? (interval_free_time => $interval_free_time) : ()),
-		#(defined $interval_free_cash ? (interval_free_cash => $interval_free_cash) : ()),
+		(defined $interval_free_cash ? (interval_free_cash => $interval_free_cash) : ()),
 	);
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},
