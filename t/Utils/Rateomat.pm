@@ -10,7 +10,9 @@ use Test::More;
 use Data::Dumper;
 use Time::HiRes qw();
 use Data::Rmap qw();
+use POSIX qw(tzset);
 
+use Utils::Env qw();
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -47,6 +49,11 @@ $ENV{RATEOMAT_BILLING_DB_USER} //= 'root';
 $ENV{RATEOMAT_PROVISIONING_DB_USER} //= 'root';
 $ENV{RATEOMAT_ACCOUNTING_DB_USER} //= 'root';
 #$ENV{RATEOMAT_DUPLICATE_DB_USER} //= 'root';
+
+if ($ENV{RATEOMAT_CONNECTION_TIMEZONE}) {
+	$ENV{TZ} = $ENV{RATEOMAT_CONNECTION_TIMEZONE};
+	tzset;
+}
 
 $ENV{RATEOMAT_DEBUG} //= 1;
 $ENV{RATEOMAT_DAEMONIZE} = 0;
@@ -330,9 +337,10 @@ sub generate_call_id {
 }
 
 sub decimal_to_string {
-	my $value = shift;
+	my ($value,$decimals) = @_;
+	$decimals //= 6;
 	if (defined $value) {
-        return sprintf('%6f',$value);
+        return sprintf('%.' . $decimals . 'f',$value);
     } else {
 		return;
 	}
@@ -789,8 +797,8 @@ sub check_cdr_cash_balance_data {
 	my $result = _get_cdr_cash_balance_data($cdr_id,$direction,$provider,$relation);
 	if (defined $expected) {
         if ((scalar @$result) == 1) {
-			return is($result->[0]->{val_before},decimal_to_string($expected->{before}),$label.'before '.$result->[0]->{val_before}.' = '.decimal_to_string($expected->{before})) &
-			is($result->[0]->{val_after},decimal_to_string($expected->{after}),$label.'after '.$result->[0]->{val_after}.' = '.decimal_to_string($expected->{after}));
+			return is(decimal_to_string($result->[0]->{val_before},4),decimal_to_string($expected->{before},4),$label.'before '.decimal_to_string($result->[0]->{val_before},4).' = '.decimal_to_string($expected->{before},4)) &
+			is(decimal_to_string($result->[0]->{val_after},4),decimal_to_string($expected->{after},4),$label.'after '.decimal_to_string($result->[0]->{val_after},4).' = '.decimal_to_string($expected->{after},4));
 		} else {
 			return is(scalar @$result,1,$label.'number of records '.(scalar @$result).' = 1');
 		}
