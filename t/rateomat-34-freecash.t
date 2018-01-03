@@ -11,7 +11,7 @@ use Utils::Rateomat qw();
 use Test::More;
 
 ### testcase outline:
-### onnet calls that consume profile's freetime
+### onnet calls that consume profile's freecash
 ###
 ### this tests verify that rating correctly
 ### consumes up free time before cash balance.
@@ -20,14 +20,12 @@ local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 my $init_secs = 50;
 my $follow_secs = 20;
-my $in_free_time = $init_secs + 20 * $follow_secs;
-my $out_free_time = $init_secs + 30 * $follow_secs;
 
 {
     my $now = Utils::Api::get_now();
-    my $begin = $now->clone->truncate(to => 'month'); # prevent ratio
+    my $begin = $now->clone->subtract(months => 2);
     Utils::Api::set_time($begin);
-    my $provider = create_provider($in_free_time,$out_free_time);
+    my $provider = create_provider(60 * 100,50 * 100);
     my $balance = 5;
     my $caller = Utils::Api::setup_subscriber($provider,$provider->{subscriber_fees}->[0]->{profile},$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
     my $callee = Utils::Api::setup_subscriber($provider,$provider->{subscriber_fees}->[1]->{profile},$balance,{ cc => 888, ac => '2<n>', sn => '<t>' });
@@ -36,9 +34,8 @@ my $out_free_time = $init_secs + 30 * $follow_secs;
     my $callee_costs = 2 * ($provider->{subscriber_fees}->[1]->{fees}->[0]->{onpeak_follow_rate} *
 	$provider->{subscriber_fees}->[1]->{fees}->[0]->{onpeak_follow_interval})/100.0;
 
-    my $max_free_time = ($in_free_time, $out_free_time)[$in_free_time < $out_free_time];
-    my $call_duration = $follow_secs + $max_free_time + 1;
-    Utils::Api::set_time($begin->clone->add(seconds => $call_duration + 20));
+    my $call_duration = $follow_secs + $follow_secs;
+    Utils::Api::set_time($now->clone->truncate(to => 'month'));
     my $start_time = Utils::Api::current_unix() - $call_duration - 1;
     Utils::Api::set_time();
     my @cdr_ids = map { $_->{id}; } @{ Utils::Rateomat::create_cdrs([
@@ -81,12 +78,12 @@ done_testing();
 exit;
 
 sub create_provider {
-    my ($free_time_in,$free_time_out) = @_;
+    my ($free_cash_in,$free_cash_out) = @_;
 
     return Utils::Api::setup_provider('test<n>.com', [
         # rates:
         {
-            interval_free_time       => $free_time_out,
+            interval_free_cash       => $free_cash_out,
             fees => [
                 {
                     direction => 'out',
@@ -99,11 +96,10 @@ sub create_provider {
                     offpeak_init_interval    => $init_secs,
                     offpeak_follow_rate      => 2,
                     offpeak_follow_interval  => $follow_secs,
-                    use_free_time           => 1,
                 },
             ]
         }, {
-            interval_free_time       => $free_time_in,
+            interval_free_cash       => $free_cash_in,
             fees => [
                 {
                     direction => 'in',
@@ -117,7 +113,6 @@ sub create_provider {
                     offpeak_init_interval    => $init_secs,
                     offpeak_follow_rate      => 2,
                     offpeak_follow_interval  => $follow_secs,
-                    use_free_time           => 1,
                 },
             ]
         },

@@ -1282,15 +1282,14 @@ PREPARE_BALANCE_CATCHUP:
 				$ratio = ($last_end + 1 - $create_time_aligned) / ($last_end + 1 - $last_start);
 			}
 			#take the previous interval's (old) free cash, e.g. 5euro:
-			$last_cash_balance_int = $last_profile->{int_free_cash} // 0.0; #backward-defaults
-			$old_free_cash = $ratio * $last_cash_balance_int;
+			$old_free_cash = $ratio * ($last_profile->{int_free_cash} // 0.0);
 			#carry over the last cash balance value, e.g. 23euro:
 			$cash_balance = $last_cash_balance;
 			if ($last_cash_balance_int < $old_free_cash) {
 				# the customer didn't spent all of the the old free cash, but
                 # only e.g. 2euro overall. to get the raw balance, subtract the
                 # unused rest of the old free cash, e.g. -3euro.
-				$cash_balance = $cash_balance + $last_cash_balance_int - $old_free_cash;
+				$cash_balance += $last_cash_balance_int - $old_free_cash;
 			} #the customer spent all free cash
 			#free time corrections can take place here once..
 			#$last_profile->{int_free_time} ...
