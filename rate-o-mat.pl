@@ -73,6 +73,12 @@ my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
+# test may execute rate-o-mat on another host with different
+# timezone. the connection timezone can therefore be forced to
+# eg. the UTC default on ngcp.
+my $connection_timezone = $ENV{RATEOMAT_CONNECTION_TIMEZONE};
+# $ENV{TZ} has to be adjusted in the root thread.
+
 # billing database
 my $BillDB_Name = $ENV{RATEOMAT_BILLING_DB_NAME} || 'billing';
 my $BillDB_Host = $ENV{RATEOMAT_BILLING_DB_HOST} || 'localhost';
@@ -244,7 +250,8 @@ sub connect_billdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
-	INFO "Successfully connected to billing db...";
+	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
+	INFO "Successfully connected to duplication db...";
 
 }
 
@@ -257,6 +264,7 @@ sub connect_acctdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
+	$acctdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to accounting db...";
 
 }
@@ -276,6 +284,7 @@ sub connect_provdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($provdbh);
+	$provdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to provisioning db...";
 
 }
@@ -295,6 +304,7 @@ sub connect_dupdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($dupdbh);
+	$dupdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to duplication db...";
 
 }
@@ -1278,22 +1288,23 @@ PREPARE_BALANCE_CATCHUP:
 			$ratio = 1.0;
 			if($create_time > $last_start and $create_time < $last_end) {
 				$create_time_aligned = truncate_day($create_time);
-				$create_time_aligned = $create_time if $create_time_aligned < $stime;
+				$create_time_aligned = $create_time if $create_time_aligned < $last_start;
+				DEBUG sub { "last ratio = " . ($last_end + 1 - $create_time_aligned) . ' / ' . ($last_end + 1 - $last_start) . ", create_time = $create_time, create_time_aligned = $create_time_aligned"; };
 				$ratio = ($last_end + 1 - $create_time_aligned) / ($last_end + 1 - $last_start);
 			}
+			DEBUG "last ratio: $ratio";
 			#take the previous interval's (old) free cash, e.g. 5euro:
-			$last_cash_balance_int = $last_profile->{int_free_cash} // 0.0; #backward-defaults
-			$old_free_cash = $ratio * $last_cash_balance_int;
+			$old_free_cash = $ratio * ($last_profile->{int_free_cash} // 0.0);
 			#carry over the last cash balance value, e.g. 23euro:
 			$cash_balance = $last_cash_balance;
 			if ($last_cash_balance_int < $old_free_cash) {
 				# the customer didn't spent all of the the old free cash, but
-                # only e.g. 2euro overall. to get the raw balance, subtract the
-                # unused rest of the old free cash, e.g. -3euro.
-				$cash_balance = $cash_balance + $last_cash_balance_int - $old_free_cash;
-			} #the customer spent all free cash
-			#free time corrections can take place here once..
-			#$last_profile->{int_free_time} ...
+				# only e.g. 2euro overall. to get the raw balance, subtract the
+				# unused rest of the old free cash, e.g. -3euro.
+				DEBUG sub { "cash balance = $cash_balance, last_cash_balance_int = $last_cash_balance_int, old_free_cash = $old_free_cash"; };
+				$cash_balance += $last_cash_balance_int - $old_free_cash;
+				DEBUG sub { "free cash refill: " . (($last_cash_balance_int - $old_free_cash) + ($profile->{int_free_cash} // 0.0)); };
+			}
 		} else {
 			DEBUG "discarding cash balance (mode '$carry_over_mode'".($notopup_expiration ? ", notopup expiration " . $notopup_expiration : "").")";
 		}
@@ -2032,8 +2043,8 @@ sub get_call_cost {
 		} else {
 			DEBUG "add current interval cost $rate to total cost $$r_cost";
 			$$r_cost += $rate;
-			$bal->{cash_balance_interval} += $rate;
 		}
+		$bal->{cash_balance_interval} += $rate;
 
 		$$r_real_cost += $rate;
 

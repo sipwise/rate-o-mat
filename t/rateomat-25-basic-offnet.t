@@ -96,7 +96,7 @@ my @offnet_subscribers = (Utils::Rateomat::prepare_offnet_subsriber_info({ cc =>
                   my $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$cdr_ids[0],'source','customer','contract_balance_id');
                   Utils::Api::check_interval_history($label,$caller->{customer}->{id},[
                       { cash => $cash_balance/100.0,
-                        debit => (($no_balance && !$prepaid) ? 3 * $caller_call_costs : 0.0)/100.0,
+                        debit => ((!$prepaid) ? 3 * $caller_call_costs : 0.0)/100.0,
                         id => $balance_id,
                       },
                   ]);
@@ -224,7 +224,7 @@ my @offnet_subscribers = (Utils::Rateomat::prepare_offnet_subsriber_info({ cc =>
                   my $balance_id = Utils::Rateomat::get_cdr_relation_data($label,$cdr_ids[0],'destination','customer','contract_balance_id');
                   Utils::Api::check_interval_history($label,$callee->{customer}->{id},[
                       { cash => $cash_balance/100.0,
-                        debit => ($no_balance ? 3 * $callee_call_costs : 0.0)/100.0,
+                        debit => 3 * $callee_call_costs/100.0, #(!$prepaid ? 3 * $callee_call_costs : 0.0)/100.0,
                         id => $balance_id,
                       },
                   ]);
