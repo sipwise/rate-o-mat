@@ -1,0 +1,14 @@
+[Unit]
+Description=NGCP CDR Rating Daemon
+After=mariadb.service
+Requires=mariadb.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/ngcp-rate-o-mat
+ExecStart=/usr/sbin/rate-o-mat
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+Alias=rate-o-mat.service
