@@ -18,7 +18,6 @@ use Storable qw(dclone);
 
 $0 = 'rate-o-mat'; ## no critic (Variables::RequireLocalizedPunctuationVars)
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
-my $PID;
 my $pidfile = '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = ((defined $ENV{RATEOMAT_LOOP_INTERVAL} && $ENV{RATEOMAT_LOOP_INTERVAL}) ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10);
@@ -2840,24 +2839,45 @@ RATING_DURATION_FOUND:
 
 }
 
+sub create_pidfile {
+
+	my $pidfh;
+
+	open $pidfh, '>>', $pidfile or FATAL "Can't open '$pidfile' for writing: $!\n";
+	flock($pidfh, LOCK_EX | LOCK_NB) or FATAL "Unable to lock pidfile '$pidfile': $!\n";
+
+	return $pidfh;
+
+}
+
+sub write_pidfile {
+
+	my $pidfh = shift;
+
+	seek $pidfh, 0, SEEK_SET;
+	truncate $pidfh, 0;
+	printflush $pidfh "$$\n";
+
+}
+
 sub daemonize {
 
 	my $pidfile = shift;
+	my $pidfh;
 
 	chdir '/' or FATAL "Can't chdir to /: $!\n";
 	open STDIN, '<', '/dev/null' or FATAL "Can't read /dev/null: $!\n";
 	open STDOUT, ">", "/dev/null" or FATAL "Can't open /dev/null: $!\n";
 	open STDERR, ">", "/dev/null" or FATAL "Can't open /dev/null: $!\n";
-	open $PID, ">>", "$pidfile" or FATAL "Can't open '$pidfile' for writing: $!\n";
-	flock($PID, LOCK_EX | LOCK_NB) or FATAL "Unable to lock pidfile '$pidfile': $!\n";
+	$pidfh = create_pidfile($pidfile);
 	defined(my $pid = fork) or FATAL "Can't fork: $!\n";
 	exit if $pid;
 	setsid or FATAL "Can't start a new session: $!\n";
-	seek $PID, 0, SEEK_SET;
-	truncate $PID, 0;
-	printflush $PID "$$\n";
+	write_pidfile($pidfh);
 	open STDOUT, "|-", "logger -s -t $log_ident" or FATAL "Can't open logger output stream: $!\n";
 	open STDERR, '>&STDOUT' or FATAL "Can't dup stdout: $!\n";
+
+	return $pidfh;
 
 }
 
@@ -2877,12 +2897,17 @@ sub debug_rating_time {
 }
 
 sub main {
+	my $pidfh;
 
 	openlog($log_ident, $log_opts, $log_facility)
 		or die "Error opening syslog: $!\n";
 
-	daemonize($pidfile)
-		if($fork == 1);
+	if ($fork != 0) {
+		$pidfh = daemonize($pidfile);
+	} else {
+		$pidfh = create_pidfile($pidfile);
+		write_pidfile($pidfh);
+	}
 
 	local $SIG{TERM} = \&signal_handler;
 	local $SIG{INT} = \&signal_handler;
@@ -3112,6 +3137,6 @@ sub main {
 	$provdbh and $acctdbh->disconnect;
 	$dupdbh and $dupdbh->disconnect;
 	closelog;
-	close $PID;
+	close $pidfh;
 	unlink $pidfile;
 }
