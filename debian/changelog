@@ -1,3 +1,19 @@
+ngcp-rate-o-mat (6.2.0.0+0~mr6.2.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [a9441b9] TT#28512 negative call costs for postpaid calls
+  * [16c186e] TT#29754 fix free cash calculation/carry over
+  * [f450458] TT#29755 free cash testcase
+
+  [ Guillem Jover ]
+  * [e742185] TT#26264 Create a pidfile even if we do not daemonize
+  * [04ebe82] TT#26264 Add systemd service file
+  * [2a306b0] TT#26264 Switch from mariadb.service to mysql.service in systemd service
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 29 Jan 2018 21:56:56 +0100
+
 ngcp-rate-o-mat (6.1.0.0+0~mr6.1.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
