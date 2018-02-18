@@ -45,6 +45,53 @@
       "revId": "e742185f647a4ecfc430f81aad15546b39777015",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba7be1f8_e8b51332",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2846,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-02-18T15:40:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ba7be1f8_68aa03d6",
+      "range": {
+        "startLine": 2846,
+        "startChar": 6,
+        "endLine": 2846,
+        "endChar": 12
+      },
+      "revId": "e742185f647a4ecfc430f81aad15546b39777015",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba7be1f8_08826752",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2909,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-02-18T15:40:10Z",
+      "side": 1,
+      "message": "would suggest to drop this again",
+      "range": {
+        "startLine": 2907,
+        "startChar": 1,
+        "endLine": 2909,
+        "endChar": 24
+      },
+      "revId": "e742185f647a4ecfc430f81aad15546b39777015",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
