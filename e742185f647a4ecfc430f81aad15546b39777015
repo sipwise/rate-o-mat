@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba7be1f8_68aa03d6",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2846,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-02-18T15:25:40Z",
+      "side": 1,
+      "message": "FATAL: Can\u0027t open \u0027/var/run/rate-o-mat.pid\u0027 for writing: Permission denied\n\n(this wasnt the case before)\n\nmaybe also set process umask in here?",
+      "range": {
+        "startLine": 2846,
+        "startChar": 6,
+        "endLine": 2846,
+        "endChar": 12
+      },
+      "revId": "e742185f647a4ecfc430f81aad15546b39777015",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
