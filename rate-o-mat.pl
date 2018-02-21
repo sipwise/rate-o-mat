@@ -18,7 +18,7 @@ use Storable qw(dclone);
 
 $0 = 'rate-o-mat'; ## no critic (Variables::RequireLocalizedPunctuationVars)
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
-my $pidfile = '/var/run/rate-o-mat.pid';
+my $pidfile = $ENV{RATEOMAT_PIDFILE} // '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = ((defined $ENV{RATEOMAT_LOOP_INTERVAL} && $ENV{RATEOMAT_LOOP_INTERVAL}) ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10);
 my $debug = ((defined $ENV{RATEOMAT_DEBUG} && $ENV{RATEOMAT_DEBUG}) ? int $ENV{RATEOMAT_DEBUG} : 0);
@@ -2904,7 +2904,7 @@ sub main {
 
 	if ($fork != 0) {
 		$pidfh = daemonize($pidfile);
-	} else {
+	} elsif (length $pidfile) {
 		$pidfh = create_pidfile($pidfile);
 		write_pidfile($pidfh);
 	}

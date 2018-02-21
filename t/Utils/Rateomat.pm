@@ -51,6 +51,7 @@ $ENV{RATEOMAT_ACCOUNTING_DB_USER} //= 'root';
 
 $ENV{RATEOMAT_DEBUG} //= 1;
 $ENV{RATEOMAT_DAEMONIZE} = 0;
+$ENV{RATEOMAT_PIDFILE} = '';
 my $rateomat_timeout = 5;
 my $rateomat_pl = $ENV{RATEOMAT_PL} // '../rate-o-mat.pl';
 
