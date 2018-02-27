@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.18.7.2+0~mr4.5.7.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [556d986] TT#29754 fix free cash calculation/carry over
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 27 Feb 2018 13:39:09 +0100
+
 ngcp-rate-o-mat (1.18.7.1+0~mr4.5.7.1) unstable; urgency=medium
 
   * New release.
