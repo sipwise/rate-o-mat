@@ -137,8 +137,7 @@ my $sth_billing_info_v4;
 my $sth_billing_info_v6;
 my $sth_billing_info_panel;
 my $sth_profile_info;
-my $sth_offpeak_weekdays;
-my $sth_offpeak_special;
+my $sth_offpeak;
 my $sth_unrated_cdrs;
 my $sth_update_cdr;
 my $sth_create_cdr_fragment;
@@ -217,6 +216,11 @@ sub WARNING {
 	print "WARNING: $msg\n" if($fork != 1);
 	syslog('warning', $msg);
 
+}
+
+sub sql_convert_tz {
+  my ($date,$to_tz) = @_;
+  return "unix_timestamp(convert_tz($date,\@\@session.time_zone,$to_tz))";
 }
 
 sub sql_time {
@@ -400,6 +404,15 @@ sub init_db {
 	connect_acctdbh;
 	connect_dupdbh;
 
+	$billdbh->do("create temporary table if not exists billing.date_enum (d date, index (d))");
+	$billdbh->do("truncate table billing.date_enum");
+	$billdbh->do("insert into billing.date_enum select adddate('1970-01-01',d4.i*10000 + d3.i*1000 + d2.i*100 + d1.i*10 + d0.i) from
+		(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d0,
+		(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d1,
+		(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d2,
+		(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d3,
+		(select 0 as i union select 1 union select 2) d4"); #up to 2052-02-19, takes 0.3 secs
+
 	$sth_get_contract_info = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(c.create_timestamp),".
 		" UNIX_TIMESTAMP(c.modify_timestamp),".
@@ -540,32 +553,22 @@ EOS
 		"LIMIT 1"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
-	$sth_offpeak_weekdays = $billdbh->prepare( # TODO: optimize lines 4 and 10 below
-		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
-		"FROM billing.billing_peaktime_weekdays ".
-		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(FROM_UNIXTIME(?)) <= WEEKDAY(FROM_UNIXTIME(? + ?)) ".
-		"AND weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
-		"AND weekday <= WEEKDAY(FROM_UNIXTIME(? + ?)) ".
-		"UNION ".
-		"SELECT weekday, TIME_TO_SEC(start), TIME_TO_SEC(end) ".
-		"FROM billing.billing_peaktime_weekdays ".
-		"WHERE billing_profile_id = ? ".
-		"AND WEEKDAY(FROM_UNIXTIME(?)) > WEEKDAY(FROM_UNIXTIME(? + ?)) ".
-		"AND (weekday >= WEEKDAY(FROM_UNIXTIME(?)) ".
-		"OR weekday <= WEEKDAY(FROM_UNIXTIME(? + ?)))"
-	) or FATAL "Error preparing weekday offpeak statement: ".$billdbh->errstr;
-
-	$sth_offpeak_special = $billdbh->prepare(
-		"SELECT UNIX_TIMESTAMP(start), UNIX_TIMESTAMP(end) ".
-		"FROM billing.billing_peaktime_special ".
-		"WHERE billing_profile_id = ? ".
-		"AND ( ".
-		"(start <= FROM_UNIXTIME(?) AND end >= FROM_UNIXTIME(?)) ".
-		"OR (start >= FROM_UNIXTIME(?) AND end <= FROM_UNIXTIME(? + ?)) ".
-		"OR (start <= FROM_UNIXTIME(? + ?) AND end >= FROM_UNIXTIME(? + ?)) ".
-		")"
-	) or FATAL "Error preparing special offpeak statement: ".$billdbh->errstr;
+	my $x="";
+	my $sth_offpeak;
+	$sth_offpeak = $billdbh->prepare("select ".
+		sql_convert_tz("concat(date_enum.d,' ',pw.start)",$x) .','. sql_convert_tz("concat(date_enum.d,' ',pw.end)",$x) .
+		" from billing.date_enum as date_enum ".
+		"join billing.billing_peaktime_weekdays pw on pw.weekday=weekday(date_enum.d) ".
+		"where date_enum.d >= date(from_unixtime(?)) ".
+		"and date_enum.d <= date(from_unixtime(? + ?)) ".
+		"and pw.billing_profile_id = ?".
+		" union ".
+		"select ".
+		sql_convert_tz("ps.start",$x) .','. sql_convert_tz("ps.end",$x) .
+		" from billing.billing_peaktime_special as ps ".
+		"where ps.billing_profile_id = ? ".
+		"and (ps.start <= from_unixtime(? + ?) and ps.end >= from_unixtime(?))"
+	) or FATAL "Error preparing offpeak statement: ".$billdbh->errstr;
 
 	$sth_unrated_cdrs = $acctdbh->prepare(
 		"SELECT * ".
@@ -1626,37 +1629,7 @@ sub get_profile_info {
 	return 1;
 }
 
-sub get_offpeak_weekdays {
-
-	my $bpid = shift;
-	my $start = shift;
-	my $duration = shift;
-	my $r_offpeaks = shift;
-
-	my $sth = $sth_offpeak_weekdays;
-
-	$sth->execute(
-		$bpid,
-		$start, $start, $duration,
-		$start, $start, $duration,
-		$bpid,
-		$start, $start, $duration,
-		$start, $start, $duration
-	) or FATAL "Error executing weekday offpeak statement: ".$sth->errstr;
-
-	while(my @res = $sth->fetchrow_array()) {
-		my %e = ();
-		$e{weekday} = $res[0];
-		$e{start} = $res[1];
-		$e{end} = $res[2];
-		push @$r_offpeaks, \%e;
-	}
-
-	return 1;
-
-}
-
-sub get_offpeak_special {
+sub get_offpeak {
 
 	my $bpid = shift;
 	my $start = shift;
@@ -1684,7 +1657,7 @@ sub get_offpeak_special {
 
 }
 
-sub is_offpeak_special {
+sub is_offpeak {
 
 	my $start = shift;
 	my $offset = shift;
@@ -1694,27 +1667,6 @@ sub is_offpeak_special {
 
 	foreach my $r_o(@$r_offpeaks) {
 		return 1 if($secs >= $r_o->{start} && $secs <= $r_o->{end});
-	}
-
-	return 0;
-
-}
-
-sub is_offpeak_weekday {
-
-	my $start = shift;
-	my $offset = shift;
-	my $r_offpeaks = shift;
-
-	my ($S, $M, $H, $d, $m, $y, $wd, $yd, $dst) = localtime($start + $offset);
-	$wd = ($wd - 1) % 7; # convert to MySQL notation (mysql: mon=0, unix: mon=1)
-	$y += 1900; $m += 1;
-	#$H -= 1 if($dst == 1); # regard daylight saving time
-
-	my $secs = $S + $M * 60 + $H * 3600; # we have seconds since midnight as reference
-	foreach my $r_o(@$r_offpeaks) {
-		return 1 if($wd == $r_o->{weekday} &&
-			$secs >= $r_o->{start} && $secs <= $r_o->{end});
 	}
 
 	return 0;
@@ -1898,17 +1850,10 @@ sub get_call_cost {
 
 	DEBUG sub { "billing fee is ".(Dumper $r_profile_info) };
 
-	my @offpeak_weekdays = ();
-	get_offpeak_weekdays($profile_id, $cdr->{start_time},
-		$cdr->{duration}, \@offpeak_weekdays) or
-		FATAL "Error getting weekdays offpeak info\n";
-	#print Dumper \@offpeak_weekdays;
-
-	my @offpeak_special = ();
-	get_offpeak_special($profile_id, $cdr->{start_time},
-		$cdr->{duration}, \@offpeak_special) or
-		FATAL "Error getting special offpeak info\n";
-	#print Dumper \@offpeak_special;
+	my @offpeak = ();
+	get_offpeak($profile_id, $cdr->{start_time},
+		$cdr->{duration}, \@offpeak) or
+		FATAL "Error getting offpeak info\n";
 
 	$$r_cost = 0;
 	$$r_real_cost = 0;
@@ -1929,8 +1874,7 @@ sub get_call_cost {
 	my %bal_map = map { $_->{id} => $_; } @$r_balances;
 
 	if($duration == 0) {  # zero duration call, yes these are possible
-		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special)
-				   or is_offpeak_weekday($cdr->{start_time}, $offset, \@offpeak_weekdays)) {
+		if(is_offpeak($cdr->{start_time}, $offset, \@offpeak)) {
 			$$r_onpeak = 0;
 		} else {
 			$$r_onpeak = 1;
@@ -1940,11 +1884,7 @@ sub get_call_cost {
 	while ($duration > 0) {
 		DEBUG "try to rate remaining duration of $duration secs";
 
-		if(is_offpeak_special($cdr->{start_time}, $offset, \@offpeak_special)) {
-			#print "offset $offset is offpeak-special\n";
-			$onpeak = 0;
-		} elsif(is_offpeak_weekday($cdr->{start_time}, $offset, \@offpeak_weekdays)) {
-			#print "offset $offset is offpeak-weekday\n";
+		if(is_offpeak($cdr->{start_time}, $offset, \@offpeak)) {
 			$onpeak = 0;
 		} else {
 			#print "offset $offset is onpeak\n";
@@ -3088,8 +3028,7 @@ sub main {
 	$sth_billing_info_v6->finish;
 	$sth_billing_info_panel->finish;
 	$sth_profile_info->finish;
-	$sth_offpeak_weekdays->finish;
-	$sth_offpeak_special->finish;
+	$sth_offpeak->finish;
 	$sth_unrated_cdrs->finish;
 	$sth_update_cdr->finish;
 	$split_peak_parts and $sth_create_cdr_fragment->finish;
