@@ -412,15 +412,6 @@ sub init_db {
 	connect_acctdbh;
 	connect_dupdbh;
 
-	$billdbh->do("create temporary table if not exists billing.date_enum (d date, index (d))");
-	$billdbh->do("truncate table billing.date_enum");
-	$billdbh->do("insert into billing.date_enum select adddate('1970-01-01',d4.i*10000 + d3.i*1000 + d2.i*100 + d1.i*10 + d0.i) from ".
-		"(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d0, ".
-		"(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d1, ".
-		"(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d2, ".
-		"(select 0 as i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) d3, ".
-		"(select 0 as i union select 1 union select 2) d4"); #up to 2052-02-19, takes 0.3 secs only but will be moved to a fixed table in favour of swrate
-
 	$sth_get_contract_info = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(c.create_timestamp),".
 		" UNIX_TIMESTAMP(c.modify_timestamp),".
@@ -563,7 +554,7 @@ EOS
 
 	$sth_offpeak = $billdbh->prepare("select ".
 		"unix_timestamp(concat(date_enum.d,' ',pw.start)),unix_timestamp(concat(date_enum.d,' ',pw.end))".
-		" from billing.date_enum as date_enum ".
+		" from ngcp.date_enum as date_enum ".
 		"join billing.billing_peaktime_weekdays pw on pw.weekday=weekday(date_enum.d) ".
 		"where date_enum.d >= date(from_unixtime(?)) ".
 		"and date_enum.d <= date(from_unixtime(? + ?)) ".
@@ -578,7 +569,7 @@ EOS
 
 	$sth_offpeak_subscriber = $billdbh->prepare("select ".
 		_sql_offpeak_convert_tz("concat(date_enum.d,' ',pw.start)") .','. _sql_offpeak_convert_tz("concat(date_enum.d,' ',pw.end)") .
-		" from billing.date_enum as date_enum ".
+		" from ngcp.date_enum as date_enum ".
 		"join billing.billing_peaktime_weekdays pw on pw.weekday=weekday(date_enum.d) ".
 		"where date_enum.d >= date(from_unixtime(?)) ".
 		"and date_enum.d <= date(from_unixtime(? + ?)) ".
