@@ -1238,7 +1238,7 @@ sub catchup_contract_balance {
 	my $profile;
 	my ($stime,$etime);
 	my $align_eom_time;
-	if ("create" eq $start_mode && defined $create_time) {
+	if (("create" eq $start_mode or "create_tz" eq $start_mode) && defined $create_time) {
 		$align_eom_time = $create_time;
 	} #no eom preserve, since we don't have the begin of the first topup interval
 	#} elsif ("topup_interval" eq $start_mode && defined x) {
