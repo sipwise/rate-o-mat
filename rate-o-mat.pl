@@ -53,6 +53,11 @@ my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMA
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
+# set to 1 to write real call costs to CDRs for postpaid, even if balance was consumed:
+my $use_customer_real_cost = 0;
+my $use_provider_real_cost = 0;
+my $prepaid_update_balance = 0;
+
 # control writing cdr relation data:
 # disable it for now until this will be limited to prepaid contracts,
 # as it produces massive amounts of zeroed or unneeded data.
@@ -2375,8 +2380,10 @@ sub get_customer_call_cost {
 			# maybe another rateomat was faster and already processed+deleted it?
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
-			update_contract_balance(\@balances)
-				or FATAL "Error updating ".$dir."customer contract balance\n";
+			if ($prepaid_update_balance) {
+				update_contract_balance(\@balances)
+					or FATAL "Error updating ".$dir."customer contract balance\n";
+			}
 			$$r_cost = $real_cost;
 			$cdr->{$dir."customer_cash_balance_after"} = $snapshot_bal->{cash_balance};
 			$cdr->{$dir."customer_free_time_balance_after"} = $snapshot_bal->{free_time_balance};
@@ -2388,6 +2395,9 @@ sub get_customer_call_cost {
 			$$r_cost = $real_cost;
 		} else { #postpaid in, postpaid out
 			DEBUG "billing profile is post-paid, update contract balance";
+			if ($use_customer_real_cost) {
+				$$r_cost = $real_cost;
+			}
 		}
 		update_contract_balance(\@balances)
 			or FATAL "Error updating ".$dir."customer contract balance\n";
@@ -2471,6 +2481,10 @@ sub get_provider_call_cost {
 		# restore the original balance and leave the fields empty
 
 		# no balance update for providers with prepaid profile
+	}
+
+	if ($use_provider_real_cost) {
+		$$r_cost = $real_cost;
 	}
 
 	return 1;
