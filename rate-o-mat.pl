@@ -53,6 +53,12 @@ my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMA
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
+# set to 1 to write real call costs to CDRs for postpaid, even if balance was consumed:
+my $use_customer_real_cost = 0;
+my $use_provider_real_cost = 0;
+# don't update balance of prepaid contracts, if no prepaid_costs record is found (re-rating):
+my $prepaid_update_balance = 0;
+
 # control writing cdr relation data:
 # disable it for now until this will be limited to prepaid contracts,
 # as it produces massive amounts of zeroed or unneeded data.
@@ -2418,7 +2424,7 @@ sub get_customer_call_cost {
 			# maybe another rateomat was faster and already processed+deleted it?
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
-			unless ($readonly) {
+			if (not $readonly and $prepaid_update_balance) {
 				update_contract_balance(\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
@@ -2430,9 +2436,12 @@ sub get_customer_call_cost {
 		# we don't do prepaid for termination fees for now, so treat it as post-paid
 		if($prepaid == 1 && $direction eq "in") { #prepaid in
 			DEBUG "treat pre-paid billing profile as post-paid for termination fees";
-			$$r_cost = $real_cost; #prepaid: update balance AND show full costs
+			$$r_cost = $real_cost; #prepaid: always update balance AND show full costs
 		} else { #postpaid in, postpaid out
 			DEBUG "billing profile is post-paid, update contract balance";
+			if ($use_customer_real_cost) {
+				$$r_cost = $real_cost;
+			}
 		}
 		unless ($readonly) {
 			update_contract_balance(\@balances)
@@ -2522,6 +2531,10 @@ sub get_provider_call_cost {
 		# restore the original balance and leave the fields empty
 
 		# no balance update for providers with prepaid profile
+	}
+
+	if ($use_provider_real_cost) {
+		$$r_cost = $real_cost;
 	}
 
 	return 1;
