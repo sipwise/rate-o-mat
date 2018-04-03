@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_e02fe2f4",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 60,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-04-03T12:49:22Z",
+      "side": 1,
+      "message": "should these have corresponding $ENV options?",
+      "range": {
+        "startLine": 57,
+        "startChar": 0,
+        "endLine": 60,
+        "endChar": 31
+      },
+      "revId": "76481a3876ec4ad35c258bb064bbc196ef8f67b0",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_20ef0ab2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 2427,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-04-03T12:49:22Z",
+      "side": 1,
+      "message": "add parenthesis for clarity? (no idea about the precedence of `not` vs `and`)\n\nwith the default options above, this looks like it would change the default behaviour",
+      "range": {
+        "startLine": 2427,
+        "startChar": 6,
+        "endLine": 2427,
+        "endChar": 49
+      },
+      "revId": "76481a3876ec4ad35c258bb064bbc196ef8f67b0",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
