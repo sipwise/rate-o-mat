@@ -1,3 +1,21 @@
+ngcp-rate-o-mat (6.2.1.0+0~mr6.2.1.0) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * [e3f3ec6] TT#26264 Make it possible to disable pidfile creation
+
+  [ Rene Krenn ]
+  * [7b78123] TT#32910 store initial cash_balance, free_time_balance
+  * [d5d7089] TT#27659 apply timezones for onpeak/offpeak times
+  * [8122f0f] TT#33983 use ngcp.date_range_helper instead of temp table
+  * [87510f8] TT#32912 consider new "tz" balance start modes
+
+  [ Alexander Lutay ]
+  * [25404df] TT#33276 Remove sysv init script dependency on sshd
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 03 Apr 2018 22:32:12 +0200
+
 ngcp-rate-o-mat (6.2.0.0+0~mr6.2.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
