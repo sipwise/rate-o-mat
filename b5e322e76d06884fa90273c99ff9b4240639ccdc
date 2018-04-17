@@ -22,6 +22,30 @@
       "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9aa53dc9_a239e043",
+        "filename": "debian/ngcp-rate-o-mat.maintscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2018-04-17T14:16:10Z",
+      "side": 1,
+      "message": "\u003e should we have 3 here?\n\nI tend to do +1 version in the changes of Sipwise lately, so for people using trunk it\u0027ll get removed on upgrades.\n\nThe effect is that it will keep trying to remove it until 6.4, so it should be harmless, although it can be a bit strange looking back after a few versions and seeing that it was written with a \"wrong\" version.\n\nI can change it to 6.3 if any of you prefers that.",
+      "parentUuid": "9aa53dc9_a2b440d1",
+      "range": {
+        "startLine": 1,
+        "startChar": 42,
+        "endLine": 1,
+        "endChar": 43
+      },
+      "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
