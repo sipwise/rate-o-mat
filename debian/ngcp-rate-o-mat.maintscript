@@ -1,0 +1,1 @@
+rm_conffile /etc/init.d/ngcp-rate-o-mat 6.4.0.0~ ngcp-rate-o-mat
