@@ -70,6 +70,30 @@
       "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9aa53dc9_02608c34",
+        "filename": "debian/ngcp-rate-o-mat.maintscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-04-17T14:28:22Z",
+      "side": 1,
+      "message": "See my comment on the other review, I use the +1 which is IMO precisely to be used for this kind of thing.",
+      "parentUuid": "9aa53dc9_a239e043",
+      "range": {
+        "startLine": 1,
+        "startChar": 42,
+        "endLine": 1,
+        "endChar": 43
+      },
+      "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
