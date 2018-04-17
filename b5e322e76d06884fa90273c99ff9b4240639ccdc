@@ -46,6 +46,30 @@
       "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9aa53dc9_e27da8e8",
+        "filename": "debian/ngcp-rate-o-mat.maintscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-04-17T14:25:24Z",
+      "side": 1,
+      "message": "Ah, good to know, tnx for explanation, LGTM.",
+      "parentUuid": "9aa53dc9_a239e043",
+      "range": {
+        "startLine": 1,
+        "startChar": 42,
+        "endLine": 1,
+        "endChar": 43
+      },
+      "revId": "b5e322e76d06884fa90273c99ff9b4240639ccdc",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
