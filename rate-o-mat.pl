@@ -53,6 +53,9 @@ my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMA
 # update subscriber prepaid attribute value upon profile mapping updates:
 my $update_prepaid_preference = 1;
 
+# don't update balance of prepaid contracts, if no prepaid_costs record is found (re-rating):
+my $prepaid_update_balance = 0;
+
 # control writing cdr relation data:
 # disable it for now until this will be limited to prepaid contracts,
 # as it produces massive amounts of zeroed or unneeded data.
@@ -2445,7 +2448,7 @@ sub get_customer_call_cost {
 			# maybe another rateomat was faster and already processed+deleted it?
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
-			unless ($readonly) {
+			if (not $readonly and $prepaid_update_balance) {
 				update_contract_balance(\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
