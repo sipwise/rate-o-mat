@@ -1,7 +1,7 @@
 [Unit]
 Description=NGCP CDR Rating Daemon
-After=mysql.service
-Requires=mysql.service
+After=mariadb.service
+Wants=mariadb.service
 
 [Service]
 Type=simple
