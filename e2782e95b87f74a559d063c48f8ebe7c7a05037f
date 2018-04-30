@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7aaa499b_53ad4687",
+        "filename": "debian/ngcp-rate-o-mat.maintscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-04-30T08:32:52Z",
+      "side": 1,
+      "message": "Does it change something? In some other reviews you still have  6.4.0.something",
+      "revId": "e2782e95b87f74a559d063c48f8ebe7c7a05037f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
