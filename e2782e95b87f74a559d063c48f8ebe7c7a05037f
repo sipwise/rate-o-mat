@@ -16,6 +16,24 @@
       "revId": "e2782e95b87f74a559d063c48f8ebe7c7a05037f",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7aaa499b_d39ef606",
+        "filename": "debian/ngcp-rate-o-mat.maintscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-04-30T09:02:32Z",
+      "side": 1,
+      "message": "This is what it should have been from the beginning, as the +1 guarantees we are using a version immediately higher than the one in the changelog, but not higher than the next mr release.",
+      "parentUuid": "7aaa499b_53ad4687",
+      "revId": "e2782e95b87f74a559d063c48f8ebe7c7a05037f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
