@@ -1,3 +1,18 @@
+ngcp-rate-o-mat (6.2.1.1+0~mr6.2.1.1) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [b7a5382] TT#35502 Replace Requires=mysql.service with Wants=mariadb.service for ngcp-rate-o-mat.service
+
+  [ Manuel Montecelo ]
+  * [6af6da3] TT#26264 Remove obsolete init script
+
+  [ Guillem Jover ]
+  * [e2782e9] TT#26264 Remove obsolete rc.d symlinks
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 02 May 2018 12:58:51 +0200
+
 ngcp-rate-o-mat (6.2.1.0+0~mr6.2.1.0) unstable; urgency=medium
 
   [ Guillem Jover ]
