@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (6.1.2.1+0~mr6.1.2.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [6d86ba8] TT#35815 do not update balances if no prepaid_costs record
+  * [74a5fd3] TT#32910 store initial cash_balance, free_time_balance
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 14 May 2018 23:05:19 +0200
+
 ngcp-rate-o-mat (6.1.2.0+0~mr6.1.2.0) unstable; urgency=medium
 
   * New release.
