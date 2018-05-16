@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fabf19d9_c3561c06",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 3
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-05-16T14:07:29Z",
+      "side": 1,
+      "message": "If this is a platform problem, we should fix the root cause, as I\u0027ve mentioned elsewhere, that is, for example by disabling relying systemd messages to journald completely. Otherwise this looks like papering over the issue at hand.\n\nAlso I think it\u0027d be preferable, if we do not find any other reason not to, to send messages to stdout/stderr so that they can be globally controlled from systemd?",
+      "revId": "f9c4a29258b509474ec0217320b2ec3f76beff04",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
