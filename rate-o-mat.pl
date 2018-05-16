@@ -7,7 +7,6 @@ use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
-use Sys::Syslog;
 use NetAddr::IP;
 use Data::Dumper;
 use Time::HiRes qw(); #for debugging info only
@@ -22,10 +21,6 @@ my $pidfile = $ENV{RATEOMAT_PIDFILE} // '/var/run/rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = ((defined $ENV{RATEOMAT_LOOP_INTERVAL} && $ENV{RATEOMAT_LOOP_INTERVAL}) ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10);
 my $debug = ((defined $ENV{RATEOMAT_DEBUG} && $ENV{RATEOMAT_DEBUG}) ? int $ENV{RATEOMAT_DEBUG} : 0);
-
-my $log_ident = 'rate-o-mat';
-my $log_facility = 'daemon';
-my $log_opts = 'ndely,cons,pid,nowait';
 
 # number of unrated cdrs to fetch at once:
 my $batch_size = ((defined $ENV{RATEOMAT_BATCH_SIZE} && $ENV{RATEOMAT_BATCH_SIZE} > 0) ? int $ENV{RATEOMAT_BATCH_SIZE} : 100);
@@ -192,10 +187,7 @@ exit 0;
 sub FATAL {
 	my $msg = shift;
 	chomp $msg;
-	print "FATAL: $msg\n" if($fork != 1);
-	syslog('crit', $msg) if $log_fatal;
-	die "$msg\n";
-
+	die "FATAL: $msg\n";
 }
 
 sub DEBUG {
@@ -205,8 +197,7 @@ sub DEBUG {
 	$msg = &$msg() if 'CODE' eq ref $msg;
 	chomp $msg;
 	$msg =~ s/#012 +/ /g;
-	print "DEBUG: $msg\n" if($fork != 1);
-	syslog('debug', $msg);
+	print "DEBUG: $msg\n";
 
 }
 
@@ -214,8 +205,7 @@ sub INFO {
 
 	my $msg = shift;
 	chomp $msg;
-	print "INFO: $msg\n" if($fork != 1);
-	syslog('info', $msg);
+	print "INFO: $msg\n";
 
 }
 
@@ -223,8 +213,7 @@ sub WARNING {
 
 	my $msg = shift;
 	chomp $msg;
-	print "WARNING: $msg\n" if($fork != 1);
-	syslog('warning', $msg);
+	warn "WARNING: $msg\n";
 
 }
 
@@ -1712,7 +1701,7 @@ sub is_offpeak {
 sub check_shutdown {
 
 	if ($shutdown) {
-		syslog('warning', 'Shutdown detected, aborting work in progress');
+		warn 'Shutdown detected, aborting work in progress';
 		return 1;
 	}
 	return 0;
@@ -2424,7 +2413,7 @@ sub get_customer_call_cost {
 			# maybe another rateomat was faster and already processed+deleted it?
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
-			if (not $readonly and $prepaid_update_balance) {
+			if ((not $readonly) and $prepaid_update_balance) {
 				update_contract_balance(\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
@@ -2886,9 +2875,6 @@ sub debug_rating_time {
 sub main {
 	my $pidfh;
 
-	openlog($log_ident, $log_opts, $log_facility)
-		or die "Error opening syslog: $!\n";
-
 	if ($fork != 0) {
 		$pidfh = daemonize($pidfile);
 	} elsif (length $pidfile) {
@@ -3123,7 +3109,6 @@ sub main {
 	$provdbh->disconnect;
 	$provdbh and $acctdbh->disconnect;
 	$dupdbh and $dupdbh->disconnect;
-	closelog;
 	close $pidfh;
 	unlink $pidfile;
 }
