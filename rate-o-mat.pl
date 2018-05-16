@@ -192,8 +192,8 @@ exit 0;
 sub FATAL {
 	my $msg = shift;
 	chomp $msg;
-	print "FATAL: $msg\n" if($fork != 1);
-	syslog('crit', $msg) if $log_fatal;
+	print "FATAL: $msg\n" if $debug;
+	syslog('crit', $msg) if !$debug && $log_fatal;
 	die "$msg\n";
 
 }
@@ -205,8 +205,8 @@ sub DEBUG {
 	$msg = &$msg() if 'CODE' eq ref $msg;
 	chomp $msg;
 	$msg =~ s/#012 +/ /g;
-	print "DEBUG: $msg\n" if($fork != 1);
-	syslog('debug', $msg);
+	print "DEBUG: $msg\n" if $debug;
+	syslog('debug', $msg) unless $debug;
 
 }
 
@@ -214,8 +214,8 @@ sub INFO {
 
 	my $msg = shift;
 	chomp $msg;
-	print "INFO: $msg\n" if($fork != 1);
-	syslog('info', $msg);
+	print "INFO: $msg\n" if $debug;
+	syslog('info', $msg) unless $debug;
 
 }
 
@@ -223,8 +223,8 @@ sub WARNING {
 
 	my $msg = shift;
 	chomp $msg;
-	print "WARNING: $msg\n" if($fork != 1);
-	syslog('warning', $msg);
+	print "WARNING: $msg\n" if $debug;
+	syslog('warning', $msg) unless $debug;
 
 }
 
@@ -2424,7 +2424,7 @@ sub get_customer_call_cost {
 			# maybe another rateomat was faster and already processed+deleted it?
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
-			if (not $readonly and $prepaid_update_balance) {
+			if ((not $readonly) and $prepaid_update_balance) {
 				update_contract_balance(\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
