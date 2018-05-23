@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fabf19d9_01040913",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1704,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-05-23T11:20:10Z",
+      "side": 1,
+      "message": "Why warn and not WARNING?",
+      "revId": "ee27a6180dc6abd13c504664e7ec1dbbfe0e88c0",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
