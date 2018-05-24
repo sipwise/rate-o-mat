@@ -2910,6 +2910,10 @@ sub main {
 
 	init_db or FATAL "Error initializing database handlers\n";
 	my $rated = 0;
+	my $rated_old = 0;
+	my $t_wave_end;
+	my $t_wave_start = Time::HiRes::time();
+	my $delay = 0.0;
 	my $next_del = 10000;
 	my %failed_counter_map = ();
 	foreach (keys %cdr_col_models) {
@@ -2917,6 +2921,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
+	
 	while (!$shutdown) {
 
 		$log_fatal = 1;
@@ -2947,10 +2952,24 @@ sub main {
 
 		$shutdown and last;
 
-		unless (@cdrs) {
-			INFO "No new CDRs to rate, sleep $loop_interval";
-			sleep($loop_interval);
-			next;
+		if ((scalar @cdrs) < $batch_size) { # running out of cdrs, so we have end of a "wave"
+			$t_wave_end = Time::HiRes::time();
+			my $cdrs_done = $rated - $rated_old; # number of cdrs done during the wave
+			if ($cdrs_done == 0) { # no cdrs, sleep long as we did.
+				INFO "No new CDRs to rate, sleep $loop_interval";
+				sleep($loop_interval);
+				next;
+			} else {
+				my $idle_time = $loop_interval - ($t_wave_end - $t_wave_start);
+				# presuming same load of arriving cdrs, distribute the idle time for subsequent batches:
+				if ($idle_time > 0.0) {
+					$delay = $cdrs_done / $idle_time;
+				} else {
+					$delay = 0.0; # switch to full speed again, if we were too slow.
+				}
+			}
+			$t_wave_end = $t_wave;
+			$rated_old = $rated;
 		}
 
 		my $rated_batch = 0;
@@ -2958,13 +2977,14 @@ sub main {
 		my $cdr_id;
 		my $info_prefix;
 		my $failed = 0;
+
 		eval {
 			foreach my $cdr (@cdrs) {
 				$rollback = 0;
 				$log_fatal = 0;
 				$info_prefix = ($rated_batch + 1) . "/" . (scalar @cdrs) . " - ";
 				eval {
-					$t = Time::HiRes::time() if $debug;
+					$t = Time::HiRes::time();
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
 					# required to avoid contract_balances duplications during catchup:
@@ -2991,6 +3011,9 @@ sub main {
 					delete $failed_counter_map{$cdr_id};
 					debug_rating_time($t,$cdr_id,0);
 					check_shutdown() and last;
+					if ($delay > 0.0) {
+						Time::HiRes::sleep($delay);
+					}
 				};
 				$error = $@;
 				if ($error) {
@@ -3057,14 +3080,10 @@ sub main {
 			}
 		}
 
-		if ((scalar @cdrs) < 5)	{
-			INFO "Less than 5 new CDRs, sleep $loop_interval";
-			sleep($loop_interval);
-		}
 		if ($failed > 0) {
-            INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
+			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
-        }
+		}
 
 	}
 
