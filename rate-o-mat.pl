@@ -2954,17 +2954,29 @@ sub main {
 		}
 
 		my $rated_batch = 0;
-		my $t;
+		my $t,$t1;
 		my $cdr_id;
 		my $info_prefix;
 		my $failed = 0;
+		my $time_left = $loop_interval;
 		eval {
 			foreach my $cdr (@cdrs) {
 				$rollback = 0;
 				$log_fatal = 0;
 				$info_prefix = ($rated_batch + 1) . "/" . (scalar @cdrs) . " - ";
 				eval {
-					$t = Time::HiRes::time() if $debug;
+					$t1 = $t;
+					$t = Time::HiRes::time();
+					if (defined $t1) {
+						my $dt = $t - $t1;
+						$time_left -= $dt;
+						my $cdrs_left = (scalar @cdrs) - $rated_batch;
+						my $time_required = $dt * $cdrs_left;
+						if ($time_required < $time_left) {
+							my $delay = ($time_left - $time_required) / $cdrs_left;
+							Time::HiRes::sleep($delay);
+						}
+					}
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
 					# required to avoid contract_balances duplications during catchup:
@@ -3057,14 +3069,10 @@ sub main {
 			}
 		}
 
-		if ((scalar @cdrs) < 5)	{
-			INFO "Less than 5 new CDRs, sleep $loop_interval";
-			sleep($loop_interval);
-		}
 		if ($failed > 0) {
-            INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
+			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
-        }
+		}
 
 	}
 
