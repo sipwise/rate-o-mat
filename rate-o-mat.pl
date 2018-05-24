@@ -129,6 +129,25 @@ my %cdr_col_models = ();
 my $rollback;
 my $log_fatal = 1;
 
+# load equalization using first or second order low pass filter:
+my $cps_info = {
+	rated => 0,
+	rated_old => 0,
+	d_rated => 0,
+	d_rated_old => 0,
+	dd_rated => 0,
+
+	t => 0.0,
+	t_old => 0.0,
+	dt => 0.0,	
+
+	delay => 0.0,
+	cps => 0.0,
+
+	speedup => 0.02,
+	speeddown => 0.01,
+};
+
 # stmt handlers: #######################################################
 
 my $billdbh;
@@ -2867,6 +2886,47 @@ sub debug_rating_time {
 
 }
 
+sub _cps_delay {
+	if ($cps_info->{delay} > 0.0) {
+		DEBUG "sleep for ".sprintf("%.3f",$cps_info->{delay})." secs";
+		Time::HiRes::sleep($cps_info->{delay});
+	}
+}
+sub _update_cps {
+	my $num_of_cdrs = shift;
+
+	$cps_info->{rated_old} = $cps_info->{rated};
+	$cps_info->{rated} += $num_of_cdrs;
+	$cps_info->{d_rated_old} = $cps_info->{d_rated};
+	$cps_info->{d_rated} = $cps_info->{rated} - $cps_info->{rated_old};
+	$cps_info->{dd_rated} = $cps_info->{d_rated} - $cps_info->{d_rated_old}; # if 2nd order is to be used.
+
+	$cps_info->{t_old} = $cps_info->{t};
+	$cps_info->{t} = Time::HiRes::time();
+	$cps_info->{dt} = $cps_info->{t} - $cps_info->{t_old};
+
+	if ($cps_info->{dt} > 0.0) {
+		$cps_info->{cps} = $cps_info->{d_rated} / $cps_info->{dt};
+		DEBUG sprintf("%.1f",$cps_info->{cps} )." CDRs per sec";
+	} else {
+		$cps_info->{cps} = ~0;
+	}
+
+	if ($cps_info->{d_rated} > 0) { # using first order for now.
+		if (($cps_info->{delay} + $cps_info->{speedup}) > 0.0) {
+			$cps_info->{delay} -= $cps_info->{speedup};
+			DEBUG "reducing delay";
+		}
+	} else { #if ($cps_info->{dd_rated} < 0.0) {
+		if ($cps_info->{delay} < ($loop_interval - $cps_info->{speeddown})) {
+			$cps_info->{delay} += $cps_info->{speeddown};
+			DEBUG "increasing delay";
+		}
+	#} else {
+
+	}
+}
+
 sub main {
 	my $pidfh;
 
@@ -2898,6 +2958,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
+	
 	while (!$shutdown) {
 
 		$log_fatal = 1;
@@ -2928,24 +2989,19 @@ sub main {
 
 		$shutdown and last;
 
-		unless (@cdrs) {
-			INFO "No new CDRs to rate, sleep $loop_interval";
-			sleep($loop_interval);
-			next;
-		}
-
 		my $rated_batch = 0;
 		my $t;
 		my $cdr_id;
 		my $info_prefix;
 		my $failed = 0;
+
 		eval {
 			foreach my $cdr (@cdrs) {
 				$rollback = 0;
 				$log_fatal = 0;
 				$info_prefix = ($rated_batch + 1) . "/" . (scalar @cdrs) . " - ";
 				eval {
-					$t = Time::HiRes::time() if $debug;
+					$t = Time::HiRes::time();
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
 					# required to avoid contract_balances duplications during catchup:
@@ -2972,6 +3028,8 @@ sub main {
 					delete $failed_counter_map{$cdr_id};
 					debug_rating_time($t,$cdr_id,0);
 					check_shutdown() and last;
+_update_cps(1); # unless ($rated_batch % 5);
+					_cps_delay();
 				};
 				$error = $@;
 				if ($error) {
@@ -3028,6 +3086,10 @@ sub main {
 
 		$rated += $rated_batch;
 		INFO "Batch of $rated_batch CDRs completed. $rated CDRs rated overall so far.\n";
+		unless (@cdrs) {
+			_update_cps(0);
+			_cps_delay();
+		}
 
 		$shutdown and last;
 
@@ -3038,14 +3100,10 @@ sub main {
 			}
 		}
 
-		if ((scalar @cdrs) < 5)	{
-			INFO "Less than 5 new CDRs, sleep $loop_interval";
-			sleep($loop_interval);
-		}
 		if ($failed > 0) {
-            INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
+			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
-        }
+		}
 
 	}
 
