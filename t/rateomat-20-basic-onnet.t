@@ -13,7 +13,7 @@ use Test::More;
 ### balance > 0.0/no balance produce correct customer/reseller call cost, cash balance
 ### and cash balance interval values.
 
-local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
+$ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
 my $init_secs = 60;
 my $follow_secs = 30;

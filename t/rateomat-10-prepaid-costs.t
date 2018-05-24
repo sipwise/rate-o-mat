@@ -31,10 +31,10 @@ my $provider = Utils::Api::setup_provider('test.com',
 my $call_costs = ($provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_rate} *
 	$provider->{subscriber_fees}->[0]->{fee}->{onpeak_init_interval} +
     $provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_rate} *
-	$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval});
+	$provider->{subscriber_fees}->[0]->{fee}->{onpeak_follow_interval})/100.0;
 
 my $call_count = 3;
-my $balance = $call_count * $call_costs / 100.0;
+my $balance = $call_count * $call_costs;
 my $profiles_setup = $provider->{subscriber_fees}->[0]->{profile};
 my $caller = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });
 #my $caller2 = Utils::Api::setup_subscriber($provider,$profiles_setup,$balance,{ cc => 888, ac => '1<n>', sn => '<t>' });

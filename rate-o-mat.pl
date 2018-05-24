@@ -655,14 +655,11 @@ EOS
 	) or FATAL "Error preparing prepaid costs count statement: ".$acctdbh->errstr;
 
 	$sth_prepaid_cost = $acctdbh->prepare( #call_id index required
-		'SELECT * FROM accounting.prepaid_costs WHERE call_id = ? ' .
-		'AND source_user_id = ? AND destination_user_id = ?' .
-		'ORDER BY timestamp ASC' # newer entries overwrite older ones
+		"SELECT * FROM accounting.prepaid_costs WHERE call_id = ? order by timestamp asc" # newer entries overwrite older ones
 	) or FATAL "Error preparing prepaid cost statement: ".$acctdbh->errstr;
 
 	$sth_delete_prepaid_cost = $acctdbh->prepare( #call_id index required
-		'DELETE FROM accounting.prepaid_costs WHERE call_id = ? ' .
-		'AND source_user_id = ? AND destination_user_id = ?'
+		"DELETE FROM accounting.prepaid_costs WHERE call_id = ?"
 	) or FATAL "Error preparing delete prepaid costs statement: ".$acctdbh->errstr;
 
 	$sth_delete_old_prepaid = $acctdbh->prepare(
@@ -852,10 +849,8 @@ sub lock_contracts {
 	}
 	my %user_ids = ();
 	# callee subscriber contract:
-	WARNING "empty source_user_id for CDR ID $cdr->{id}" unless length($cdr->{source_user_id}) > 0;
 	$user_ids{$cdr->{source_user_id}} = 1 if $cdr->{source_user_id} ne "0";
 	# (onnet) caller subscriber:
-	WARNING "empty destination_user_id for CDR ID $cdr->{id}" unless length($cdr->{destination_user_id}) > 0;
 	$user_ids{$cdr->{destination_user_id}} = 1 if $cdr->{destination_user_id} ne "0";
 	my @uuids = keys %user_ids;
 	my $uuid_count = scalar @uuids;
@@ -2136,20 +2131,9 @@ sub populate_prepaid_cost_cache {
 		if ($count > $prepaid_costs_cache_limit) {
 			WARNING "over $prepaid_costs_cache_limit pending prepaid_costs records, too many to preload";
 		} else {
-			$prepaid_costs_cache = {};
 			$sth_prepaid_costs_cache->execute()
 				or FATAL "Error executing get prepaid costs cache statement: ".$sth_prepaid_costs_cache->errstr;
-			while (my $prepaid_cost = $sth_prepaid_costs_cache->fetchrow_hashref()) {
-				$prepaid_costs_cache->{$prepaid_cost->{call_id}} //= {};
-				my $map = $prepaid_costs_cache->{$prepaid_cost->{call_id}};
-				$map->{$prepaid_cost->{source_user_id}} //= {};
-				$map = $map->{$prepaid_cost->{source_user_id}};
-				if (exists $map->{$prepaid_cost->{destination_user_id}}) {
-					WARNING "duplicate prepaid_costs call_id = $prepaid_cost->{call_id}, source_user_id = $prepaid_cost->{source_user_id}, destination_user_id = $prepaid_cost->{destination_user_id}";
-				}
-				$map->{$prepaid_cost->{destination_user_id}} = $prepaid_cost;
-			}
-			DEBUG "prepaid_costs cache populated, $count records";
+			$prepaid_costs_cache = $sth_prepaid_costs_cache->fetchall_hashref('call_id');
 			return 1;
 		}
 	} else {
@@ -2170,23 +2154,17 @@ sub get_prepaid_cost {
 	my $cdr = shift;
 	my $entry = undef;
 	if (defined $prepaid_costs_cache) {
-		if (exists $prepaid_costs_cache->{$cdr->{call_id}}) {
-			my $map = $prepaid_costs_cache->{$cdr->{call_id}};
-			if (exists $map->{$cdr->{source_user_id}}) {
-				$map = $map->{$cdr->{source_user_id}};
-				if (exists $map->{$cdr->{destination_user_id}}) {
-					DEBUG "prepaid_costs call_id = $cdr->{call_id}, source_user_id = $cdr->{source_user_id}, destination_user_id = $cdr->{destination_user_id} found in cache";
-					$entry = $map->{$cdr->{destination_user_id}};
-				}
-			}
+		if (exists($prepaid_costs_cache->{$cdr->{call_id}})) {
+			DEBUG "prepaid cost record for call ID $cdr->{call_id} found in cache";
+			$entry = $prepaid_costs_cache->{$cdr->{call_id}};
 		}
 	} else {
-		$sth_prepaid_cost->execute($cdr->{call_id},$cdr->{source_user_id},$cdr->{destination_user_id})
+		$sth_prepaid_cost->execute($cdr->{call_id})
 			or FATAL "Error executing get prepaid cost statement: ".$sth_prepaid_cost->errstr;
-		my $prepaid_cost = $sth_prepaid_cost->fetchall_hashref('destination_user_id');
-		if ($prepaid_cost && exists $prepaid_cost->{$cdr->{destination_user_id}}) {
-            DEBUG "prepaid cost record for call ID $cdr->{call_id} retrieved";
-			$entry = $prepaid_cost->{$cdr->{destination_user_id}};
+		my $prepaid_cost = $sth_prepaid_cost->fetchall_hashref('call_id');
+		if ($prepaid_cost && exists($prepaid_cost->{$cdr->{call_id}})) {
+            DEBUG "prepaid cost record for call ID $cdr->{call_id} fetched";
+			$entry = $prepaid_cost->{$cdr->{call_id}};
         }
 	}
 	return $entry;
@@ -2196,33 +2174,14 @@ sub get_prepaid_cost {
 sub drop_prepaid_cost {
 
 	my $entry = shift;
-	my $count = $sth_delete_prepaid_cost->execute($entry->{call_id},$entry->{source_user_id},$entry->{destination_user_id})
+	$sth_delete_prepaid_cost->execute($entry->{call_id})
 		or FATAL "Error executing delete prepaid cost statement: ".$sth_delete_prepaid_cost->errstr;
-	if ($count > 1) {
-		WARNING "multiple prepaid_costs call_id = $entry->{call_id}, source_user_id = $entry->{source_user_id}, destination_user_id = $entry->{destination_user_id} deleted";
-	} elsif ($count == 1) {
-		DEBUG "prepaid_costs call_id = $entry->{call_id}, source_user_id = $entry->{source_user_id}, destination_user_id = $entry->{destination_user_id} deleted";
-	} elsif ($count == 1) {
-		WARNING "no prepaid_costs call_id = $entry->{call_id}, source_user_id = $entry->{source_user_id}, destination_user_id = $entry->{destination_user_id} deleted";
-	}
 	if (defined $prepaid_costs_cache) {
-		if (exists $prepaid_costs_cache->{$entry->{call_id}}) {
-			my $map = $prepaid_costs_cache->{$entry->{call_id}};
-			if (exists $map->{$entry->{source_user_id}}) {
-				$map = $map->{$entry->{source_user_id}};
-				if (exists $map->{$entry->{destination_user_id}}) {
-					delete $map->{$entry->{destination_user_id}};
-					my $empty = (scalar keys %$map) == 0;
-					$map = $prepaid_costs_cache->{$entry->{call_id}};
-					delete $map->{$entry->{source_user_id}} if $empty;
-					$empty = (scalar keys %$map) == 0;
-					delete $prepaid_costs_cache->{$entry->{call_id}} if $empty;
-					DEBUG "dropped prepaid_costs call_id = $entry->{call_id}, source_user_id = $entry->{source_user_id}, destination_user_id = $entry->{destination_user_id} from cache";
-				}
-			}
+		if (delete($prepaid_costs_cache->{$entry->{call_id}})) {
+			DEBUG "dropped prepaid cost record for call ID $entry->{call_id}";
 		}
 	}
-	return $count;
+	return $sth_delete_prepaid_cost->rows;
 
 }
 
