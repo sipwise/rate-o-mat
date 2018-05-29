@@ -128,6 +128,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_30d3d53a",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-05-29T09:47:54Z",
+      "side": 1,
+      "message": "ah you are referring to the perl cmdline options, not to the equalisation params inside.\n\ni tried \"perl -c rate-o-mat.pl\" after placing some variable without declaration, and it raised it (i must be an error, not only a warning). i need to retry putting it somewhere more nested now. only reason i can think of it doesnt raise this error is if it ignores \"use strict;\" for some reason.",
+      "parentUuid": "fabf19d9_1031f1a2",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
