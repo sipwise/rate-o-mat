@@ -146,6 +146,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_b0e7e511",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-05-29T09:49:20Z",
+      "side": 1,
+      "message": "with \"-w\" I was able to catch the error you introduced in this patchset. Is it good option to use? probably with -c and -T",
+      "parentUuid": "fabf19d9_30d3d53a",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
