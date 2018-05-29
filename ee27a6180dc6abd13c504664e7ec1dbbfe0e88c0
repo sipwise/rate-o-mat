@@ -16,6 +16,24 @@
       "revId": "ee27a6180dc6abd13c504664e7ec1dbbfe0e88c0",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_305e35ea",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 6
+      },
+      "lineNbr": 1704,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-05-29T09:24:11Z",
+      "side": 1,
+      "message": "just did not unified here, let me fix",
+      "parentUuid": "fabf19d9_01040913",
+      "revId": "ee27a6180dc6abd13c504664e7ec1dbbfe0e88c0",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
