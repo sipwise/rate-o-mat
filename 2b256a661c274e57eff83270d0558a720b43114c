@@ -164,6 +164,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_70c82d75",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-05-29T09:55:41Z",
+      "side": 1,
+      "message": "there is something wrong. the script has \"use warnings;\" inside, so there is no need to use \"-w\":\n\n-w\n\nThis is the existing flag. If the lexical warnings pragma is not used in any of you code, or any of the modules that you use, this flag will enable warnings everywhere. See Backward Compatibility for details of how this flag interacts with lexical warnings.\n\nthe error for undeclared variable must pop wit \"perl -c\" right away. the same way it must also reject to execute it, ie. \"perl rate-o-mat.pl\".",
+      "parentUuid": "fabf19d9_b0e7e511",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
