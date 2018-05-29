@@ -56,6 +56,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_906f4192",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-05-29T09:30:20Z",
+      "side": 1,
+      "message": "I have tried to create a test here, no luck, patchset2 passes \"perl -cv\"\n\n11:28:47 ✔ taurus:(master)~/sipwise/git/rate-o-mat$ git review -d 21373,2\nDownloading refs/changes/73/21373/2 from gerrit\nSwitched to branch \"review/rene_krenn/21373-patch2\"\n\n11:29:08 ✔ taurus:(review/rene_krenn/21373-patch2)~/sipwise/git/rate-o-mat$ docker run --rm -i -t -v $(pwd):/code:rw docker.mgm.sipwise.com/rate-o-mat-functional-tests-stretch:latest bash\nroot@57324b3fe16e:/code# perl -cv rate-o-mat.pl \n\nThis is perl 5, version 24, subversion 1 (v5.24.1) built for x86_64-linux-gnu-thread-multi\n(with 75 registered patches, see perl -V for more detail)\n\nCopyright 1987-2017, Larry Wall\n\nPerl may be copied only under the terms of either the Artistic License or the\nGNU General Public License, which may be found in the Perl 5 source kit.\n\nComplete documentation for Perl, including FAQ lists, should be found on\nthis system using \"man perl\" or \"perldoc perl\".  If you have access to the\nInternet, point your browser at http://www.perl.org/, the Perl Home Page.\n\n(null) syntax OK\nroot@57324b3fe16e:/code# \n\n\n\nAny hints here how to test it?",
+      "parentUuid": "fabf19d9_f5b54f7e",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
