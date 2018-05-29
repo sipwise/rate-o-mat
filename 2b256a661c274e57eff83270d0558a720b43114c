@@ -110,6 +110,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_1031f1a2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-05-29T09:38:14Z",
+      "side": 1,
+      "message": "Sure, I want to create a fast jenkins test here, so how should I execute the perl to check the rate-o-mat code? \n\nI would say \"perl -cwT rate-o-mat.pl\" inside docker is a good start, but here https://www.perl.com/pub/2004/08/09/commandline.html/ it says:\n\nPerl (since 5.6.0) the -w option has been replaced by the use warnings pragma, which is more flexible than the command-line option so you shouldn’t use -w in new code.\n\n\nwhile without \"-w\" I can\u0027t catch such error (see my test above)... :-(",
+      "parentUuid": "fabf19d9_f00e7de4",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
