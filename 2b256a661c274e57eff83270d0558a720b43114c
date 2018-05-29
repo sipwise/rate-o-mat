@@ -74,6 +74,24 @@
       "revId": "2b256a661c274e57eff83270d0558a720b43114c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_300515c2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 2
+      },
+      "lineNbr": 2971,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-05-29T09:32:07Z",
+      "side": 1,
+      "message": "Are those options good enough for beginning?\n\nroot@e6af5659c7ac:/code# perl -cwTt rate-o-mat.pl \nGlobal symbol \"$t_wave\" requires explicit package name (did you forget to declare \"my $t_wave\"?) at rate-o-mat.pl line 2971.\nrate-o-mat.pl had compilation errors.",
+      "parentUuid": "fabf19d9_906f4192",
+      "revId": "2b256a661c274e57eff83270d0558a720b43114c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
