@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fabf19d9_30bab5e2",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 2980,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-05-29T09:50:27Z",
+      "side": 1,
+      "message": "trailing spaces is not nice... it looks like the person who created the review didn\u0027t check the diff before sending the review :-)  $0.05",
+      "revId": "e566466c81f27a5b07a4b76e63dbc8ab3b043de9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
