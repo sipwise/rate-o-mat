@@ -16,6 +16,24 @@
       "revId": "e566466c81f27a5b07a4b76e63dbc8ab3b043de9",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_30a195aa",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 2980,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2018-05-29T09:59:23Z",
+      "side": 1,
+      "message": "that came because i end up with three versions of it opened (for the 2 simultaneous change tickets), ending up not using the same editor for each :-) will fix before final version with adjusted speedup/speeddown params.",
+      "parentUuid": "fabf19d9_30bab5e2",
+      "revId": "e566466c81f27a5b07a4b76e63dbc8ab3b043de9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
