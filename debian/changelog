@@ -1,3 +1,21 @@
+ngcp-rate-o-mat (6.4.0.0+0~mr6.4.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [57ac258] TT#34858 TT#34855 better support to re-rate prepaid calls
+
+  [ Manuel Montecelo ]
+  * [b5e322e] TT#26264 Remove obsolete init script
+
+  [ Alexander Lutay ]
+  * [e52d129] TT#35502 Replace Requires=mysql.service with Wants=mariadb.service for ngcp-rate-o-mat.service
+
+  [ Guillem Jover ]
+  * [1a742b2] TT#26264 Remove obsolete rc.d symlinks
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 29 May 2018 10:09:10 +0200
+
 ngcp-rate-o-mat (6.3.0.0+0~mr6.3.0.0) unstable; urgency=medium
 
   [ Guillem Jover ]
