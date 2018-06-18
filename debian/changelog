@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.18.10.0+0~mr4.5.10.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7bf5266] TT#34659 Use builddeps.list from proper release (backported from TT#17642)
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 Jun 2018 10:42:48 +0200
+
 ngcp-rate-o-mat (1.18.9.0+0~mr4.5.9.0) unstable; urgency=medium
 
   [ Rene Krenn ]
