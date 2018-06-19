@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (1.18.9.2+0~mr4.5.9.2) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [4f35d57] TT#37391 Remove ngcp-rate-o-mat package and make testrunner more flexible
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 19 Jun 2018 10:31:30 +0200
+
 ngcp-rate-o-mat (1.18.9.1+0~mr4.5.9.1) unstable; urgency=medium
 
   [ Victor Seva ]
