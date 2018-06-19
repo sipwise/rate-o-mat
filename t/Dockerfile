@@ -22,7 +22,10 @@ RUN apt-get install --assume-yes \
         libtap-harness-archive-perl \
         libtext-table-perl \
         libtime-warp-perl \
-        ngcp-rate-o-mat \
+        libdbd-mysql-perl \
+        libexception-class-perl \
+        libnetaddr-ip-perl \
+        perl-modules \
         mysql-client
 RUN apt-get clean
 
