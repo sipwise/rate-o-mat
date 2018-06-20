@@ -46,7 +46,7 @@ my @lnp_order_by = ();
 my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMAT_SPLIT_PEAK_PARTS}) ? int $ENV{RATEOMAT_SPLIT_PEAK_PARTS} : 0);
 
 # update subscriber prepaid attribute value upon profile mapping updates:
-my $update_prepaid_preference = 1;
+my $update_prepaid_preference = 0;
 
 # set to 1 to write real call costs to CDRs for postpaid, even if balance was consumed:
 my $use_customer_real_cost = 0;
