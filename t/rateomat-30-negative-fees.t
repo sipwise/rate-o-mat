@@ -19,6 +19,7 @@ use Test::More;
 ### balance.
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
+local $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} = 1;
 
 use Text::Table;
 use Text::Wrap;
