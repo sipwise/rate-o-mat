@@ -21,6 +21,7 @@ use Storable qw();
 ### note: this tests takes longer time to complete
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
+local $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} = 1;
 
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:

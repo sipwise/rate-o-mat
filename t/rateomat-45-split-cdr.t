@@ -22,6 +22,7 @@ use List::Util qw();
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 local $ENV{RATEOMAT_SPLIT_PEAK_PARTS} = 1;
+local $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} = 1;
 local $ENV{RATEOMAT_BATCH_SIZE} = 1;
 
 #use Text::Table;

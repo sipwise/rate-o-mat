@@ -52,7 +52,7 @@ my $update_prepaid_preference = 1;
 my $use_customer_real_cost = 0;
 my $use_provider_real_cost = 0;
 # don't update balance of prepaid contracts, if no prepaid_costs record is found (re-rating):
-my $prepaid_update_balance = 0;
+my $prepaid_update_balance = ((defined $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} && $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE}) ? int $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} : 0);
 
 # control writing cdr relation data:
 # disable it for now until this will be limited to prepaid contracts,
@@ -139,7 +139,7 @@ my $cps_info = {
 
 	t => 0.0,
 	t_old => 0.0,
-	dt => 0.0,	
+	dt => 0.0,
 
 	delay => 0.0,
 	cps => 0.0,
@@ -1471,10 +1471,10 @@ sub get_contract_balances {
 	my $start_time = $cdr->{start_time};
 	my $duration = $cdr->{duration};
 
-	catchup_contract_balance($start_time,$start_time + $duration,$contract_id,$r_package_info);
+	catchup_contract_balance(int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
 
 	my $sth = $sth_get_cbalances;
-	$sth->execute($contract_id, $start_time)
+	$sth->execute($contract_id, int($start_time))
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 	$sth->finish;
@@ -2958,7 +2958,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
-	
+
 	while (!$shutdown) {
 
 		$log_fatal = 1;
@@ -3089,6 +3089,9 @@ _update_cps(1); # unless ($rated_batch % 5);
 		unless (@cdrs) {
 			_update_cps(0);
 			_cps_delay();
+		}
+		if ($debug && $split_peak_parts && (scalar @cdrs) < 5) {
+			sleep $loop_interval; #split peak parts testcase
 		}
 
 		$shutdown and last;
