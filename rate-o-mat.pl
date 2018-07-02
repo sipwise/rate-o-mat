@@ -139,7 +139,7 @@ my $cps_info = {
 
 	t => 0.0,
 	t_old => 0.0,
-	dt => 0.0,	
+	dt => 0.0,
 
 	delay => 0.0,
 	cps => 0.0,
@@ -1967,7 +1967,7 @@ sub get_call_cost {
 		my $current_call_time = int($cdr->{start_time} + $offset);
 		my @bals = grep {
 			$_->{start_unix} <= $current_call_time &&
-			(is_infinite_unix($_->{end_unix}) || $current_call_time <= $_->{end_unix})
+			(is_infinite_unix($_->{end_unix}) || $current_call_time < ($_->{end_unix} + 1.0))
 		} @$r_balances;
 		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
 		WARNING "overlapping contract balances for CDR $cdr->{id} found: ".(Dumper \@bals) if (scalar @bals) > 1;
@@ -2958,7 +2958,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
-	
+
 	while (!$shutdown) {
 
 		$log_fatal = 1;
