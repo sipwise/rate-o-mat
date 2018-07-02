@@ -139,7 +139,7 @@ my $cps_info = {
 
 	t => 0.0,
 	t_old => 0.0,
-	dt => 0.0,	
+	dt => 0.0,
 
 	delay => 0.0,
 	cps => 0.0,
@@ -640,7 +640,7 @@ EOS
 		"unix_timestamp(end) end_unix ".
 		"FROM billing.contract_balances ".
 		"WHERE contract_id = ? AND ".
-		"end >= FROM_UNIXTIME(?) ORDER BY start ASC"
+		"end >= FROM_UNIXTIME(FLOOR(?)) ORDER BY start ASC"
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance = $billdbh->prepare(
@@ -1274,7 +1274,7 @@ sub catchup_contract_balance {
 	my $now = time;
 	my $bal;
 
-	while (defined $last_id && !is_infinite_unix($last_end) && $last_end < $call_end_time) {
+	while (defined $last_id && !is_infinite_unix($last_end) && ($last_end + 1.0) < $call_end_time) {
 		$next_start = $last_end + 1;
 
 		if ($has_package && $balances_count == 0) {
@@ -1967,7 +1967,7 @@ sub get_call_cost {
 		my $current_call_time = int($cdr->{start_time} + $offset);
 		my @bals = grep {
 			$_->{start_unix} <= $current_call_time &&
-			(is_infinite_unix($_->{end_unix}) || $current_call_time <= $_->{end_unix})
+			(is_infinite_unix($_->{end_unix}) || $current_call_time < ($_->{end_unix} + 1.0))
 		} @$r_balances;
 		@bals or FATAL "No contract balance for CDR $cdr->{id} found";
 		WARNING "overlapping contract balances for CDR $cdr->{id} found: ".(Dumper \@bals) if (scalar @bals) > 1;
@@ -2958,7 +2958,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
-	
+
 	while (!$shutdown) {
 
 		$log_fatal = 1;
