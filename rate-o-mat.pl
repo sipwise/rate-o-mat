@@ -1424,10 +1424,10 @@ sub get_contract_balances {
 	my $start_time = $cdr->{start_time};
 	my $duration = $cdr->{duration};
 
-	catchup_contract_balance($start_time,$start_time + $duration,$contract_id,$r_package_info);
+	catchup_contract_balance(int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
 
 	my $sth = $sth_get_cbalances;
-	$sth->execute($contract_id, $start_time)
+	$sth->execute($contract_id, int($start_time))
 		or FATAL "Error executing get contract balance statement: ".$sth->errstr;
 	my $res = $sth->fetchall_arrayref({});
 	$sth->finish;
