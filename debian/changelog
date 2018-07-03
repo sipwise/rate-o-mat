@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (5.5.4.2+0~mr5.5.4.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [95c09c4] TT#39612 fix balance lookup for 23:59:59.xxx start/end time
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 03 Jul 2018 10:13:45 +0200
+
 ngcp-rate-o-mat (5.5.4.1+0~mr5.5.4.1) unstable; urgency=medium
 
   * New release.
