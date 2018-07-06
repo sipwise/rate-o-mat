@@ -45,9 +45,6 @@ my @lnp_order_by = ();
 # the reseller or the carrier billing profile.
 my $split_peak_parts = ((defined $ENV{RATEOMAT_SPLIT_PEAK_PARTS} && $ENV{RATEOMAT_SPLIT_PEAK_PARTS}) ? int $ENV{RATEOMAT_SPLIT_PEAK_PARTS} : 0);
 
-# update subscriber prepaid attribute value upon profile mapping updates:
-my $update_prepaid_preference = 1;
-
 # set to 1 to write real call costs to CDRs for postpaid, even if balance was consumed:
 my $use_customer_real_cost = 0;
 my $use_provider_real_cost = 0;
@@ -156,9 +153,8 @@ my $provdbh;
 my $dupdbh;
 my $sth_get_contract_info;
 my $sth_get_subscriber_contract_id;
-my $sth_billing_info_v4;
-my $sth_billing_info_v6;
-my $sth_billing_info_panel;
+my $sth_billing_info_network;
+my $sth_billing_info;
 my $sth_profile_info;
 my $sth_offpeak;
 my $sth_offpeak_subscriber;
@@ -184,8 +180,6 @@ my $sth_prepaid_cost;
 my $sth_delete_prepaid_cost;
 my $sth_delete_old_prepaid;
 my $sth_get_billing_voip_subscribers;
-my $sth_get_package_profile_sets;
-my $sth_create_billing_mappings;
 my $sth_lock_billing_subscribers;
 my $sth_unlock_billing_subscribers;
 my $sth_get_provisioning_voip_subscribers;
@@ -350,7 +344,7 @@ sub commit_transaction {
 
 	my $dbh = shift;
 	if ($dbh) {
-		#capture result to force list context and prevent good old komodo perl5db.pl bug:
+		#capture result to force list context and prevent legacy komodo perl5db.pl bug:
 		my @wa = $dbh->commit or FATAL "Error committing: ".$dbh->errstr;
 	}
 
@@ -438,10 +432,13 @@ sub init_db {
 		" p.notopup_discard_intervals,".
 		" p.underrun_profile_threshold,".
 		" p.underrun_lock_threshold,".
-		" p.underrun_lock_level ".
+		" p.underrun_lock_level, ".
+		" (SELECT COUNT(*) FROM billing.package_profile_sets WHERE package_id = p.id AND discriminator = 'underrun') as underrun_profiles_count, ".
+		" product.class ".
 		"FROM billing.contracts c ".
-		"LEFT JOIN billing.profile_packages p on c.profile_package_id = p.id ".
-		"LEFT JOIN billing.contacts co on c.contact_id = co.id ".
+		"JOIN billing.products product ON c.product_id = product.id ".
+		"LEFT JOIN billing.profile_packages p ON c.profile_package_id = p.id ".
+		"LEFT JOIN billing.contacts co ON c.contact_id = co.id ".
 		"WHERE c.id = ?"
 	) or FATAL "Error preparing subscriber contract info statement: ".$billdbh->errstr;
 
@@ -478,56 +475,23 @@ sub init_db {
 		"SELECT contract_id FROM billing.voip_subscribers WHERE uuid = ?"
 	) or FATAL "Error preparing subscriber contract id statement: ".$billdbh->errstr;
 
-	$sth_billing_info_v4 = $billdbh->prepare(<<EOS
-		SELECT b.billing_profile_id, b.product_id, p.class, d.prepaid,
-			d.interval_charge, d.interval_free_time, d.interval_free_cash,
-			d.interval_unit, d.interval_count
-		FROM billing.billing_mappings b
-		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
-		LEFT JOIN billing.products p ON b.product_id = p.id
-		LEFT JOIN billing.billing_networks n ON n.id = b.network_id
-		LEFT JOIN billing.billing_network_blocks nb ON n.id = nb.network_id
-		WHERE b.contract_id = ?
-		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
-		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
-		AND ( (nb._ipv4_net_from <= ? AND nb._ipv4_net_to >= ?) OR b.network_id IS NULL)
-		ORDER BY b.network_id DESC, b.start_date DESC, b.id DESC
-		LIMIT 1
+	$sth_billing_info_network = $billdbh->prepare(<<EOS
+		SELECT bp.id, bp.prepaid,
+			bp.interval_charge, bp.interval_free_time, bp.interval_free_cash,
+			bp.interval_unit, bp.interval_count
+		FROM billing.billing_profiles bp
+		WHERE bp.id = billing.get_billing_profile_by_contract_id_network(?,?,?)
 EOS
-	) or FATAL "Error preparing ipv4 billing info statement: ".$billdbh->errstr;
+	) or FATAL "Error preparing network billing info statement: ".$billdbh->errstr;
 
-	$sth_billing_info_v6 = $billdbh->prepare(<<EOS
-		SELECT b.billing_profile_id, b.product_id, p.class, d.prepaid,
-			d.interval_charge, d.interval_free_time, d.interval_free_cash,
-			d.interval_unit, d.interval_count
-		FROM billing.billing_mappings b
-		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
-		LEFT JOIN billing.products p ON b.product_id = p.id
-		LEFT JOIN billing.billing_networks n ON n.id = b.network_id
-		LEFT JOIN billing.billing_network_blocks nb ON n.id = nb.network_id
-		WHERE b.contract_id = ?
-		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
-		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
-		AND ( (nb._ipv6_net_from <= ? AND nb._ipv6_net_to >= ?) OR b.network_id IS NULL)
-		ORDER BY b.network_id DESC, b.start_date DESC, b.id DESC
-		LIMIT 1
+	$sth_billing_info = $billdbh->prepare(<<EOS
+		SELECT bp.id, bp.prepaid,
+			bp.interval_charge, bp.interval_free_time, bp.interval_free_cash,
+			bp.interval_unit, bp.interval_count
+		FROM billing.billing_profiles bp
+		WHERE bp.id = billing.get_billing_profile_by_contract_id(?,?)
 EOS
-	) or FATAL "Error preparing ipv6 billing info statement: ".$billdbh->errstr;
-
-	$sth_billing_info_panel = $billdbh->prepare(<<EOS
-		SELECT b.billing_profile_id, b.product_id, p.class, d.prepaid,
-			d.interval_charge, d.interval_free_time, d.interval_free_cash,
-			d.interval_unit, d.interval_count
-		FROM billing.billing_mappings b
-		JOIN billing.billing_profiles d ON b.billing_profile_id = d.id
-		LEFT JOIN billing.products p ON b.product_id = p.id
-		WHERE b.contract_id = ?
-		AND ( b.start_date IS NULL OR b.start_date <= FROM_UNIXTIME(?) )
-		AND ( b.end_date IS NULL OR b.end_date >= FROM_UNIXTIME(?) )
-		ORDER BY b.start_date DESC, b.id DESC
-		LIMIT 1
-EOS
-	) or FATAL "Error preparing panel billing info statement: ".$billdbh->errstr;
+	) or FATAL "Error preparing billing info statement: ".$billdbh->errstr;
 
 	$sth_lnp_number = $billdbh->prepare(<<EOS
 		SELECT lnp_provider_id
@@ -709,14 +673,6 @@ EOS
 	$sth_get_billing_voip_subscribers = $billdbh->prepare(
 		"SELECT uuid FROM billing.voip_subscribers WHERE contract_id = ? AND status != 'terminated'"
 	) or FATAL "Error preparing get billing voip subscribers statement: ".$billdbh->errstr;
-
-	$sth_get_package_profile_sets = $billdbh->prepare(
-		"SELECT profile_id, network_id FROM billing.package_profile_sets WHERE package_id = ? AND discriminator = ?"
-	) or FATAL "Error preparing get package profile sets statement: ".$billdbh->errstr;
-
-	$sth_create_billing_mappings = $billdbh->prepare(
-		"INSERT INTO billing.billing_mappings (contract_id, billing_profile_id, network_id, product_id, start_date) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))"
-	) or FATAL "Error preparing create billing mappings statement: ".$billdbh->errstr;
 
 	$sth_lock_billing_subscribers = $billdbh->prepare(
 		"UPDATE billing.voip_subscribers SET status = 'locked' WHERE contract_id = ? AND status = 'active'"
@@ -1100,58 +1056,15 @@ sub set_subscriber_status {
 
 }
 
-sub switch_prepaid {
-
-	my $contract_id = shift;
-	my $prepaid = shift; #int
-	my $readonly = shift;
-
-	return set_subscriber_first_int_attribute_value($contract_id,($prepaid ? 1 : 0),'prepaid',$readonly);
-
-}
-
 sub add_profile_mappings {
 
 	my $contract_id = shift;
 	my $stime = shift;
 	my $package_id = shift;
 	my $profiles = shift;
-	my $readonly = shift;
 
-	my $mappings_added = 0;
-	my $profile_id;
-	my $network_id;
-	my $now = time;
-	my $profile = undef;
-
-	$sth_get_package_profile_sets->execute($package_id,$profiles)
-		or FATAL "Error executing get package profile sets statement: ".$sth_get_package_profile_sets->errstr;
-
-	while (my @res = $sth_get_package_profile_sets->fetchrow_array) {
-		($profile_id,$network_id) = @res;
-		if ($readonly) {
-            DEBUG "Adding profile mappings skipped";
-        } else {
-			unless (defined $profile) {
-				$profile = {};
-				get_billing_info($now, $contract_id, undef, $profile) or
-					FATAL "Error getting billing info for date '".$now."' and contract_id $contract_id\n";
-			}
-			$sth_create_billing_mappings->execute($contract_id,$profile_id,$network_id,$profile->{product_id},$stime)
-				or FATAL "Error executing create billing mappings statement: ".$sth_create_billing_mappings->errstr;
-			$sth_create_billing_mappings->finish;
-			$mappings_added++;
-		}
-	}
-	$sth_get_package_profile_sets->finish;
-	if ($update_prepaid_preference && $mappings_added > 0) {
-		DEBUG "$mappings_added '$profiles' profile mappings added";
-		get_billing_info($now, $contract_id, undef, $profile) or
-			FATAL "Error getting billing info for date '".$now."' and contract_id $contract_id\n";
-		switch_prepaid($contract_id,$profile->{prepaid},$readonly);
-	}
-
-	return $mappings_added;
+	$billdbh->do("CALL billing.create_contract_billing_profile_network_from_package(?,?,?,?)",undef,$contract_id,$stime,$package_id,$profiles)
+		or FATAL "Error executing create billing mappings statement: ".$DBI::errstr;
 
 }
 
@@ -1231,7 +1144,7 @@ sub catchup_contract_balance {
 	$sth->execute($contract_id) or FATAL "Error executing get info statement: ".$sth->errstr;
 	my ($create_time,$modify,$contact_reseller_id,$package_id,$interval_unit,$interval_value,
 		$start_mode,$carry_over_mode,$notopup_discard_intervals,$underrun_profile_threshold,
-		$underrun_lock_threshold,$underrun_lock_level) = $sth->fetchrow_array();
+		$underrun_lock_threshold,$underrun_lock_level,$underrun_profiles_count,$class) = $sth->fetchrow_array();
 	$sth->finish;
 	$create_time ||= $modify; #contract create_timestamp might be 0000-00-00 00:00:00
 	my $create_time_aligned;
@@ -1358,7 +1271,8 @@ PREPARE_BALANCE_CATCHUP:
 		if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && $cash_balance < $underrun_profile_threshold) {
 			$underrun_profiles_applied = 1;
 			DEBUG "cash balance was decreased from $last_cash_balance to $cash_balance and dropped below underrun profile threshold $underrun_profile_threshold";
-			if (add_profile_mappings($contract_id,$stime,$package_id,'underrun',0) > 0) {
+			if ($underrun_profiles_count > 0) {
+				add_profile_mappings($contract_id,$stime,$package_id,'underrun',0);
 				$underrun_profiles_time = $now;
 				goto PREPARE_BALANCE_CATCHUP;
 			}
@@ -1438,7 +1352,8 @@ PREPARE_BALANCE_CATCHUP:
 			if (!$underrun_profiles_applied && defined $underrun_profile_threshold && $last_cash_balance >= $underrun_profile_threshold && 0.0 < $underrun_profile_threshold) {
 				$underrun_profiles_applied = 1;
 				DEBUG "cash balance was decreased from $last_cash_balance to 0 and dropped below underrun profile threshold $underrun_profile_threshold";
-				if (add_profile_mappings($contract_id,$call_start_time,$package_id,'underrun',0) > 0) {
+				if ($underrun_profiles_count > 0) {
+					add_profile_mappings($contract_id,$call_start_time,$package_id,'underrun',0);
 					$underrun_profiles_time = $now;
 					$bal->{underrun_profile_time} = $now;
 				}
@@ -1449,11 +1364,13 @@ PREPARE_BALANCE_CATCHUP:
 	}
 
 	$r_package_info->{id} = $package_id;
+	$r_package_info->{class} = $class;
 	$r_package_info->{underrun_profile_threshold} = $underrun_profile_threshold;
 	$r_package_info->{underrun_lock_threshold} = $underrun_lock_threshold;
 	$r_package_info->{underrun_lock_level} = $underrun_lock_level;
 	$r_package_info->{underrun_lock_applied} = $underrun_lock_applied;
 	$r_package_info->{underrun_profiles_applied} = $underrun_profiles_applied;
+	$r_package_info->{underrun_profiles_count} = $underrun_profiles_count;
 
 	DEBUG "$balances_count contract balance rows created";
 
@@ -1551,29 +1468,15 @@ sub get_billing_info {
 	my $label;
 	my $sth;
 	if ($source_ip) {
-		my $ip_size;
-		my $ip = NetAddr::IP->new($source_ip);
-		if($ip->version == 4) {
-			$sth = $sth_billing_info_v4;
-			$ip_size = 4;
-		} elsif($ip->version == 6) {
-			$sth = $sth_billing_info_v6;
-			$ip_size = 16;
-		} else {
-			FATAL "Invalid source_ip $source_ip\n";
-		}
-
-		my $int_ip = $ip->bigint;
-		my $ip_bytes = bigint_to_bytes($int_ip, $ip_size);
-
-		$sth->execute($contract_id, $start, $start, $ip_bytes, $ip_bytes) or
+		$sth = $sth_billing_info_network;
+		$sth->execute($contract_id, $start, $source_ip) or
 			FATAL "Error executing billing info statement: ".$sth->errstr;
-		$label = "ipv".$ip->version." source ip $source_ip";
+		$label = "and $source_ip";
 	} else {
-		$sth = $sth_billing_info_panel;
-		$sth->execute($contract_id, $start, $start) or
+		$sth = $sth_billing_info;
+		$sth->execute($contract_id, $start) or
 			FATAL "Error executing billing info statement: ".$sth->errstr;
-		$label = "panel";
+		$label = "";
 	}
 
 	my @res = $sth->fetchrow_array();
@@ -1581,16 +1484,14 @@ sub get_billing_info {
 
 	$r_info->{contract_id} = $contract_id;
 	$r_info->{profile_id} = $res[0];
-	$r_info->{product_id} = $res[1];
-	$r_info->{class} = $res[2];
-	$r_info->{prepaid} = $res[3];
-	$r_info->{int_charge} = $res[4];
-	$r_info->{int_free_time} = $res[5];
-	$r_info->{int_free_cash} = $res[6];
-	$r_info->{int_unit} = $res[7];
-	$r_info->{int_count} = $res[8];
+	$r_info->{prepaid} = $res[1];
+	$r_info->{int_charge} = $res[2];
+	$r_info->{int_free_time} = $res[3];
+	$r_info->{int_free_cash} = $res[4];
+	$r_info->{int_unit} = $res[5];
+	$r_info->{int_count} = $res[6];
 
-	DEBUG "contract ID $contract_id billing mapping ($r_info->{class}) is profile id $r_info->{profile_id} for time $start from $label";
+	DEBUG "contract ID $contract_id billing mapping is profile id $r_info->{profile_id} for time $start" . $label;
 
 	$sth->finish;
 
@@ -2080,7 +1981,8 @@ sub get_call_cost {
 		if (!$underrun_profiles_applied && defined $r_package_info->{underrun_profile_threshold} && $prev_cash_balance >= $r_package_info->{underrun_profile_threshold} && $last_bal->{cash_balance} < $r_package_info->{underrun_profile_threshold}) {
 			$underrun_profiles_applied = 1;
 			DEBUG "cash balance was decreased from $prev_cash_balance to $last_bal->{cash_balance} and dropped below underrun profile threshold $r_package_info->{underrun_profile_threshold}";
-			if (add_profile_mappings($contract_id,$cdr->{start_time} + $cdr->{duration},$r_package_info->{id},'underrun',$readonly) > 0) {
+			if (not $readonly and $r_package_info->{underrun_profiles_count} > 0) {
+				add_profile_mappings($contract_id,$cdr->{start_time} + $cdr->{duration},$r_package_info->{id},'underrun');
 				$last_bal->{underrun_profile_time} = $now;
 			}
 		}
@@ -2116,16 +2018,8 @@ sub get_prepaid {
 	my $cdr = shift;
 	my $billing_info = shift;
 	my $prefix = shift;
+	# strictly take it from the (scheduled) billing profile:
 	my $prepaid = (defined $billing_info ? $billing_info->{prepaid} : undef);
-	# todo: fetch these from another eav table ..
-	if (defined $prefix && exists $cdr->{$prefix.'prepaid'} && defined $cdr->{$prefix.'prepaid'}) {
-		# cdr is supposed to provide prefilled columns:
-		#   source_prepaid
-		#   destination_prepaid <-- mediator should provide this one at least
-		$prepaid = $cdr->{$prefix.'prepaid'};
-	} else {
-		# undefined without billing info and prefix
-	}
 	return $prepaid;
 
 }
@@ -2495,7 +2389,7 @@ sub get_provider_call_cost {
 	}
 
 	my $provider_type;
-	if ($provider_info->{billing}->{class} eq "reseller") {
+	if ($provider_info->{package}->{class} eq "reseller") {
 		$provider_type = "reseller_";
 	} else {
 		$provider_type = "carrier_";
@@ -2663,7 +2557,7 @@ RATING_DURATION_FOUND:
 	if($cdr->{source_user_id} ne "0") {
 		DEBUG "call from local subscriber, source_user_id is $$cdr{source_user_id}";
 		# if we have a call from local subscriber, the source provider MUST be a reseller
-		if($source_provider_billing_info{profile_id} && $source_provider_billing_info{class} ne "reseller") {
+		if($source_provider_billing_info{profile_id} && $source_provider_package_info{class} ne "reseller") {
 			FATAL "The local source_user_id ".$cdr->{source_user_id}." has a source_provider_id ".$cdr->{source_provider_id}.
 				" which is not a reseller in cdr #".$cdr->{id}."\n";
 		}
@@ -3028,7 +2922,7 @@ sub main {
 					delete $failed_counter_map{$cdr_id};
 					debug_rating_time($t,$cdr_id,0);
 					check_shutdown() and last;
-_update_cps(1); # unless ($rated_batch % 5);
+					_update_cps(1); # unless ($rated_batch % 5);
 					_cps_delay();
 				};
 				$error = $@;
@@ -3113,9 +3007,8 @@ _update_cps(1); # unless ($rated_batch % 5);
 	INFO "Shutting down.\n";
 
 	$sth_get_subscriber_contract_id->finish;
-	$sth_billing_info_v4->finish;
-	$sth_billing_info_v6->finish;
-	$sth_billing_info_panel->finish;
+	$sth_billing_info_network->finish;
+	$sth_billing_info->finish;
 	$sth_profile_info->finish;
 	$sth_offpeak->finish;
 	$sth_offpeak_subscriber->finish;
@@ -3142,8 +3035,6 @@ _update_cps(1); # unless ($rated_batch % 5);
 	$sth_delete_prepaid_cost->finish;
 	$sth_delete_old_prepaid->finish;
 	$sth_get_billing_voip_subscribers->finish;
-	$sth_get_package_profile_sets->finish;
-	$sth_create_billing_mappings->finish;
 	$sth_lock_billing_subscribers->finish;
 	$sth_unlock_billing_subscribers->finish;
 	$sth_get_provisioning_voip_subscribers and $sth_get_provisioning_voip_subscribers->finish;

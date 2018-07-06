@@ -23,7 +23,7 @@ local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 {
 
     my $number_of_rateomat_threads = 3;
-    my $rateomat_timeout = 60;
+    my $rateomat_timeout = 120;
     my $number_of_providers = 3;
     my $number_of_subscribers_per_provider = 3;
     my $balance = 0.0;
