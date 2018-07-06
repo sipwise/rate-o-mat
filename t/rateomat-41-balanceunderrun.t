@@ -86,7 +86,8 @@ my $lock_level = 4;
 			  profile => $provider->{subscriber_fees}->[2]->{profile}->{id}},
 		]);
 		is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},$lock_level,$label.'subscriber is locked now');
-		is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
+		#not updated any longer:
+		#is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
 	}
 }
 
