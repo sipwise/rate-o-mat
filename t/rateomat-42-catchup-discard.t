@@ -7,7 +7,7 @@ use Cwd;
 use lib Cwd::abs_path(File::Basename::dirname(__FILE__));
 
 use Utils::Api qw();
-use Utils::Rateomat qw();
+use Utils::Rateomat qw($rateomat_timeout);
 use Test::More;
 use Storable qw();
 
@@ -22,6 +22,7 @@ use Storable qw();
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 local $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} = 1;
+$rateomat_timeout = 10;
 
 Utils::Api::set_time(Utils::Api::get_now->subtract(months => 5));
 #provider contract needs to be created in the past as well:
@@ -105,7 +106,7 @@ foreach my $start_mode ('create','1st') {
 		if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
 			ok(Utils::Rateomat::check_cdrs('',
 				map { $_ => { id => $_, rating_status => 'ok', }; } @cdr_ids
-			 ),'cdrs were all processed');
+			 ),'cdrs were all processed') or die;
 			my $label = $start_mode . '/' . $carry_over_mode;
 			$begin->truncate(to => 'day');
 			my @intervals = map { {
@@ -239,7 +240,8 @@ foreach my $carry_over_mode ('carry_over','carry_over_timely') {
 				]);
 				if ({@{$cash_values[$i]}}->{cash} == 0) {
 					is(Utils::Api::get_subscriber_preferences($caller->{subscriber})->{lock},4,$label.'subscriber is locked now');
-					is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
+					#not updated any longer:
+					#is(Utils::Rateomat::get_usr_preferences($caller->{subscriber},'prepaid')->[0]->{value},1,$label.'subscriber is prepaid now');
 				}
 
 			}

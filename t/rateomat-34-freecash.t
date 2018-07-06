@@ -19,7 +19,7 @@ use Test::More;
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 local $ENV{RATEOMAT_PREPAID_UPDATE_BALANCE} = 1;
-Utils::Env::set_local_timezone('UTC','+00:00'); #'UTC'; #vagrant SYSTEM timezone is "Etc/UTC"
+#Utils::Env::set_local_timezone('UTC','+00:00'); #'UTC'; #vagrant SYSTEM timezone is "Etc/UTC"
 
 my $init_secs = 50;
 my $follow_secs = 20;
