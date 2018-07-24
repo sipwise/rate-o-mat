@@ -1,3 +1,15 @@
+ngcp-rate-o-mat (6.5.0.0+0~mr6.5.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [8ac0612] TT#36659 print log msgs to STDOUT, STDERR
+  * [1e21430] TT#37202 dynamic sleep interval
+  * [9bef1b2] TT#39612 fix balance lookup for 23:59:59.xxx start/end time
+  * [8b5800e] TT#39941 refactor to use the new billing mappings
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 24 Jul 2018 13:40:53 +0200
+
 ngcp-rate-o-mat (6.4.0.0+0~mr6.4.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
