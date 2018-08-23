@@ -511,10 +511,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? ".
-		"AND direction = ? AND ? REGEXP(source) AND ? REGEXP(destination) ".
-		"ORDER BY LENGTH(destination) DESC, LENGTH(source) DESC LIMIT 1"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
 	$sth_lnp_profile_info = $billdbh->prepare(
@@ -524,10 +521,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? ".
-		"AND direction = ? AND destination = ? ".
-		"LIMIT 1"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,null,?,\"exact_destination\")"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
 	$sth_offpeak = $billdbh->prepare("select ".
@@ -2667,6 +2661,9 @@ RATING_DURATION_FOUND:
 					$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
 		} else {
 			# TODO what about transit calls?
+			# TODO ngcp 6.5
+			#   calculate source carrier (peering) costs
+			#   calculate destination carrier (peering) costs
 		}
 	}
 
