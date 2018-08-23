@@ -39,7 +39,7 @@ foreach my $prepaid ((0,1)) { #0,1)) {
             Utils::Api::datetime_from_string($caller->{first_interval}->{stop}));
         is(Utils::Api::get_cash_balance($caller->{customer})->{ratio},$caller_ratio,"caller ratio $caller_ratio");
 
-        Utils::Api::set_time($begin->clone->add(days => 10));
+        #Utils::Api::set_time($begin->clone->add(days => 10));
         my $callee = Utils::Api::setup_subscriber($provider,$provider->{subscriber_fees}->[1]->{profile},$balance,{ cc => 888, ac => '2<n>', sn => '<t>' });
         my $callee_ratio = _get_free_ratio(Utils::Api::datetime_from_string($callee->{customer}->{create_timestamp}),
             Utils::Api::datetime_from_string($callee->{first_interval}->{start}),
