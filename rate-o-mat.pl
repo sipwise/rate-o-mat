@@ -511,10 +511,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? ".
-		"AND direction = ? AND ? REGEXP(source) AND ? REGEXP(destination) ".
-		"ORDER BY LENGTH(destination) DESC, LENGTH(source) DESC LIMIT 1"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
 	$sth_lnp_profile_info = $billdbh->prepare(
@@ -524,10 +521,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE billing_profile_id = ? ".
-		"AND bf_id IS NOT NULL AND type = ? ".
-		"AND direction = ? AND destination = ? ".
-		"LIMIT 1"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,null,?,\"exact_destination\")"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
 	$sth_offpeak = $billdbh->prepare("select ".
@@ -2624,6 +2618,40 @@ RATING_DURATION_FOUND:
 					\$rating_durations[@rating_durations])
 			or FATAL "Error getting source customer cost for local source_user_id ".
 					$cdr->{source_user_id}." for cdr ".$cdr->{id}."\n";
+
+
+
+
+	if($cdr->{source_user_id} ne "0") {
+		if($cdr->{destination_user_id} ne "0") {
+			DEBUG "call from local subscriber to local subscriber";
+            # charge both caller and callee:
+			#   calculate source customer&reseller costs
+			#   calculate destination customer&reseller costs
+		} else {
+			DEBUG "call from local subscriber to offnet subscriber";
+            # charge caller only:
+			#   calculate source customer&reseller costs
+			#   calculate source carrier (peering) costs
+		}
+	} else {
+		if($cdr->{destination_user_id} ne "0") {
+			DEBUG "call from offnet subscriber to local subscriber";
+            # charge callee only:
+			#   calculate destination customer&reseller costs
+			#   calculate destination carrier (peering) costs
+		} else {
+			DEBUG "call from offnet subscriber to offnet subscriber";
+			# TODO ngcp 6.5
+			#   calculate source carrier (peering) costs
+			#   calculate destination carrier (peering) costs
+		}
+	}
+
+
+
+
+
 
 	} else {
 		# call from a foreign caller
