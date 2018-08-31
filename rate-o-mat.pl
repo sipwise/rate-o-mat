@@ -511,7 +511,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,?,?,null)"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
 	$sth_lnp_profile_info = $billdbh->prepare(
@@ -521,7 +521,7 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
-		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee(?,?,?,null,?,\"exact_destination\")"
+		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,null,?,\"exact_destination\")"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
 	$sth_offpeak = $billdbh->prepare("select ".
