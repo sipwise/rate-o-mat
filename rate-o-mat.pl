@@ -7,6 +7,7 @@ use DBI;
 use POSIX qw(setsid mktime);
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
+use IO::Socket::UNIX;
 use NetAddr::IP;
 use Data::Dumper;
 use Time::HiRes qw(); #for debugging info only
@@ -2746,6 +2747,26 @@ sub write_pidfile {
 
 }
 
+sub notify_send {
+	my $message = shift;
+
+	if ($ENV{NOTIFY_SOCKET}) {
+		my $addr = $ENV{NOTIFY_SOCKET} =~ s/^@/\0/r;
+		my $sock = IO::Socket::UNIX->new(
+		    Type => SOCK_DGRAM(),
+		    Peer => $addr,
+		) or warn "cannot connect to socket $ENV{NOTIFY_SOCKET}: $!\n";
+		if ($sock) {
+			$sock->autoflush(1);
+			print { $sock } $message
+				or warn "cannot send to socket $ENV{NOTIFY_SOCKET}: $!\n";
+			close $sock;
+		}
+	} else {
+		warn "NOTIFY_SOCKET not set\n";
+	}
+}
+
 sub daemonize {
 
 	my $pidfile = shift;
@@ -2849,6 +2870,7 @@ sub main {
 	}
 
 	INFO "Up and running.\n";
+	notify_send("READY=1\n");
 
 	while (!$shutdown) {
 
@@ -3001,6 +3023,7 @@ sub main {
 
 	}
 
+	notify_send("STOPPING=1\n");
 	INFO "Shutting down.\n";
 
 	$sth_get_subscriber_contract_id->finish;

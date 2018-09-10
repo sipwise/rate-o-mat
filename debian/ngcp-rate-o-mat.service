@@ -4,7 +4,7 @@ After=mariadb.service
 Wants=mariadb.service
 
 [Service]
-Type=simple
+Type=notify
 EnvironmentFile=-/etc/default/ngcp-rate-o-mat
 ExecStart=/usr/sbin/rate-o-mat
 ExecReload=/bin/kill -HUP $MAINPID
