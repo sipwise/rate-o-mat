@@ -1,3 +1,16 @@
+ngcp-rate-o-mat (7.0.0.0+0~mr7.0.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [b27dac1] TT#41557 use stored proc to get the billing fee
+  * [6f6cfc4] TT#41557 use correct stored proc for billing fees selection
+
+  [ Guillem Jover ]
+  * [b7c0308] TT#42907 Add systemd notify support
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Sep 2018 18:58:35 +0200
+
 ngcp-rate-o-mat (6.5.0.0+0~mr6.5.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
