@@ -2661,10 +2661,28 @@ RATING_DURATION_FOUND:
 			or FATAL "Error getting destination customer cost for local destination_user_id ".
 					$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
 		} else {
-			# TODO what about transit calls?
-			# TODO ngcp 6.5
-			#   calculate source carrier (peering) costs
-			#   calculate destination carrier (peering) costs
+
+			if($source_provider_billing_info{profile_id}) {
+				DEBUG sub { "fetching destination_carrier_cost based on source_provider_billing_info ".(Dumper \%source_provider_billing_info) };
+				get_provider_call_cost($cdr, $type, "in", $readonly,
+							$source_provider_info, \$destination_carrier_cost, \$destination_carrier_free_time,
+							\$rating_durations[@rating_durations])
+					or FATAL "Error getting destination carrier cost for local destination_provider_id ".
+							$cdr->{destination_provider_id}." for cdr ".$cdr->{id}."\n";
+			} else {
+				WARNING "missing source profile, so we can't calculate destination_carrier_cost for source_provider_billing_info ".(Dumper \%source_provider_billing_info);
+			}
+			
+			if($destination_provider_billing_info{profile_id}) {
+				DEBUG sub { "fetching source_carrier_cost based on destination_provider_billing_info ".(Dumper \%destination_provider_billing_info) };
+				get_provider_call_cost($cdr, $type, "out", $readonly,
+							$destination_provider_info, \$source_carrier_cost, \$source_carrier_free_time,
+							\$rating_durations[@rating_durations])
+						or FATAL "Error getting source carrier cost for cdr ".$cdr->{id}."\n";
+			} else {
+				WARNING "missing destination profile, so we can't calculate source_carrier_cost for destination_provider_billing_info ".(Dumper \%destination_provider_billing_info);
+			}
+
 		}
 	}
 
