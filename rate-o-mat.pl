@@ -114,10 +114,12 @@ foreach my $gpp_idx(0 .. 9) {
 my $acc_cash_balance_col_model_key = 1;
 my $acc_time_balance_col_model_key = 2;
 my $acc_relation_col_model_key = 3;
+my $acc_tag_col_model_key = 4;
 
-my $dup_cash_balance_col_model_key = 4;
-my $dup_time_balance_col_model_key = 5;
-my $dup_relation_col_model_key = 6;
+my $dup_cash_balance_col_model_key = 5;
+my $dup_time_balance_col_model_key = 6;
+my $dup_relation_col_model_key = 7;
+my $dup_tag_col_model_key = 8;
 
 # globals: #############################################################
 
@@ -702,6 +704,7 @@ EOS
 		$acc_cash_balance_col_model_key,
 		$acc_time_balance_col_model_key,
 		$acc_relation_col_model_key,
+		$acc_tag_col_model_key,
 		'local');
 
 	if ($dupdbh) {
@@ -717,6 +720,7 @@ EOS
 		$dup_cash_balance_col_model_key,
 		$dup_time_balance_col_model_key,
 		$dup_relation_col_model_key,
+		$dup_tag_col_model_key,
 		'duplication');
 	}
 
@@ -730,10 +734,11 @@ sub prepare_cdr_col_models {
 	my $cash_balance_col_model_key = shift;
 	my $time_balance_col_model_key = shift;
 	my $relation_col_model_key = shift;
+	my $tag_col_model_key = shift;
 	my $description_prefix = shift;
 
 	prepare_cdr_col_model($dbh,$cash_balance_col_model_key,$description_prefix.' cdr cash balance column model',$description_prefix,
-		[ 'direction', 'provider', 'cash_balance' ], # avoid using Tie::IxHash
+		[ 'provider', 'direction', 'cash_balance' ], # avoid using Tie::IxHash
 		{
 			provider => {
 				sql => 'SELECT * FROM accounting.cdr_provider',
@@ -749,15 +754,19 @@ sub prepare_cdr_col_models {
 			},
 		},{
 			sql => "INSERT INTO accounting.cdr_cash_balance_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,cash_balance_id,val_before,val_after) VALUES".
+				"  (cdr_id,cdr_start_time,provider_id,direction_id,cash_balance_id,val_before,val_after) VALUES".
 				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
 				"val_before = ?, val_after = ?",
 			description => "write $description_prefix cdr cash balance col data",
+		},{
+			sql => "SELECT val_before, val_after FROM accounting.cdr_cash_balance_data".
+				"  WHERE cdr_id = ? AND provider_id = ? AND direction_id = ? AND cash_balance_id = ?",
+			description => "read $description_prefix cdr cash balance col data",
 		}
 	);
 
 	prepare_cdr_col_model($dbh,$time_balance_col_model_key,$description_prefix.' cdr time balance column model',$description_prefix,
-		[ 'direction', 'provider', 'time_balance' ],
+		[ 'provider', 'direction', 'time_balance' ],
 		{
 			provider => {
 				sql => 'SELECT * FROM accounting.cdr_provider',
@@ -773,15 +782,19 @@ sub prepare_cdr_col_models {
 			},
 		},{
 			sql => "INSERT INTO accounting.cdr_time_balance_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,time_balance_id,val_before,val_after) VALUES".
+				"  (cdr_id,cdr_start_time,provider_id,direction_id,time_balance_id,val_before,val_after) VALUES".
 				"  (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
 				"val_before = ?, val_after = ?",
 			description => "write $description_prefix cdr time balance col data",
+		},{
+			sql => "SELECT val_before, val_after FROM accounting.cdr_time_balance_data".
+				"  WHERE cdr_id = ? AND provider_id = ? AND direction_id = ? AND time_balance_id = ?",
+			description => "read $description_prefix cdr time balance col data",
 		}
 	);
 
 	prepare_cdr_col_model($dbh,$relation_col_model_key,$description_prefix.' cdr relation column model',$description_prefix,
-		[ 'direction', 'provider', 'relation' ],
+		[ 'provider', 'direction', 'relation' ],
 		{
 			provider => {
 				sql => 'SELECT * FROM accounting.cdr_provider',
@@ -797,10 +810,42 @@ sub prepare_cdr_col_models {
 			},
 		},{
 			sql => "INSERT INTO accounting.cdr_relation_data".
-				"  (cdr_id,cdr_start_time,direction_id,provider_id,relation_id,val) VALUES".
+				"  (cdr_id,cdr_start_time,provider_id,direction_id,relation_id,val) VALUES".
 				"  (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
 				"val = ?",
 			description => "write $description_prefix cdr relation col data",
+		},{
+			sql => "SELECT val FROM accounting.cdr_relation_data".
+				"  WHERE cdr_id = ? AND provider_id = ? AND direction_id = ? AND relation_id = ?",
+			description => "read $description_prefix cdr relation col data",
+		}
+	);
+
+	prepare_cdr_col_model($dbh,$tag_col_model_key,$description_prefix.' cdr tag column model',$description_prefix,
+		[ 'provider', 'direction', 'tag' ],
+		{
+			provider => {
+				sql => 'SELECT * FROM accounting.cdr_provider',
+				description => "get $description_prefix cdr provider cols",
+			},
+			direction => {
+				sql => 'SELECT * FROM accounting.cdr_direction',
+				description => "get $description_prefix cdr direction cols",
+			},
+			tag => {
+				sql => 'SELECT * FROM accounting.cdr_tag',
+				description => "get $description_prefix tag cols",
+			},
+		},{
+			sql => "INSERT INTO accounting.cdr_tag_data".
+				"  (cdr_id,cdr_start_time,provider_id,direction_id,tag_id,val) VALUES".
+				"  (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ".
+				"val = ?",
+			description => "write $description_prefix cdr tag col data",
+		},{
+			sql => "SELECT val FROM accounting.cdr_tag_data".
+				"  WHERE cdr_id = ? AND provider_id = ? AND direction_id = ? AND tag_id = ?",
+			description => "read $description_prefix cdr tag col data",
 		}
 	);
 
@@ -1698,6 +1743,18 @@ sub update_cdr {
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
 					$dup_relation_col_model_key);
+
+				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
+					{ direction => 'destination', provider => 'customer', tag => 'furnished_charging_info' });
+
+				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
+					{ direction => 'source', provider => 'customer', tag => 'header=P-Asserted-Identity' });
+
+				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
+					{ direction => 'destination', provider => 'customer', tag => 'header=Diversion' });
+
+				#todo: replicate mos values ...
+
 			} else {
 				FATAL "cdr ID $cdr->{id} and col data could not be duplicated";
 			}
@@ -2136,6 +2193,7 @@ sub prepare_cdr_col_model {
 	my $dimensions = shift;
 	my $col_dimension_stmt_map = shift;
 	my $write_stmt = shift;
+	my $read_stmt = shift;
 
 	$cdr_col_models{$col_model_key} = {
 		description => $model_description,
@@ -2159,6 +2217,10 @@ sub prepare_cdr_col_model {
 	$model->{write_sth} = { description => $write_stmt->{description}, };
 	$model->{write_sth}->{sth} = $dbh->prepare($write_stmt->{sql})
 		or FATAL "Error preparing ".$write_stmt->{description}." statement: ".$dbh->errstr;
+
+	$model->{read_sth} = { description => $read_stmt->{description}, };
+	$model->{read_sth}->{sth} = $dbh->prepare($read_stmt->{sql})
+		or FATAL "Error preparing ".$read_stmt->{description}." statement: ".$dbh->errstr;
 
 }
 
@@ -2229,6 +2291,38 @@ sub write_cdr_col_data {
 	#	DEBUG 'no '.$model->{description_prefix}.' col data written for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	}
 	return $sth->rows;
+
+}
+
+sub copy_cdr_col_data {
+
+	my $src_col_model_key = shift;
+	my $dst_col_model_key = shift;
+	my $cdr = shift;
+	my $src_cdr_id = shift;
+	my $dst_cdr_id = shift;
+	my $lookup = shift;
+	FATAL "unknown column model key $src_col_model_key" unless exists $cdr_col_models{$src_col_model_key};
+	my $src_model = $cdr_col_models{$src_col_model_key};
+	my @bind_parms = ($src_cdr_id);
+	foreach my $dimension (@{$src_model->{dimensions}}) {
+		my $dimension_value = $lookup->{$dimension};
+		unless ($dimension_value) {
+			FATAL "missing '$dimension' dimension for reading ".$src_model->{description_prefix}." col data of ".$src_model->{description};
+		}
+		my $dictionary = $src_model->{dimension_dictionaries}->{$dimension};
+		my $dimension_value_lookup = $dictionary->{$dimension_value};
+		unless ($dimension_value_lookup) {
+			FATAL "unknown '$dimension' col name '$dimension_value' for reading ".$src_model->{description_prefix}." col data of ".$src_model->{description};
+		}
+		push(@bind_parms,$dimension_value_lookup->{id});
+	}
+
+	my $sth = $src_model->{read_sth}->{sth};
+	$sth->execute(@bind_parms) or FATAL "Error executing ".$src_model->{read_sth}->{description}."statement: ".$sth->errstr;
+	my @vals = $sth->fetchrow_array;
+
+	return write_cdr_col_data($dst_col_model_key,$cdr,$dst_cdr_id,$lookup,@vals);
 
 }
 
@@ -3067,6 +3161,7 @@ sub main {
 	foreach (keys %cdr_col_models) {
 		my $model = $cdr_col_models{$_};
 		$model->{write_sth}->{sth}->finish;
+		$model->{read_sth}->{sth}->finish;
 		foreach (values %{$model->{dimension_sths}}) {
 			$_->{sth}->finish;
 		}
