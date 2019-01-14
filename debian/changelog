@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (6.5.4.0+0~mr6.5.4.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [a077d02] TT#47921 replicate cdr_tag data: diversion, pai, fci
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 14 Jan 2019 14:21:15 +0100
+
 ngcp-rate-o-mat (6.5.3.0+0~mr6.5.3.0) unstable; urgency=medium
 
   * New release.
