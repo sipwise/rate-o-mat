@@ -9,8 +9,8 @@
 
 override_dh_clean:
 	dh_clean
-	rm -rf rate-o-mat
+	rm -f ngcp-rate-o-mat
 
 override_dh_auto_install:
-	install -m 755 rate-o-mat.pl rate-o-mat
+	install -m 755 rate-o-mat.pl ngcp-rate-o-mat
 	dh_install

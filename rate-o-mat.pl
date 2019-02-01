@@ -16,9 +16,9 @@ use Storable qw(dclone);
 
 # constants: ###########################################################
 
-$0 = 'rate-o-mat'; ## no critic (Variables::RequireLocalizedPunctuationVars)
+$0 = 'ngcp-rate-o-mat'; ## no critic (Variables::RequireLocalizedPunctuationVars)
 my $fork = $ENV{RATEOMAT_DAEMONIZE} // 1;
-my $pidfile = $ENV{RATEOMAT_PIDFILE} // '/var/run/rate-o-mat.pid';
+my $pidfile = $ENV{RATEOMAT_PIDFILE} // '/run/ngcp-rate-o-mat.pid';
 my $type = 'call';
 my $loop_interval = ((defined $ENV{RATEOMAT_LOOP_INTERVAL} && $ENV{RATEOMAT_LOOP_INTERVAL}) ? int $ENV{RATEOMAT_LOOP_INTERVAL} : 10);
 my $debug = ((defined $ENV{RATEOMAT_DEBUG} && $ENV{RATEOMAT_DEBUG}) ? int $ENV{RATEOMAT_DEBUG} : 0);
