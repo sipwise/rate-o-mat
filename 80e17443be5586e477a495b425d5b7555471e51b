@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+2: Manuel Montecelo <mmontecelo@sipwise.com>
+Code-Review+2: Mykola Malkov <mmalkov@sipwise.com>
+Submitted-by: Guillem Jover <gjover@sipwise.com>
+Submitted-at: Mon, 04 Feb 2019 15:47:05 +0100
+Reviewed-on: http://gerrit.mgm.sipwise.com/26925
+Project: rate-o-mat
+Branch: refs/heads/master
