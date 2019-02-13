@@ -66,6 +66,9 @@ my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOM
 # with 2 retries and 30sec delay, rato-o-mat tolerates a replication
 # lag of around 60secs until it terminates.
 
+# use source_user if number and source_cli =~ /anonymous/i:
+my $anonymous_source_cli_fallback = 1;
+
 # pause between db connect attempts:
 my $connect_interval = 3;
 
@@ -1819,8 +1822,16 @@ sub get_call_cost {
 	my $r_onpeak = shift;
 	my $r_balances = shift;
 
-	my $src_user = $cdr->{source_cli};
-	my $src_user_domain = $cdr->{source_cli}.'@'.$cdr->{source_domain};
+	my $src_user;
+	if($anonymous_source_cli_fallback
+	   and $cdr->{source_user_id} eq "0"
+	   and $cdr->{source_cli} =~ /anonymous/i
+	   and $cdr->{source_user} =~ /^[+ 0-9]+$/) {
+		$src_user = $cdr->{source_user};
+	} else {
+		$src_user = $cdr->{source_cli};
+	}
+	my $src_user_domain = $src_user.'@'.$cdr->{source_domain};
 	my $dst_user = $cdr->{destination_user_in};
 	my $dst_user_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 
@@ -2766,7 +2777,7 @@ RATING_DURATION_FOUND:
 			} else {
 				WARNING "missing source profile, so we can't calculate destination_carrier_cost for source_provider_billing_info ".(Dumper \%source_provider_billing_info);
 			}
-			
+
 			if($destination_provider_billing_info{profile_id}) {
 				DEBUG sub { "fetching source_carrier_cost based on destination_provider_billing_info ".(Dumper \%destination_provider_billing_info) };
 				get_provider_call_cost($cdr, $type, "out", $readonly,
