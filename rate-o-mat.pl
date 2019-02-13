@@ -66,6 +66,9 @@ my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOM
 # with 2 retries and 30sec delay, rato-o-mat tolerates a replication
 # lag of around 60secs until it terminates.
 
+# use source_user if number and source_cli =~ /anonymous/i:
+my $offnet_anonymous_source_cli_fallback = 1;
+
 # pause between db connect attempts:
 my $connect_interval = 3;
 
@@ -1838,8 +1841,16 @@ sub get_call_cost {
 	my $r_onpeak = shift;
 	my $r_balances = shift;
 
-	my $src_user = $cdr->{source_cli};
-	my $src_user_domain = $cdr->{source_cli}.'@'.$cdr->{source_domain};
+	my $src_user;
+	if($offnet_anonymous_source_cli_fallback
+	   and $cdr->{source_user_id} eq "0"
+	   and $cdr->{source_cli} =~ /anonymous/i
+	   and $cdr->{source_user} =~ /^[+ 0-9]+$/) {
+		$src_user = $cdr->{source_user};
+	} else {
+		$src_user = $cdr->{source_cli};
+	}
+	my $src_user_domain = $src_user.'@'.$cdr->{source_domain};
 	my $dst_user = $cdr->{destination_user_in};
 	my $dst_user_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 
@@ -2803,10 +2814,12 @@ RATING_DURATION_FOUND:
 			or FATAL "Error getting destination customer cost for local destination_user_id ".
 					$cdr->{destination_user_id}." for cdr ".$cdr->{id}."\n";
 		} else {
+
 			# TODO what about transit calls?
 			# TODO ngcp 6.5
 			#   calculate source carrier (peering) costs
 			#   calculate destination carrier (peering) costs
+
 		}
 	}
 
