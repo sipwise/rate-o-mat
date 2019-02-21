@@ -111,6 +111,8 @@ foreach my $gpp_idx(0 .. 9) {
 	push @cdr_fields, ("source_gpp$gpp_idx", "destination_gpp$gpp_idx");
 }
 
+my @mos_data_fields = qw(mos_average mos_average_packetloss mos_average_jitter mos_average_roundtrip);
+
 my $acc_cash_balance_col_model_key = 1;
 my $acc_time_balance_col_model_key = 2;
 my $acc_relation_col_model_key = 3;
@@ -162,6 +164,7 @@ my $sth_offpeak_subscriber;
 my $sth_unrated_cdrs;
 my $sth_update_cdr;
 my $sth_create_cdr_fragment;
+my $sth_mos_data;
 my $sth_get_cbalances;
 my $sth_update_cbalance_w_underrun_profiles_lock;
 my $sth_update_cbalance_w_underrun_lock;
@@ -190,6 +193,7 @@ my $sth_create_usr_preference_value;
 my $sth_update_usr_preference_value;
 my $sth_delete_usr_preference_value;
 my $sth_duplicate_cdr;
+my $sth_duplicate_mos_data;
 
 # run the main loop: ##################################################
 
@@ -577,6 +581,11 @@ EOS
 		"WHERE id = ? AND rating_status = 'unrated'"
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
+	$sth_mos_data = $acctdbh->prepare(
+		"SELECT * ".
+		"FROM accounting.cdr_mos_data WHERE cdr_id = ?"
+	) or FATAL "Error preparing mos data statement: ".$acctdbh->errstr;
+
 	if ($split_peak_parts) {
 		my @exclude_fragment_fields = qw(start_time duration is_fragmented);
 		my %exclude_fragment_fields = map { $_ => 1 } @exclude_fragment_fields;
@@ -712,6 +721,14 @@ EOS
 			join(',', (map {'?'} @cdr_fields)).
 			')'
 		) or FATAL "Error preparing duplicate_cdr statement: ".$dupdbh->errstr;
+
+		$sth_duplicate_mos_data = $dupdbh->prepare(
+			'insert into cdr_mos_data ('.
+			join(',', 'cdr_id',@mos_data_fields,'cdr_start_time').
+			') values (?,'.
+			join(',', (map {'?'} @mos_data_fields)).
+			',?) ON DUPLICATE KEY UPDATE ' . join(',',map { $_ . ' = ?'; } @mos_data_fields)
+		) or FATAL "Error preparing duplicate_mos_data statement: ".$dupdbh->errstr;
 
 		prepare_cdr_col_models($dupdbh,
 		$dup_cash_balance_col_model_key,
@@ -1694,10 +1711,14 @@ sub update_cdr {
 			my $dup_cdr_id = $dupdbh->{'mysql_insertid'};
 			if ($dup_cdr_id) {
 				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
+
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
 					$dup_relation_col_model_key);
+
+				copy_cdr_mos_data($cdr,$cdr->{id},$dup_cdr_id);
+
 			} else {
 				FATAL "cdr ID $cdr->{id} and col data could not be duplicated";
 			}
@@ -2229,6 +2250,35 @@ sub write_cdr_col_data {
 	#	DEBUG 'no '.$model->{description_prefix}.' col data written for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	}
 	return $sth->rows;
+
+}
+
+sub copy_cdr_mos_data {
+
+	my $cdr = shift;
+	my $src_cdr_id = shift;
+	my $dst_cdr_id = shift;
+
+	my $row_count = 0;
+	$sth_mos_data->execute($src_cdr_id) or FATAL "Error executing mos data statement: ".$sth_mos_data->errstr;
+	while (my $mos_data = $sth_mos_data->fetchrow_hashref()) {
+		my @bind_values = ($dst_cdr_id);
+		foreach my $mos_data_field (@mos_data_fields) {
+			push(@bind_values,$mos_data->{$mos_data_field});
+		}
+		push(@bind_values,$cdr->{start_time});
+		foreach my $mos_data_field (@mos_data_fields) {
+			push(@bind_values,$mos_data->{$mos_data_field});
+		}
+		$sth_duplicate_mos_data->execute(@bind_values) or FATAL "Error executing duplicate mos data statement: ".$sth_duplicate_mos_data->errstr;
+		if ($sth_duplicate_mos_data->rows == 1) {
+			DEBUG 'mos data created or up to date for cdr id '.$src_cdr_id.': '.join(', ',@bind_values);
+		} elsif ($sth_duplicate_mos_data->rows > 1) {
+			DEBUG 'mos data updated for cdr id '.$src_cdr_id.': '.join(', ',@bind_values);
+		}
+		$row_count += 1;
+	}
+	return $row_count;
 
 }
 
@@ -3035,6 +3085,7 @@ sub main {
 	$sth_unrated_cdrs->finish;
 	$sth_update_cdr->finish;
 	$split_peak_parts and $sth_create_cdr_fragment->finish;
+	$sth_mos_data->finish;
 	$sth_get_cbalances->finish;
 	$sth_update_cbalance_w_underrun_profiles_lock->finish;
 	$sth_update_cbalance_w_underrun_lock->finish;
@@ -3064,6 +3115,7 @@ sub main {
 	$sth_update_usr_preference_value and $sth_update_usr_preference_value->finish;
 	$sth_delete_usr_preference_value and $sth_delete_usr_preference_value->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
+	$sth_duplicate_mos_data and $sth_duplicate_mos_data->finish;
 	foreach (keys %cdr_col_models) {
 		my $model = $cdr_col_models{$_};
 		$model->{write_sth}->{sth}->finish;
