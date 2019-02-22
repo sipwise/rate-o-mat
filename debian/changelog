@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (6.5.3.2+0~mr6.5.3.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [bda8eaa] TT#52964 replicate cdr mos data
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 22 Feb 2019 14:08:26 +0100
+
 ngcp-rate-o-mat (6.5.3.1+0~mr6.5.3.1) unstable; urgency=medium
 
   [ Rene Krenn ]
