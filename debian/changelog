@@ -1,3 +1,17 @@
+ngcp-rate-o-mat (7.2.1.0+0~mr7.2.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [6fa46f7] TT#44911 calculate carrier costs for transit calls WIP
+  * [28a3ea2] TT#52581 fall back to source_user for anyonymous source_cli
+  * [ec64059] TT#52964 replicate cdr mos data
+
+  [ Guillem Jover ]
+  * [80e1744] TT#49150 Namespace binary name with ngcp-
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Feb 2019 22:58:51 +0100
+
 ngcp-rate-o-mat (7.2.0.0+0~mr7.2.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
