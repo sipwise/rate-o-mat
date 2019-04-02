@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (5.5.2.2+0~mr5.5.2.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [5a62d29] TT#56420 5.5 fix for call_start_time at day transition
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 02 Apr 2019 13:12:33 +0200
+
 ngcp-rate-o-mat (5.5.2.1+0~mr5.5.2.1) unstable; urgency=medium
 
   * New release.
