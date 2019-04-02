@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+1: Christian Bergamaschi <cbergamaschi@sipwise.com>
+Code-Review+2: Rene Krenn <rkrenn@sipwise.com>
+Submitted-by: Rene Krenn <rkrenn@sipwise.com>
+Submitted-at: Tue, 02 Apr 2019 13:11:18 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/28663
+Project: rate-o-mat
+Branch: refs/heads/mr5.5.2
