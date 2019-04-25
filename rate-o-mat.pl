@@ -1566,14 +1566,15 @@ sub get_profile_info {
 	my $direction = shift;
 	my $source = shift;
 	my $destination = shift;
+	my $lnp_number = shift; #force lnp fee lookup
 	my $b_info = shift;
 	my $start_time = shift;
 
 	my @res;
 
-	if($destination =~ /^\d+$/) {
+	if(defined $lnp_number and $lnp_number =~ /^\d+$/) {
 		# let's see if we find the number in our LNP database
-		$sth_lnp_number->execute($destination, $start_time, $start_time)
+		$sth_lnp_number->execute($lnp_number, $start_time, $start_time)
 			or FATAL "Error executing LNP number statement: ".$sth_lnp_number->errstr;
 		my ($lnppid) = $sth_lnp_number->fetchrow_array();
 
@@ -1856,11 +1857,11 @@ sub get_call_cost {
 	DEBUG "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
 		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain";
 
-	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain,
+	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $src_user,
 		$r_profile_info, $cdr->{start_time})) {
 		DEBUG "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
 			"src_user_domain $src_user, dst_user_domain $dst_user";
-		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user,
+		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user, undef,
 			$r_profile_info, $cdr->{start_time})) {
 			# we gracefully ignore missing profile infos for inbound direction
 			FATAL "No outbound fee info for profile $profile_id and ".
