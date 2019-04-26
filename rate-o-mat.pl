@@ -1814,7 +1814,7 @@ sub get_call_cost {
 	DEBUG "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
 		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain";
 
-	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $src_user,
+	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $dst_user,
 		$r_profile_info, $cdr->{start_time})) {
 		DEBUG "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
 			"src_user_domain $src_user, dst_user_domain $dst_user";
