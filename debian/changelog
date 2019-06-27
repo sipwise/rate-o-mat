@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (6.5.5.1+0~mr6.5.5.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [feedc96] TT#46155 fix/force lnp fees matching
+  * [827723e] TT#46155 use dst for lnp fees matching
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 27 Jun 2019 15:52:38 +0200
+
 ngcp-rate-o-mat (6.5.5.0+0~mr6.5.5.0) unstable; urgency=medium
 
   [ Rene Krenn ]
