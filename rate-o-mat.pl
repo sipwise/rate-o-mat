@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use DBI;
-use POSIX qw(setsid mktime);
+use POSIX qw(setsid mktime ceil);
 use Fcntl qw(LOCK_EX LOCK_NB SEEK_SET);
 use IO::Handle;
 use IO::Socket::UNIX;
@@ -73,6 +73,9 @@ my $offnet_anonymous_source_cli_fallback = 1;
 my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
+
+#execute contract subscriber locks if fraud limits are exceeded after a call:
+my $apply_fraud_lock = 0;
 
 # test may execute rate-o-mat on another host with different
 # timezone. the connection timezone can therefore be forced to
@@ -164,6 +167,12 @@ my $sth_get_subscriber_contract_id;
 my $sth_billing_info_network;
 my $sth_billing_info;
 my $sth_profile_info;
+my $sth_profile_fraud_info;
+my $sth_contract_fraud_info;
+my $sth_upsert_cdr_period_costs;
+my $sth_get_cdr_period_costs;
+my $sth_duplicate_upsert_cdr_period_costs;
+my $sth_duplicate_get_cdr_period_costs;
 my $sth_offpeak;
 my $sth_offpeak_subscriber;
 my $sth_unrated_cdrs;
@@ -524,6 +533,18 @@ EOS
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
+	$sth_profile_fraud_info = $billdbh->prepare(
+		"SELECT bp.fraud_interval_limit, bp.fraud_daily_limit, " .
+		"bp.fraud_interval_lock, bp.fraud_daily_lock, bp.fraud_use_reseller_rates " .
+		"FROM billing.billing_profiles bp WHERE bp.id = ?"
+	) or FATAL "Error preparing profile fraud info statement: ".$billdbh->errstr;
+
+	$sth_contract_fraud_info = $billdbh->prepare(
+		"SELECT cfp.fraud_interval_limit, cfp.fraud_daily_limit, " .
+		"cfp.fraud_interval_lock, cfp.fraud_daily_lock " .
+		"FROM billing.contract_fraud_preferences cfp WHERE cfp.contract_id = ?"
+	) or FATAL "Error preparing contract fraud info statement: ".$billdbh->errstr;
+
 	$sth_lnp_profile_info = $billdbh->prepare(
 		"SELECT id, source, destination, ".
 		"onpeak_init_rate, onpeak_init_interval, ".
@@ -585,6 +606,64 @@ EOS
 		"duration = ? ".
 		"WHERE id = ? AND rating_status = 'unrated'"
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
+
+	my $upsert_cdr_period_costs_stmt = "INSERT INTO accounting.cdr_period_costs (" .
+		"  contract_id," .
+		"  period," .
+		"  period_date," .
+		"  direction," .
+		  #billing_profile_id,
+		"  customer_cost," .
+		"  reseller_cost," .
+		"  fraud_limit_exceeded," .
+		"  fraud_limit_type," .
+		"  first_cdr_start_time," .
+		"  last_cdr_start_time" .
+		") VALUES (" .
+		"  ?," . #_contract_id," .
+		"  ?," . #'month'," .
+		"  ?," . #_month_period_date," .
+		"  ?," . #_direction," .
+		  #_billing_profile_id,
+		"  ?," . #_customer_cost," .
+		"  ?," . #_reseller_cost," .
+		"  if(? > 0," . #_fraud_use_reseller_rates
+		"	if(? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"  ?," . #_fraud_limit_type," .
+		"  ?," . #_cdr_start_time," .
+		"  ?" . #_cdr_start_time" .
+		") ON DUPLICATE KEY UPDATE " .
+		  #billing_profile_id = _billing_profile_id,
+		"  customer_cost = customer_cost + ?," . #_customer_cost," .
+		"  reseller_cost = reseller_cost + ?," . #_reseller_cost," .
+		"  cdr_count = cdr_count + 1," .
+		"  fraud_limit_exceeded = if(? > 0," . #_fraud_use_reseller_rates
+		"	if(reseller_cost + ? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(customer_cost + ? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"  fraud_limit_type = ?," . #_fraud_limit_type
+		"  first_cdr_start_time = if(? < first_cdr_start_time," . #_cdr_start_time
+		"	?," . #_cdr_start_time
+		"	first_cdr_start_time)," .
+		"  last_cdr_start_time = if(? > last_cdr_start_time," . #_cdr_start_time
+		"	?," . #_cdr_start_time
+		"	last_cdr_start_time)";
+
+	my $get_cdr_period_costs_stmt = "SELECT " .
+		"cpc.fraud_limit_exceeded " .
+		"FROM accounting.cdr_period_costs as cpc WHERE " .
+		"cpc.contract_id = _contract_id " .
+		"AND cpc.period = _day_period " .
+		"AND cpc.period_date = _date_period " .
+		"AND cpc.direction = _direction";
+
+	$sth_upsert_cdr_period_costs = $acctdbh->prepare(
+		$upsert_cdr_period_costs_stmt
+	) or FATAL "Error preparing upsert cdr period costs statement: ".$acctdbh->errstr;
+
+	$sth_get_cdr_period_costs = $acctdbh->prepare(
+		$get_cdr_period_costs_stmt
+	) or FATAL "Error preparing get cdr period costs statement: ".$acctdbh->errstr;
 
 	$sth_mos_data = $acctdbh->prepare(
 		"SELECT * ".
@@ -735,6 +814,14 @@ EOS
 			join(',', (map {'?'} @mos_data_fields)).
 			',?) ON DUPLICATE KEY UPDATE ' . join(',',map { $_ . ' = ?'; } @mos_data_fields)
 		) or FATAL "Error preparing duplicate_mos_data statement: ".$dupdbh->errstr;
+
+		$sth_duplicate_upsert_cdr_period_costs = $dupdbh->prepare(
+			$upsert_cdr_period_costs_stmt
+		) or FATAL "Error preparing duplicate upsert cdr period costs statement: ".$dupdbh->errstr;
+
+		$sth_duplicate_get_cdr_period_costs = $dupdbh->prepare(
+			$get_cdr_period_costs_stmt
+		) or FATAL "Error preparing duplicate get cdr period costs statement: ".$dupdbh->errstr;
 
 		prepare_cdr_col_models($dupdbh,
 		$dup_cash_balance_col_model_key,
@@ -1125,6 +1212,137 @@ sub add_profile_mappings {
 
 	$billdbh->do("CALL billing.create_contract_billing_profile_network_from_package(?,?,?,?)",undef,$contract_id,$stime,$package_id,$profiles)
 		or FATAL "Error executing create billing mappings statement: ".$DBI::errstr;
+
+}
+
+sub add_period_costs {
+
+	my $dup = shift;
+	my $contract_id = shift;
+	my $stime = shift;
+	my $duration = shift;
+	my $billing_profile_id = shift;
+	my $customer_cost = shift;
+	my $reseller_cost = shift;
+
+	$sth_profile_fraud_info->execute($billing_profile_id)
+	    or FATAL "Error executing profile fraud info statement: ".$sth_profile_fraud_info->errstr;
+	my ($profile_fraud_interval_limit,
+		$profile_fraud_daily_limit,
+		$profile_fraud_interval_lock,
+		$profile_fraud_daily_lock,
+		$fraud_use_reseller_rates) = $sth_profile_fraud_info->fetchrow_array();
+
+	$sth_contract_fraud_info->execute($contract_id)
+	    or FATAL "Error executing contracts fraud info statement: ".$sth_contract_fraud_info->errstr;
+	my ($contract_fraud_interval_limit,
+		$contract_fraud_daily_limit,
+		$contract_fraud_interval_lock,
+		$contract_fraud_daily_lock) = $sth_contract_fraud_info->fetchrow_array();
+
+	my ($month_period_date,$day_period_date);
+	{
+		my ($y, $m, $d, $H, $M, $S) = (localtime(ceil($stime + $duration)))[5,4,3,2,1,0];
+		$y += 1900;
+		$m += 1;
+		$day_period_date = sprintf('%04d-%02d-%02d', $y, $m, $d);
+		$month_period_date = sprintf('%04d-%02d-01', $y, $m);
+	}
+	my $direction = "out";
+	my ($fraud_limit_type,$fraud_limit);
+	my $sth = ($dup ? $sth_duplicate_upsert_cdr_period_costs : $sth_upsert_cdr_period_costs);
+	if (defined $contract_fraud_interval_limit and $contract_fraud_interval_limit > 0.0) {
+		$fraud_limit = $contract_fraud_interval_limit;
+		$fraud_limit_type = "contract";
+	} elsif (defined $profile_fraud_interval_limit and $profile_fraud_interval_limit > 0.0) {
+		$fraud_limit = $profile_fraud_interval_limit;
+		$fraud_limit_type = "billing_profile";
+	} else {
+		$fraud_limit = undef;
+		$fraud_limit_type = undef;
+	}
+
+	$sth->execute($contract_id,
+		"month",
+		$month_period_date,
+		$direction,
+		$customer_cost,
+		$reseller_cost,
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
+
+		$fraud_limit_type,
+		$stime,
+		$stime,
+
+		$customer_cost,
+		$reseller_cost,
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
+
+		$fraud_limit_type,
+
+		$stime,$stime,
+		$stime,$stime,
+	) or FATAL "Error executing upsert cdr month period costs statement: ".$sth->errstr;
+
+	if (defined $contract_fraud_daily_limit and $contract_fraud_daily_limit > 0.0) {
+		$fraud_limit = $contract_fraud_daily_limit;
+		$fraud_limit_type = "contract";
+	} elsif (defined $profile_fraud_daily_limit and $profile_fraud_daily_limit > 0.0) {
+		$fraud_limit = $profile_fraud_daily_limit;
+		$fraud_limit_type = "billing_profile";
+	} else {
+		$fraud_limit = undef;
+		$fraud_limit_type = undef;
+	}
+
+	$sth->execute($contract_id,
+		"day",
+		$day_period_date,
+		$direction,
+		$customer_cost,
+		$reseller_cost,
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
+
+		$fraud_limit_type,
+		$stime,
+		$stime,
+
+		$customer_cost,
+		$reseller_cost,
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
+
+		$fraud_limit_type,
+
+		$stime,$stime,
+		$stime,$stime,
+	) or FATAL "Error executing upsert cdr day period costs statement: ".$sth->errstr;
+
+	######
+
+	#my $sth = $dbh->prepare(
+	#	"CALL accounting.add_period_costs(?,?,?,?,?,?,?)"
+	#) or FATAL "Error preparing add period cost statement: ".$dbh->errstr;
+	#$sth->execute($contract_id,$stime,$duration,"out",$billing_profile_id,$customer_cost,$reseller_cost)
+	#	or FATAL "Error executing add period cost statement: ".$sth->errstr;
+	#my ($lock) = $sth->fetchrow_array();
+	#$sth->finish;
+	#return $lock;
+
+	#$dbh->do("CALL accounting.add_period_costs(?,?,?,?,?,?,?)",undef,
+	#	$contract_id,$stime,$duration,"out",$billing_profile_id,$customer_cost,$reseller_cost)
+	#	or FATAL "Error executing add period cost statement: ".$DBI::errstr;
 
 }
 
@@ -1750,6 +1968,14 @@ sub update_cdr {
 
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
+		my $fraud_lock = add_period_costs(0,
+			$cdr->{source_account_id},
+			$cdr->{start_time},
+			$cdr->{duration},
+			$cdr->{source_customer_billing_profile_id},
+			$cdr->{source_customer_cost},
+			$cdr->{source_reseller_cost},
+		);
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
@@ -1761,6 +1987,14 @@ sub update_cdr {
 			if ($dup_cdr_id) {
 				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
 
+				$fraud_lock = add_period_costs(1,
+					$cdr->{source_account_id},
+					$cdr->{start_time},
+					$cdr->{duration},
+					$cdr->{source_customer_billing_profile_id},
+					$cdr->{source_customer_cost},
+					$cdr->{source_reseller_cost},
+				);
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
@@ -1780,6 +2014,10 @@ sub update_cdr {
 			} else {
 				FATAL "cdr ID $cdr->{id} and col data could not be duplicated";
 			}
+		}
+		if (defined $fraud_lock and $fraud_lock > 0) {
+			set_subscriber_lock_level($cdr->{source_account_id},$fraud_lock,not $apply_fraud_lock);
+			set_subscriber_status($cdr->{source_account_id},$fraud_lock,not $apply_fraud_lock);
 		}
 	} else {
 		$rollback = 1;
@@ -2428,6 +2666,8 @@ sub get_customer_call_cost {
 		return -1;
 	}
 
+	$cdr->{$dir."customer_billing_profile_id"} = $billing_info{profile_id};
+
 	my $prepaid = get_prepaid($cdr, \%billing_info, $dir.'user_');
 	my $outgoing_prepaid = ($prepaid == 1 && $direction eq "out");
 	my $prepaid_cost_entry = undef;
@@ -3015,7 +3255,7 @@ sub main {
 
 	if ($fork != 0) {
 		$pidfh = daemonize($pidfile);
-	} elsif (length $pidfile) {
+	} elsif ($pidfile) {
 		$pidfh = create_pidfile($pidfile);
 		write_pidfile($pidfh);
 	}
@@ -3201,6 +3441,12 @@ sub main {
 	$sth_billing_info_network->finish;
 	$sth_billing_info->finish;
 	$sth_profile_info->finish;
+	$sth_profile_fraud_info->finish;
+	$sth_contract_fraud_info->finish;
+	$sth_upsert_cdr_period_costs->finish;
+	$sth_get_cdr_period_costs->finish;
+	$sth_duplicate_upsert_cdr_period_costs->finish;
+	$sth_duplicate_get_cdr_period_costs->finish;
 	$sth_offpeak->finish;
 	$sth_offpeak_subscriber->finish;
 	$sth_unrated_cdrs->finish;
