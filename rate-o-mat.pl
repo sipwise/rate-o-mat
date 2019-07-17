@@ -74,6 +74,9 @@ my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
+#execute contract subscriber locks if fraud limits are exceeded after a call:
+my $apply_fraud_lock = 1;
+
 # test may execute rate-o-mat on another host with different
 # timezone. the connection timezone can therefore be forced to
 # eg. the UTC default on ngcp.
@@ -1128,6 +1131,31 @@ sub add_profile_mappings {
 
 }
 
+sub add_period_costs {
+
+	my $dbh = shift;
+	my $contract_id = shift;
+	my $stime = shift;
+	my $duration = shift;
+	my $billing_profile_id = shift;
+	my $customer_cost = shift;
+	my $reseller_cost = shift;
+
+	my $sth = $dbh->prepare(
+		"CALL accounting.add_period_costs(?,?,?,?,?,?,?)"
+	) or FATAL "Error preparing add period cost statement: ".$dbh->errstr;
+	$sth->execute($contract_id,$stime,$duration,"out",$billing_profile_id,$customer_cost,$reseller_cost)
+		or FATAL "Error executing add period cost statement: ".$sth->errstr;
+	my ($lock) = $sth->fetchrow_array();
+	$sth->finish;
+	return $lock;
+
+	#$dbh->do("CALL accounting.add_period_costs(?,?,?,?,?,?,?)",undef,
+	#	$contract_id,$stime,$duration,"out",$billing_profile_id,$customer_cost,$reseller_cost)
+	#	or FATAL "Error executing add period cost statement: ".$DBI::errstr;
+
+}
+
 sub get_notopup_expiration {
 
 	my $contract_id = shift;
@@ -1750,6 +1778,14 @@ sub update_cdr {
 
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
+		my $fraud_lock = add_period_costs($acctdbh,
+			$cdr->{source_account_id},
+			$cdr->{start_time},
+			$cdr->{duration},
+			$cdr->{source_customer_billing_profile_id},
+			$cdr->{source_customer_cost},
+			$cdr->{source_reseller_cost},
+		);
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
@@ -1761,6 +1797,14 @@ sub update_cdr {
 			if ($dup_cdr_id) {
 				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
 
+				$fraud_lock = add_period_costs($dupdbh,
+					$cdr->{source_account_id},
+					$cdr->{start_time},
+					$cdr->{duration},
+					$cdr->{source_customer_billing_profile_id},
+					$cdr->{source_customer_cost},
+					$cdr->{source_reseller_cost},
+				);
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
@@ -1780,6 +1824,10 @@ sub update_cdr {
 			} else {
 				FATAL "cdr ID $cdr->{id} and col data could not be duplicated";
 			}
+		}
+		if (defined $fraud_lock and $fraud_lock > 0) {
+			set_subscriber_lock_level($cdr->{source_account_id},$fraud_lock,not $apply_fraud_lock);
+			set_subscriber_status($cdr->{source_account_id},$fraud_lock,not $apply_fraud_lock);
 		}
 	} else {
 		$rollback = 1;
@@ -2428,6 +2476,8 @@ sub get_customer_call_cost {
 		return -1;
 	}
 
+	$cdr->{$dir."customer_billing_profile_id"} = $billing_info{profile_id};
+
 	my $prepaid = get_prepaid($cdr, \%billing_info, $dir.'user_');
 	my $outgoing_prepaid = ($prepaid == 1 && $direction eq "out");
 	my $prepaid_cost_entry = undef;
@@ -3015,7 +3065,7 @@ sub main {
 
 	if ($fork != 0) {
 		$pidfh = daemonize($pidfile);
-	} elsif (length $pidfile) {
+	} elsif ($pidfile) {
 		$pidfh = create_pidfile($pidfile);
 		write_pidfile($pidfh);
 	}
