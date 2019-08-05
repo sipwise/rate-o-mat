@@ -1,3 +1,20 @@
+ngcp-rate-o-mat (8.0.0.0+0~mr8.0.0.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [3ae2dda] TT#60950 Switch rate-o-mat docker to buster
+
+  [ Guillem Jover ]
+  * [6c0bd55] TT#61954 Update copyright years
+  * [c7d03c0] TT#61954 Set debhelper compat level in Build-Depends instead of debian/compat
+  * [155a2e3] TT#63301 Fix package section
+
+  [ Rene Krenn ]
+  * [c3f9797] TT#62908 populate period cost sums and lock subscribers
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 05 Aug 2019 20:59:51 +0200
+
 ngcp-rate-o-mat (7.5.0.0+0~mr7.5.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
