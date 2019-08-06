@@ -608,6 +608,7 @@ EOS
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
 	my $upsert_cdr_period_costs_stmt = "INSERT INTO accounting.cdr_period_costs (" .
+	    "  id," .
 		"  contract_id," .
 		"  period," .
 		"  period_date," .
@@ -619,8 +620,11 @@ EOS
 		"  fraud_limit_exceeded," .
 		"  fraud_limit_type," .
 		"  first_cdr_start_time," .
-		"  last_cdr_start_time" .
+		"  first_cdr_id," .
+		"  last_cdr_start_time," .
+		"  last_cdr_id" .
 		") VALUES (" .
+		"  NULL," .
 		"  ?," . #_contract_id," .
 		"  ?," . #'month'," .
 		"  ?," . #_month_period_date," .
@@ -634,9 +638,12 @@ EOS
 		"	if(? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
 		"  ?," . #_fraud_limit_type," .
 		"  ?," . #_cdr_start_time," .
-		"  ?" . #_cdr_start_time" .
+		"  ?," . #_cdr_id," .
+		"  ?," . #_cdr_start_time" .
+		"  ?" . #_cdr_id," .
 		") ON DUPLICATE KEY UPDATE " .
 		  #billing_profile_id = _billing_profile_id,
+		"  id = LAST_INSERT_ID(id)," . #_customer_cost," .
 		"  customer_cost = customer_cost + ?," . #_customer_cost," .
 		"  reseller_cost = reseller_cost + ?," . #_reseller_cost," .
 		"  cdr_count = cdr_count + 1," .
@@ -647,17 +654,20 @@ EOS
 		"  first_cdr_start_time = if(? < first_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	first_cdr_start_time)," .
+		"  first_cdr_id = if(? < first_cdr_id," . #_cdr_id
+		"	?," . #_cdr_id
+		"	first_cdr_id)," .
 		"  last_cdr_start_time = if(? > last_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
-		"	last_cdr_start_time)";
+		"	last_cdr_start_time)," .
+		"  last_cdr_id = if(? > last_cdr_id," . #_cdr_id
+		"	?," . #_cdr_id
+		"	last_cdr_id)";
 
 	my $get_cdr_period_costs_stmt = "SELECT " .
 		"cpc.fraud_limit_exceeded, cpc.customer_cost, cpc.reseller_cost " .
 		"FROM accounting.cdr_period_costs as cpc WHERE " .
-		"cpc.contract_id = ? " .
-		"AND cpc.period = ? " .
-		"AND cpc.period_date = ? " .
-		"AND cpc.direction = ?";
+		"cpc.id = LAST_INSERT_ID()";
 
 	$sth_upsert_cdr_period_costs = $acctdbh->prepare(
 		$upsert_cdr_period_costs_stmt
@@ -1220,6 +1230,7 @@ sub add_profile_mappings {
 sub add_period_costs {
 
 	my $dup = shift;
+	my $cdr_id = shift;
 	my $contract_id = shift;
 	my $stime = shift;
 	my $duration = shift;
@@ -1287,7 +1298,9 @@ sub add_period_costs {
 
 		$fraud_limit_type,
 		$stime,
+		$cdr_id,
 		$stime,
+		$cdr_id,
 
 		$customer_cost,
 		$reseller_cost,
@@ -1298,15 +1311,11 @@ sub add_period_costs {
 
 		$fraud_limit_type,
 
-		$stime,$stime,
-		$stime,$stime,
+		$stime,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
 	) or FATAL "Error executing upsert cdr month period costs statement: ".$upsert_sth->errstr;
 
-	$get_sth->execute($contract_id,
-		"month",
-		$month_period_date,
-		$direction,
-	) or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
+	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($month_limit_exceeded,$month_customer_cost,$month_reseller_cost) = $get_sth->fetchrow_array();
 	if ($month_limit_exceeded) {
 		DEBUG "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
@@ -1342,7 +1351,9 @@ sub add_period_costs {
 
 		$fraud_limit_type,
 		$stime,
+		$cdr_id,
 		$stime,
+		$cdr_id,
 
 		$customer_cost,
 		$reseller_cost,
@@ -1353,15 +1364,11 @@ sub add_period_costs {
 
 		$fraud_limit_type,
 
-		$stime,$stime,
-		$stime,$stime,
+		$stime,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
 	) or FATAL "Error executing upsert cdr day period costs statement: ".$upsert_sth->errstr;
 
-	$get_sth->execute($contract_id,
-		"day",
-		$day_period_date,
-		$direction,
-	) or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
+	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($day_limit_exceeded,$day_customer_cost,$day_reseller_cost) = $get_sth->fetchrow_array();
 	if ($day_limit_exceeded) {
 		DEBUG "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
@@ -1997,6 +2004,7 @@ sub update_cdr {
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
 		my $fraud_lock = add_period_costs(0,
+			$cdr->{id},
 			$cdr->{source_account_id},
 			$cdr->{start_time},
 			$cdr->{duration},
@@ -2016,6 +2024,7 @@ sub update_cdr {
 				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
 
 				$fraud_lock = add_period_costs(1,
+					$dup_cdr_id,
 					$cdr->{source_account_id},
 					$cdr->{start_time},
 					$cdr->{duration},
