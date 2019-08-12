@@ -75,7 +75,7 @@ my $connect_interval = 3;
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
 #execute contract subscriber locks if fraud limits are exceeded after a call:
-my $apply_fraud_lock = 0;
+my $apply_fraud_lock = ((defined $ENV{RATEOMAT_FRAUD_LOCK} && $ENV{RATEOMAT_FRAUD_LOCK}) ? int $ENV{RATEOMAT_FRAUD_LOCK} : 0);
 
 # test may execute rate-o-mat on another host with different
 # timezone. the connection timezone can therefore be forced to
