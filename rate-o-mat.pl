@@ -3482,8 +3482,6 @@ sub main {
 	$sth_contract_fraud_info->finish;
 	$sth_upsert_cdr_period_costs->finish;
 	$sth_get_cdr_period_costs->finish;
-	$sth_duplicate_upsert_cdr_period_costs->finish;
-	$sth_duplicate_get_cdr_period_costs->finish;
 	$sth_offpeak->finish;
 	$sth_offpeak_subscriber->finish;
 	$sth_unrated_cdrs->finish;
@@ -3520,6 +3518,8 @@ sub main {
 	$sth_delete_usr_preference_value and $sth_delete_usr_preference_value->finish;
 	$sth_duplicate_cdr and $sth_duplicate_cdr->finish;
 	$sth_duplicate_mos_data and $sth_duplicate_mos_data->finish;
+	$sth_duplicate_upsert_cdr_period_costs and $sth_duplicate_upsert_cdr_period_costs->finish;
+	$sth_duplicate_get_cdr_period_costs and $sth_duplicate_get_cdr_period_costs->finish;
 	foreach (keys %cdr_col_models) {
 		my $model = $cdr_col_models{$_};
 		$model->{write_sth}->{sth}->finish;
