@@ -3010,6 +3010,8 @@ sub main {
 	local $SIG{HUP} = \&signal_handler;
 
 	if ($maintenance_mode eq 'yes') {
+		INFO "Up and doing nothing in the maintenance mode.\n";
+		notify_send("READY=1\n");
 		while (!$shutdown) {
 			sleep(1);
 		}
