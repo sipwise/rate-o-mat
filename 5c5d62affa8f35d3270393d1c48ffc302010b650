@@ -1,0 +1,7 @@
+Verified+1: Jenkins Jenkins
+Code-Review+2: Guillem Jover <gjover@sipwise.com>
+Submitted-by: Alexander Lutay <alutay@sipwise.com>
+Submitted-at: Tue, 03 Sep 2019 11:49:32 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/c/rate-o-mat/+/32960
+Project: rate-o-mat
+Branch: refs/heads/mr7.5.1
