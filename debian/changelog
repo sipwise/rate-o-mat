@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (7.5.1.2+0~mr7.5.1.2) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [5c5d62a] TT#66150 TT#42907 Fix b7c0308e: send systemd READY=1 when maintenance mode is enabled
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 03 Sep 2019 11:49:46 +0200
+
 ngcp-rate-o-mat (7.5.1.1+0~mr7.5.1.1) unstable; urgency=medium
 
   [ Rene Krenn ]
