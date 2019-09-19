@@ -1,3 +1,15 @@
+ngcp-rate-o-mat (6.5.6.1+0~mr6.5.6.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [1dfcf70] TT#52581 fall back to source_user for anyonymous source_cli
+
+  [ Alexander Lutay ]
+  * [bad8a1e] TT#66150 TT#42907 Fix b7c0308e: send systemd READY=1 when maintenance mode is enabled
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 19 Sep 2019 18:03:24 +0200
+
 ngcp-rate-o-mat (6.5.6.0+0~mr6.5.6.0) unstable; urgency=medium
 
   [ Rene Krenn ]
