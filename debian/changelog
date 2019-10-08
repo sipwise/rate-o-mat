@@ -1,3 +1,17 @@
+ngcp-rate-o-mat (8.1.0.0+0~mr8.1.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [d319f93] TT#62908 populate id columns in period cost sums table
+  * [7f71014] TT#64556 read rateomat.fraudlock setting from env
+  * [dfce081] TT#65850 no ->finish for cdr_period_costs duplication sth's
+
+  [ Alexander Lutay ]
+  * [ed8def2] TT#66150 TT#42907 Fix b7c0308e: send systemd READY=1 when maintenance mode is enabled
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 08 Oct 2019 09:12:02 +0200
+
 ngcp-rate-o-mat (8.0.0.0+0~mr8.0.0.0) unstable; urgency=medium
 
   [ Alexander Lutay ]
