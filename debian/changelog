@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (6.5.5.4+0~mr6.5.5.4) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [2e6f305] TT#44911 calculate carrier costs for transit calls WIP
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 04 Nov 2019 14:16:33 +0100
+
 ngcp-rate-o-mat (6.5.5.3+0~mr6.5.5.3) unstable; urgency=medium
 
   [ Alexander Lutay ]
