@@ -1318,10 +1318,10 @@ sub add_period_costs {
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($month_limit_exceeded,$month_customer_cost,$month_reseller_cost) = $get_sth->fetchrow_array();
 	if ($month_limit_exceeded) {
-		DEBUG "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
 	} else {
 		$month_lock = undef;
-		DEBUG "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller)";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller)";
 	}
 
 	if (defined $contract_fraud_daily_limit and $contract_fraud_daily_limit > 0.0) {
@@ -1371,10 +1371,10 @@ sub add_period_costs {
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($day_limit_exceeded,$day_customer_cost,$day_reseller_cost) = $get_sth->fetchrow_array();
 	if ($day_limit_exceeded) {
-		DEBUG "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
 	} else {
 		$daily_lock = undef;
-		DEBUG "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller)";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller)";
 	}
 
 	return $month_lock // $daily_lock;
