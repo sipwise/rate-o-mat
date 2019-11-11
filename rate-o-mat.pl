@@ -634,8 +634,8 @@ EOS
 		"  ?," . #_reseller_cost," .
 		"  1," .
 		"  if(? > 0," . #_fraud_use_reseller_rates
-		"	if(? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(? + 0.0 >= ? + 0.0,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(? + 0.0 >= ? + 0.0,1,0))," . #_customer_cost _fraud_interval_limit
 		"  ?," . #_fraud_limit_type," .
 		"  ?," . #_cdr_start_time," .
 		"  ?," . #_cdr_id," .
@@ -648,19 +648,19 @@ EOS
 		"  reseller_cost = reseller_cost + ?," . #_reseller_cost," .
 		"  cdr_count = cdr_count + 1," .
 		"  fraud_limit_exceeded = if(? > 0," . #_fraud_use_reseller_rates
-		"	if(reseller_cost + ? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(customer_cost + ? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(reseller_cost + ? >= ? + 0.0,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(customer_cost + ? >= ? + 0.0,1,0))," . #_customer_cost _fraud_interval_limit
 		"  fraud_limit_type = ?," . #_fraud_limit_type
-		"  first_cdr_start_time = if(? < first_cdr_start_time," . #_cdr_start_time
+		"  first_cdr_start_time = if(? + 0.0 < first_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	first_cdr_start_time)," .
-		"  first_cdr_id = if(? < first_cdr_id," . #_cdr_id
+		"  first_cdr_id = if(? + 0 < first_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	first_cdr_id)," .
-		"  last_cdr_start_time = if(? > last_cdr_start_time," . #_cdr_start_time
+		"  last_cdr_start_time = if(? + 0.0 > last_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	last_cdr_start_time)," .
-		"  last_cdr_id = if(? > last_cdr_id," . #_cdr_id
+		"  last_cdr_id = if(? + 0 > last_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	last_cdr_id)";
 
