@@ -1142,13 +1142,13 @@ sub set_subscriber_first_int_attribute_value {
 						$sth->execute($val_id)
 							or FATAL "Error executing delete '$attribute' usr preference value statement: ".$sth->errstr;
 						$changed++;
-						DEBUG "'$attribute' usr preference value ID $val_id with value '$old_value' deleted";
+						INFO "'$attribute' usr preference value ID $val_id with value '$old_value' deleted";
 					} else {
 						$sth = $sth_update_usr_preference_value;
 						$sth->execute($new_value,$val_id)
 							or FATAL "Error executing update usr preference value statement: ".$sth->errstr;
 						$changed++;
-						DEBUG "'$attribute' usr preference value ID $val_id updated from old value '$old_value' to new value '$new_value'";
+						INFO "'$attribute' usr preference value ID $val_id updated from old value '$old_value' to new value '$new_value'";
 					}
 				}
 			} elsif ($new_value > 0) {
@@ -1159,7 +1159,7 @@ sub set_subscriber_first_int_attribute_value {
 					$sth->execute($prov_subs_id,$attr_id,$new_value)
 						or FATAL "Error executing create usr preference value statement: ".$sth->errstr;
 					$changed++;
-					DEBUG "'$attribute' usr preference value ID ".$provdbh->{'mysql_insertid'}." with value '$new_value' created";
+					INFO "'$attribute' usr preference value ID ".$provdbh->{'mysql_insertid'}." with value '$new_value' created";
 				}
 			} else {
 				DEBUG "'$attribute' usr preference value does not exists and no value is to be set";
@@ -1318,10 +1318,10 @@ sub add_period_costs {
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($month_limit_exceeded,$month_customer_cost,$month_reseller_cost) = $get_sth->fetchrow_array();
 	if ($month_limit_exceeded) {
-		DEBUG "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
 	} else {
 		$month_lock = undef;
-		DEBUG "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller)";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller)";
 	}
 
 	if (defined $contract_fraud_daily_limit and $contract_fraud_daily_limit > 0.0) {
@@ -1371,10 +1371,10 @@ sub add_period_costs {
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
 	my ($day_limit_exceeded,$day_customer_cost,$day_reseller_cost) = $get_sth->fetchrow_array();
 	if ($day_limit_exceeded) {
-		DEBUG "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
 	} else {
 		$daily_lock = undef;
-		DEBUG "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller)";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller)";
 	}
 
 	return $month_lock // $daily_lock;
