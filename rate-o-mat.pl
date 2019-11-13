@@ -1346,8 +1346,8 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, $fraud_limit + 0.0,
-		$customer_cost + 0.0, $fraud_limit + 0.0,
+		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
+		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
 
 		$fraud_limit_type,
 		$stime,
@@ -1359,8 +1359,8 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, $fraud_limit + 0.0,
-		$customer_cost + 0.0, $fraud_limit + 0.0,
+		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
+		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
 
 		$fraud_limit_type,
 
