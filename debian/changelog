@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (7.5.1.6+0~mr7.5.1.6) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [18dc98f] TT#70320 period costs use inf limits if undefined (days)
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 13 Nov 2019 16:30:09 +0100
+
 ngcp-rate-o-mat (7.5.1.5+0~mr7.5.1.5) unstable; urgency=medium
 
   [ Rene Krenn ]
