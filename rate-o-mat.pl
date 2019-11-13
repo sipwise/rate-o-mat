@@ -634,8 +634,8 @@ EOS
 		"  ?," . #_reseller_cost," .
 		"  1," .
 		"  if(? > 0," . #_fraud_use_reseller_rates
-		"	if(? + 0.0 >= ? + 0.0,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(? + 0.0 >= ? + 0.0,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
 		"  ?," . #_fraud_limit_type," .
 		"  ?," . #_cdr_start_time," .
 		"  ?," . #_cdr_id," .
@@ -648,24 +648,24 @@ EOS
 		"  reseller_cost = reseller_cost + ?," . #_reseller_cost," .
 		"  cdr_count = cdr_count + 1," .
 		"  fraud_limit_exceeded = if(? > 0," . #_fraud_use_reseller_rates
-		"	if(reseller_cost + ? >= ? + 0.0,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(customer_cost + ? >= ? + 0.0,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(reseller_cost + ? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(customer_cost + ? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
 		"  fraud_limit_type = ?," . #_fraud_limit_type
-		"  first_cdr_start_time = if(? + 0.0 < first_cdr_start_time," . #_cdr_start_time
+		"  first_cdr_start_time = if(? < first_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	first_cdr_start_time)," .
-		"  first_cdr_id = if(? + 0 < first_cdr_id," . #_cdr_id
+		"  first_cdr_id = if(? < first_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	first_cdr_id)," .
-		"  last_cdr_start_time = if(? + 0.0 > last_cdr_start_time," . #_cdr_start_time
+		"  last_cdr_start_time = if(? > last_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	last_cdr_start_time)," .
-		"  last_cdr_id = if(? + 0 > last_cdr_id," . #_cdr_id
+		"  last_cdr_id = if(? > last_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	last_cdr_id)";
 
 	my $get_cdr_period_costs_stmt = "SELECT " .
-		"cpc.fraud_limit_exceeded, cpc.customer_cost, cpc.reseller_cost " .
+		"cpc.fraud_limit_exceeded, cpc.customer_cost, cpc.reseller_cost, cpc.cdr_count " .
 		"FROM accounting.cdr_period_costs as cpc WHERE " .
 		"cpc.id = LAST_INSERT_ID()";
 
@@ -1293,8 +1293,8 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost, $fraud_limit,
-		$customer_cost, $fraud_limit,
+		$reseller_cost + 0.0, $fraud_limit + 0.0,
+		$customer_cost + 0.0, $fraud_limit + 0.0,
 
 		$fraud_limit_type,
 		$stime,
@@ -1306,22 +1306,22 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost, $fraud_limit,
-		$customer_cost, $fraud_limit,
+		$reseller_cost + 0.0, $fraud_limit + 0.0,
+		$customer_cost + 0.0, $fraud_limit + 0.0,
 
 		$fraud_limit_type,
 
-		$stime,$stime,$cdr_id,$cdr_id,
-		$stime,$stime,$cdr_id,$cdr_id,
+		$stime + 0.0,$stime,$cdr_id,$cdr_id,
+		$stime + 0.0,$stime,$cdr_id,$cdr_id,
 	) or FATAL "Error executing upsert cdr month period costs statement: ".$upsert_sth->errstr;
 
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
-	my ($month_limit_exceeded,$month_customer_cost,$month_reseller_cost) = $get_sth->fetchrow_array();
+	my ($month_limit_exceeded,$month_customer_cost,$month_reseller_cost,$month_cdr_count) = $get_sth->fetchrow_array();
 	if ($month_limit_exceeded) {
-		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit ($month_cdr_count cdrs)";
 	} else {
 		$month_lock = undef;
-		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller)";
+		INFO "contract ID $contract_id month period costs $month_customer_cost (customer), $month_reseller_cost (reseller) ($month_cdr_count cdrs)";
 	}
 
 	if (defined $contract_fraud_daily_limit and $contract_fraud_daily_limit > 0.0) {
@@ -1346,8 +1346,8 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost, $fraud_limit,
-		$customer_cost, $fraud_limit,
+		$reseller_cost + 0.0, $fraud_limit + 0.0,
+		$customer_cost + 0.0, $fraud_limit + 0.0,
 
 		$fraud_limit_type,
 		$stime,
@@ -1359,22 +1359,22 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost, $fraud_limit,
-		$customer_cost, $fraud_limit,
+		$reseller_cost + 0.0, $fraud_limit + 0.0,
+		$customer_cost + 0.0, $fraud_limit + 0.0,
 
 		$fraud_limit_type,
 
-		$stime,$stime,$cdr_id,$cdr_id,
-		$stime,$stime,$cdr_id,$cdr_id,
+		$stime + 0.0,$stime,$cdr_id,$cdr_id,
+		$stime + 0.0,$stime,$cdr_id,$cdr_id,
 	) or FATAL "Error executing upsert cdr day period costs statement: ".$upsert_sth->errstr;
 
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
-	my ($day_limit_exceeded,$day_customer_cost,$day_reseller_cost) = $get_sth->fetchrow_array();
+	my ($day_limit_exceeded,$day_customer_cost,$day_reseller_cost,$day_cdr_count) = $get_sth->fetchrow_array();
 	if ($day_limit_exceeded) {
-		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) exceed $fraud_limit_type limit of $fraud_limit ($day_cdr_count cdrs)";
 	} else {
 		$daily_lock = undef;
-		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller)";
+		INFO "contract ID $contract_id day period costs $day_customer_cost (customer), $day_reseller_cost (reseller) ($day_cdr_count cdrs)";
 	}
 
 	return $month_lock // $daily_lock;
