@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (7.5.1.4+0~mr7.5.1.4) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [47033b8] TT#70153 log fraud actions to regular log, not debug
+  * [ec89dc5] TT#70320 fraud_limit_exceeded force numeric context
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 13 Nov 2019 13:45:35 +0100
+
 ngcp-rate-o-mat (7.5.1.3+0~mr7.5.1.3) unstable; urgency=medium
 
   [ Rene Krenn ]
