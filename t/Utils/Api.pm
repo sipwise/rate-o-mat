@@ -785,6 +785,7 @@ sub _setup_fees {
 	my $peaktime_specials = delete $params{peaktime_special};
 	my $interval_free_time = delete $params{interval_free_time};
 	my $interval_free_cash = delete $params{interval_free_cash};
+	my @fraud_params = map { $_ => delete $params{$_} } grep { rindex($_,'fraud') == 0 ; } keys %params;
 	my $profile = create_billing_profile(
 		reseller_id => $reseller->{id},
 		(defined $prepaid ? (prepaid => $prepaid) : ()),
@@ -792,6 +793,7 @@ sub _setup_fees {
 		(defined $peaktime_specials ? (peaktime_special => $peaktime_specials) : ()),
 		(defined $interval_free_time ? (interval_free_time => $interval_free_time) : ()),
 		(defined $interval_free_cash ? (interval_free_cash => $interval_free_cash) : ()),
+		@fraud_params,
 	);
 	my $zone = create_billing_zone(
 		billing_profile_id => $profile->{id},
