@@ -634,8 +634,8 @@ EOS
 		"  ?," . #_reseller_cost," .
 		"  1," .
 		"  if(? > 0," . #_fraud_use_reseller_rates
-		"	if(? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(coalesce(? + 0.0 >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(coalesce(? + 0.0 >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
 		"  ?," . #_fraud_limit_type," .
 		"  ?," . #_cdr_start_time," .
 		"  ?," . #_cdr_id," .
@@ -644,23 +644,23 @@ EOS
 		") ON DUPLICATE KEY UPDATE " .
 		  #billing_profile_id = _billing_profile_id,
 		"  id = LAST_INSERT_ID(id)," . #_customer_cost," .
-		"  customer_cost = customer_cost + ?," . #_customer_cost," .
-		"  reseller_cost = reseller_cost + ?," . #_reseller_cost," .
-		"  cdr_count = cdr_count + 1," .
 		"  fraud_limit_exceeded = if(? > 0," . #_fraud_use_reseller_rates
-		"	if(reseller_cost + ? >= ?,1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(customer_cost + ? >= ?,1,0))," . #_customer_cost _fraud_interval_limit
+		"	if(coalesce(? + reseller_cost >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
+		"	if(coalesce(? + customer_cost >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
+		"  customer_cost = ? + customer_cost," . #_customer_cost," .
+		"  reseller_cost = ? + reseller_cost," . #_reseller_cost," .
+		"  cdr_count = cdr_count + 1," .
 		"  fraud_limit_type = ?," . #_fraud_limit_type
-		"  first_cdr_start_time = if(? < first_cdr_start_time," . #_cdr_start_time
+		"  first_cdr_start_time = if(? + 0.0 < first_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	first_cdr_start_time)," .
-		"  first_cdr_id = if(? < first_cdr_id," . #_cdr_id
+		"  first_cdr_id = if(? + 0 < first_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	first_cdr_id)," .
-		"  last_cdr_start_time = if(? > last_cdr_start_time," . #_cdr_start_time
+		"  last_cdr_start_time = if(? + 0.0 > last_cdr_start_time," . #_cdr_start_time
 		"	?," . #_cdr_start_time
 		"	last_cdr_start_time)," .
-		"  last_cdr_id = if(? > last_cdr_id," . #_cdr_id
+		"  last_cdr_id = if(? + 0 > last_cdr_id," . #_cdr_id
 		"	?," . #_cdr_id
 		"	last_cdr_id)";
 
@@ -1285,7 +1285,7 @@ sub add_period_costs {
 		$month_lock = undef;
 	}
 
-	$upsert_sth->execute($contract_id,
+	my @bind_params = ($contract_id,
 		"month",
 		$month_period_date,
 		$direction,
@@ -1293,26 +1293,38 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
 
 		$fraud_limit_type,
 		$stime,
 		$cdr_id,
 		$stime,
 		$cdr_id,
+
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
 
 		$customer_cost,
 		$reseller_cost,
 
-		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-
 		$fraud_limit_type,
 
-		$stime + 0.0,$stime,$cdr_id,$cdr_id,
-		$stime + 0.0,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
+	);
+
+	DEBUG sub { "month fraud check: ".(Dumper {
+		fraud_limit => $fraud_limit,
+		fraud_limit_type => $fraud_limit_type,
+		month_lock => $month_lock,
+		bind => \@bind_params,
+	}) };
+
+	$upsert_sth->execute(
+		@bind_params
 	) or FATAL "Error executing upsert cdr month period costs statement: ".$upsert_sth->errstr;
 
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
@@ -1338,7 +1350,8 @@ sub add_period_costs {
 		$daily_lock = undef;
 	}
 
-	$upsert_sth->execute($contract_id,
+	@bind_params = (
+		$contract_id,
 		"day",
 		$day_period_date,
 		$direction,
@@ -1346,26 +1359,37 @@ sub add_period_costs {
 		$reseller_cost,
 
 		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
 
 		$fraud_limit_type,
 		$stime,
 		$cdr_id,
 		$stime,
 		$cdr_id,
+
+		$fraud_use_reseller_rates,
+		$reseller_cost, $fraud_limit,
+		$customer_cost, $fraud_limit,
 
 		$customer_cost,
 		$reseller_cost,
 
-		$fraud_use_reseller_rates,
-		$reseller_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-		$customer_cost + 0.0, (defined $fraud_limit ? $fraud_limit + 0.0 : POSIX::INT_MAX),
-
 		$fraud_limit_type,
 
-		$stime + 0.0,$stime,$cdr_id,$cdr_id,
-		$stime + 0.0,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
+		$stime,$stime,$cdr_id,$cdr_id,
+	);
+
+	DEBUG sub { "day fraud check: ".(Dumper {
+		fraud_limit => $fraud_limit,
+		fraud_limit_type => $fraud_limit_type,
+		daily_lock => $daily_lock,
+		bind => \@bind_params,
+	}) };
+
+	$upsert_sth->execute(
+		@bind_params
 	) or FATAL "Error executing upsert cdr day period costs statement: ".$upsert_sth->errstr;
 
 	$get_sth->execute() or FATAL "Error executing get cdr day period costs statement: ".$get_sth->errstr;
@@ -2003,7 +2027,8 @@ sub update_cdr {
 
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
-		my $fraud_lock = add_period_costs(0,
+		my $fraud_lock;
+		$fraud_lock = add_period_costs(0,
 			$cdr->{id},
 			$cdr->{source_account_id},
 			$cdr->{start_time},
@@ -2011,7 +2036,7 @@ sub update_cdr {
 			$cdr->{source_customer_billing_profile_id},
 			$cdr->{source_customer_cost},
 			$cdr->{source_reseller_cost},
-		);
+		) unless $dupdbh;
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
