@@ -1,3 +1,20 @@
+ngcp-rate-o-mat (7.5.3.0+0~mr7.5.3.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [2720491] TT#66150 TT#42907 Fix b7c0308e: send systemd READY=1 when maintenance mode is enabled
+
+  [ Rene Krenn ]
+  * [a59df7b] TT#70153 log fraud actions to regular log, not debug
+  * [a33905c] TT#70320 fix fraud_limit_exceeded calculation
+  * [0ea3178] TT#70320 fraud_limit_exceeded force numeric context
+  * [001168e] TT#70320 period costs use inf limits if undefined
+  * [4beb46f] TT#70320 period costs use inf limits if undefined (days)
+  * [4e330a5] TT#70320 TT#70154 refactor periodcosts upsert query
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 Nov 2019 14:47:20 +0100
+
 ngcp-rate-o-mat (7.5.2.0+0~mr7.5.2.0) unstable; urgency=medium
 
   [ Rene Krenn ]
