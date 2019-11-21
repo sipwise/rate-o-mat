@@ -176,6 +176,7 @@ my $sth_duplicate_get_cdr_period_costs;
 my $sth_offpeak;
 my $sth_offpeak_subscriber;
 my $sth_unrated_cdrs;
+my $sth_get_cdr;
 my $sth_update_cdr;
 my $sth_create_cdr_fragment;
 my $sth_mos_data;
@@ -530,6 +531,8 @@ EOS
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
 		"billing_zones_history_id, use_free_time ".
+		#"onpeak_extra_second, onpeak_extra_rate, ".
+		#"offpeak_extra_second, offpeak_extra_rate ".
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
@@ -590,6 +593,11 @@ EOS
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
 		"ORDER BY start_time ASC LIMIT " . $batch_size
 	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
+
+	$sth_get_cdr = $acctdbh->prepare(
+		"SELECT * ".
+		"FROM accounting.cdr WHERE id = ?"
+	) or FATAL "Error preparing get cdr statement: ".$acctdbh->errstr;
 
 	$sth_update_cdr = $acctdbh->prepare(
 		"UPDATE accounting.cdr SET ".
@@ -1888,6 +1896,10 @@ sub get_profile_info {
 	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
 	$b_info->{zone_id} = $res[11];
 	$b_info->{use_free_time} = $res[12];
+	#$b_info->{on_extra_second} = $res[13];
+	#$b_info->{on_extra_rate} = $res[14];
+	#$b_info->{off_extra_second} = $res[15];
+	#$b_info->{off_extra_rate} = $res[16];
 
 	$sth->finish;
 
@@ -1954,6 +1966,21 @@ sub is_offpeak {
 
 	return 0;
 
+}
+
+sub get_start_time {
+	my $cdr = shift;
+
+	if ($cdr->{is_fragmented}) {
+		while (my ($id) = get_cdr_col_data($acc_relation_col_model_key,$cdr->{id},
+			   { direction => 'source', provider => 'customer', relation => 'prev_fragment_id' })) {
+			$sth_get_cdr->execute($id) or FATAL "Error executing get cdr statement: ".$sth_get_cdr->errstr;
+			$cdr = $sth_get_cdr->fetchrow_hashref();
+			FATAL "missing cdr fragment ID $id" unless $cdr;
+		}
+	}
+
+	return $cdr->{start_time};
 }
 
 sub check_shutdown {
@@ -2057,6 +2084,7 @@ sub update_cdr {
 					$cdr->{source_customer_cost},
 					$cdr->{source_reseller_cost},
 				);
+
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
@@ -2117,6 +2145,7 @@ sub write_cdr_cols {
 			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, relation => 'contract_balance_id' },
 				$cdr->{$dir.'_'.$provider."_contract_balance_id"}) if $write_contract_balance_id;
+
 		}
 	}
 
@@ -2191,6 +2220,8 @@ sub get_call_cost {
 	my $rate = 0;
 	my $offset = 0;
 	my $onpeak = 0;
+	#my $extra_second = undef;
+	#my $extra_rate = undef;
 	my $init = $cdr->{is_fragmented} // 0;
 	my $duration = (defined $cdr->{rating_duration} and $cdr->{rating_duration} < $cdr->{duration}) ? $cdr->{rating_duration} : $cdr->{duration};
 	my $prev_bal_id = undef;
@@ -2226,6 +2257,10 @@ sub get_call_cost {
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ?
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
+			#$extra_second = $onpeak == 1 ?
+			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
+			#$extra_rate = $onpeak == 1 ?
+			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
 			DEBUG "add init rate $rate per sec to costs";
 		} else {
 			$interval = $onpeak == 1 ?
@@ -2624,6 +2659,38 @@ sub write_cdr_col_data {
 
 }
 
+sub get_cdr_col_data {
+
+	my $col_model_key = shift;
+	my $cdr_id = shift;
+	my $lookup = shift;
+	FATAL "unknown column model key $col_model_key" unless exists $cdr_col_models{$col_model_key};
+	my $model = $cdr_col_models{$col_model_key};
+	my @bind_parms = ($cdr_id);
+	my $virtual_col_name = '';
+	foreach my $dimension (@{$model->{dimensions}}) {
+		my $dimension_value = $lookup->{$dimension};
+		unless ($dimension_value) {
+			FATAL "missing '$dimension' dimension for writing ".$model->{description_prefix}." col data of ".$model->{description};
+		}
+		my $dictionary = $model->{dimension_dictionaries}->{$dimension};
+		my $dimension_value_lookup = $dictionary->{$dimension_value};
+		unless ($dimension_value_lookup) {
+			FATAL "unknown '$dimension' col name '$dimension_value' for reading ".$model->{description_prefix}." col data of ".$model->{description};
+		}
+		push(@bind_parms,$dimension_value_lookup->{id});
+		$virtual_col_name .= '_' if length($virtual_col_name) > 0;
+		$virtual_col_name .= $lookup->{$dimension};
+	}
+
+	my $sth = $model->{read_sth}->{sth};
+	$sth->execute(@bind_parms) or FATAL "Error executing ".$model->{read_sth}->{description}."statement: ".$sth->errstr;
+	my @vals = $sth->fetchrow_array;
+
+	return @vals;
+
+}
+
 sub copy_cdr_col_data {
 
 	my $src_col_model_key = shift;
@@ -2632,25 +2699,8 @@ sub copy_cdr_col_data {
 	my $src_cdr_id = shift;
 	my $dst_cdr_id = shift;
 	my $lookup = shift;
-	FATAL "unknown column model key $src_col_model_key" unless exists $cdr_col_models{$src_col_model_key};
-	my $src_model = $cdr_col_models{$src_col_model_key};
-	my @bind_parms = ($src_cdr_id);
-	foreach my $dimension (@{$src_model->{dimensions}}) {
-		my $dimension_value = $lookup->{$dimension};
-		unless ($dimension_value) {
-			FATAL "missing '$dimension' dimension for reading ".$src_model->{description_prefix}." col data of ".$src_model->{description};
-		}
-		my $dictionary = $src_model->{dimension_dictionaries}->{$dimension};
-		my $dimension_value_lookup = $dictionary->{$dimension_value};
-		unless ($dimension_value_lookup) {
-			FATAL "unknown '$dimension' col name '$dimension_value' for reading ".$src_model->{description_prefix}." col data of ".$src_model->{description};
-		}
-		push(@bind_parms,$dimension_value_lookup->{id});
-	}
 
-	my $sth = $src_model->{read_sth}->{sth};
-	$sth->execute(@bind_parms) or FATAL "Error executing ".$src_model->{read_sth}->{description}."statement: ".$sth->errstr;
-	my @vals = $sth->fetchrow_array;
+	my @vals = get_cdr_col_data($src_col_model_key,$src_cdr_id,$lookup);
 
 	return write_cdr_col_data($dst_col_model_key,$cdr,$dst_cdr_id,$lookup,@vals);
 
@@ -2972,6 +3022,8 @@ sub rate_cdr {
 	};
 	DEBUG sub { "destination_provider_info is ".(Dumper $destination_provider_info) };
 
+    $cdr->{_start_time} = get_start_time($cdr);
+
 	my @rating_durations;
 	my $rating_attempts = 0;
 	my $readonly;
@@ -3174,6 +3226,9 @@ RATING_DURATION_FOUND:
 				or FATAL "Error executing create cdr fragment statement: ".$sth->errstr;
 			if ($sth->rows > 0) {
 				DEBUG "New rating fragment CDR with ".($cdr->{duration} - $rating_duration)." secs duration created from cdr ID $cdr->{id}";
+				write_cdr_col_data($acc_relation_col_model_key,$cdr,$acctdbh->{'mysql_insertid'},
+					{ direction => 'source', provider => 'customer', relation => 'prev_fragment_id' },
+					$cdr->{id});
 			} else {
 				$rollback = 1;
 				FATAL "cdr ID $cdr->{id} seems to be already processed by someone else";
@@ -3512,6 +3567,7 @@ sub main {
 	$sth_offpeak->finish;
 	$sth_offpeak_subscriber->finish;
 	$sth_unrated_cdrs->finish;
+	$sth_get_cdr->finish;
 	$sth_update_cdr->finish;
 	$split_peak_parts and $sth_create_cdr_fragment->finish;
 	$sth_mos_data->finish;
