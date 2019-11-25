@@ -1,3 +1,17 @@
+ngcp-rate-o-mat (8.1.1.0+0~mr8.1.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [785b11d] TT#70153 log fraud actions to regular log, not debug
+  * [4d5655c] TT#70320 fix fraud_limit_exceeded calculation
+  * [b7a20ae] TT#70320 fraud_limit_exceeded force numeric context
+  * [9234e53] TT#70320 period costs use inf limits if undefined
+  * [a05e986] TT#70320 period costs use inf limits if undefined (days)
+  * [f7e19a7] TT#70320 TT#70154 refactor periodcosts upsert query
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Nov 2019 14:58:42 +0100
+
 ngcp-rate-o-mat (8.1.0.0+0~mr8.1.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
