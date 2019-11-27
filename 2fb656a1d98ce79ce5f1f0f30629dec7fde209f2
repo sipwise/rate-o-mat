@@ -22,6 +22,30 @@
       "revId": "2fb656a1d98ce79ce5f1f0f30629dec7fde209f2",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "30c5a6f6_59377141",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 3619,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2019-11-27T09:35:39Z",
+      "side": 1,
+      "message": "thx for pointing",
+      "parentUuid": "3811e0fa_0705a304",
+      "range": {
+        "startLine": 3619,
+        "startChar": 1,
+        "endLine": 3619,
+        "endChar": 35
+      },
+      "revId": "2fb656a1d98ce79ce5f1f0f30629dec7fde209f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
