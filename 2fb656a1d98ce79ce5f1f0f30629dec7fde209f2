@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3811e0fa_0705a304",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 3619,
+      "author": {
+        "id": 1000024
+      },
+      "writtenOn": "2019-11-27T08:43:42Z",
+      "side": 1,
+      "message": "Just accidentally read this line and found suspicious. Shouldn\u0027t this be:\n$acctdbh and $acctdbh-\u003edisconnect;",
+      "range": {
+        "startLine": 3619,
+        "startChar": 1,
+        "endLine": 3619,
+        "endChar": 35
+      },
+      "revId": "2fb656a1d98ce79ce5f1f0f30629dec7fde209f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
