@@ -530,9 +530,9 @@ EOS
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zones_history_id, use_free_time ".
-		#"onpeak_extra_second, onpeak_extra_rate, ".
-		#"offpeak_extra_second, offpeak_extra_rate ".
+		"billing_zones_history_id, use_free_time, ".
+		"onpeak_extra_second, onpeak_extra_rate, ".
+		"offpeak_extra_second, offpeak_extra_rate ".
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
@@ -1896,10 +1896,10 @@ sub get_profile_info {
 	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
 	$b_info->{zone_id} = $res[11];
 	$b_info->{use_free_time} = $res[12];
-	#$b_info->{on_extra_second} = $res[13];
-	#$b_info->{on_extra_rate} = $res[14];
-	#$b_info->{off_extra_second} = $res[15];
-	#$b_info->{off_extra_rate} = $res[16];
+	$b_info->{on_extra_second} = $res[13];
+	$b_info->{on_extra_rate} = $res[14];
+	$b_info->{off_extra_second} = $res[15];
+	$b_info->{off_extra_rate} = $res[16];
 
 	$sth->finish;
 
@@ -2069,7 +2069,8 @@ sub update_cdr {
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
-			$acc_relation_col_model_key);
+			$acc_relation_col_model_key,
+			$acc_tag_col_model_key);
 		if ($dupdbh) {
 			$sth_duplicate_cdr->execute(@$cdr{@cdr_fields})
 			or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
@@ -2090,7 +2091,8 @@ sub update_cdr {
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
-					$dup_relation_col_model_key);
+					$dup_relation_col_model_key,
+					$dup_tag_col_model_key);
 
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
 					{ direction => 'destination', provider => 'customer', tag => 'furnished_charging_info' });
@@ -2127,6 +2129,7 @@ sub write_cdr_cols {
 	my $cash_balance_col_model_key = shift;
 	my $time_balance_col_model_key = shift;
 	my $relation_col_model_key = shift;
+	my $tag_col_model_key = shift;
 
 	foreach my $dir (('source', 'destination')) {
 		foreach my $provider (('carrier','reseller','customer')) {
@@ -2147,6 +2150,10 @@ sub write_cdr_cols {
 			write_cdr_col_data($relation_col_model_key,$cdr,$cdr_id,
 				{ direction => $dir, provider => $provider, relation => 'contract_balance_id' },
 				$cdr->{$dir.'_'.$provider."_contract_balance_id"}) if $write_contract_balance_id;
+
+			write_cdr_col_data($tag_col_model_key,$cdr,$cdr_id,
+				{ direction => $dir, provider => $provider, relation => 'extra_rate' },
+				$cdr->{$dir.'_'.$provider."_extra_rate"});
 
 		}
 	}
@@ -2170,6 +2177,7 @@ sub get_call_cost {
 	my $r_free_time = shift;
 	my $r_rating_duration = shift;
 	my $r_onpeak = shift;
+	my $r_extra_rate = shift;
 	my $r_balances = shift;
 
 	my $src_user;
@@ -2210,8 +2218,8 @@ sub get_call_cost {
 	DEBUG sub { "billing fee is ".(Dumper $r_profile_info) };
 
 	my @offpeak = ();
-	get_offpeak($profile_id, $subscriber_contract_id, $cdr->{start_time},
-		$cdr->{duration}, \@offpeak) or
+	get_offpeak($profile_id, $subscriber_contract_id, $cdr->{_start_time},
+		$cdr->{start_time} - $cdr->{_start_time} + $cdr->{duration}, \@offpeak) or
 		FATAL "Error getting offpeak info\n";
 	DEBUG sub { "offpeak info: " . Dumper \@offpeak; };
 
@@ -2222,9 +2230,16 @@ sub get_call_cost {
 	my $rate = 0;
 	my $offset = 0;
 	my $onpeak = 0;
-	#my $extra_second = undef;
-	#my $extra_rate = undef;
 	my $init = $cdr->{is_fragmented} // 0;
+	my $extra_second;
+	my $extra_rate;
+	if (is_offpeak($cdr->{_start_time}, 0, \@offpeak)) {
+		$extra_second = $r_profile_info->{off_extra_second};
+		$extra_rate = $r_profile_info->{off_extra_rate} // 0.0;
+	} else {
+		$extra_second = $r_profile_info->{on_extra_second};
+		$extra_rate = $r_profile_info->{on_extra_rate} // 0.0;
+	}
 	my $duration = (defined $cdr->{rating_duration} and $cdr->{rating_duration} < $cdr->{duration}) ? $cdr->{rating_duration} : $cdr->{duration};
 	my $prev_bal_id = undef;
 	my @cash_balance_rates = ();
@@ -2259,10 +2274,6 @@ sub get_call_cost {
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ?
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
-			#$extra_second = $onpeak == 1 ?
-			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
-			#$extra_rate = $onpeak == 1 ?
-			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
 			DEBUG "add init rate $rate per sec to costs";
 		} else {
 			$interval = $onpeak == 1 ?
@@ -2339,6 +2350,18 @@ sub get_call_cost {
 			$interval -= $bal->{free_time_balance};
 			$bal->{free_time_balance} = 0;
 			DEBUG "calculate cost for remaining interval chunk $interval";
+		}
+
+		if (defined $extra_second) {
+			my $extra_second_time = int($cdr->{_start_time}) + $extra_second;
+			if ($extra_second_time >= $current_call_time
+				and $extra_second_time < ($current_call_time + $interval)
+				and int($cdr->{start_time}) <= $extra_second_time) {
+				DEBUG "add extra second ($extra_second) cost $extra_rate to rate $rate";
+				$rate += $extra_rate;
+				$$r_extra_rate = $extra_rate;
+				undef $extra_second;
+			}
 		}
 
 		if (($rate > 0 || $prepaid) and $rate <= $bal->{cash_balance}) {
@@ -2748,6 +2771,7 @@ sub get_customer_call_cost {
 	my $r_rating_duration = shift;
 	my $onpeak;
 	my $real_cost = 0;
+	my $extra_rate;
 
 	my $dir;
 	if($direction eq "out") {
@@ -2795,7 +2819,7 @@ sub get_customer_call_cost {
 	get_call_cost($cdr, $type, $direction,$contract_id,$subscriber_contract_id,
 		$billing_info{profile_id}, $readonly || ($outgoing_prepaid && defined $prepaid_cost_entry), $prepaid,
 		\%profile_info, \%package_info, $r_cost, \$real_cost, $r_free_time,
-		$r_rating_duration, \$onpeak, \@balances)
+		$r_rating_duration, \$onpeak, \$extra_rate, \@balances)
 		or FATAL "Error getting ".$dir."customer call cost\n";
 
 	DEBUG "got call cost $$r_cost and free time $$r_free_time";
@@ -2811,6 +2835,7 @@ sub get_customer_call_cost {
 	$cdr->{$dir."customer_billing_fee_id"} = $profile_info{fee_id};
 	$cdr->{$dir."customer_billing_zone_id"} = $profile_info{zone_id};
 	$cdr->{frag_customer_onpeak} = $onpeak if $split_peak_parts;
+	$cdr->{$dir."customer_extra_rate"} = $extra_rate;
 
 	if ($outgoing_prepaid) { #prepaid out
 		# overwrite the calculated costs with the ones from our table
@@ -2873,6 +2898,7 @@ sub get_provider_call_cost {
 	my $r_rating_duration = shift;
 	my $onpeak;
 	my $real_cost = 0;
+	my $extra_rate;
 
 	my $dir;
 	if($direction eq "out") {
@@ -2903,7 +2929,7 @@ sub get_provider_call_cost {
 	get_call_cost($cdr, $type, $direction,$contract_id,$subscriber_contract_id,
 		$provider_info->{billing}->{profile_id}, $readonly || $prepaid, $prepaid, # no underruns for providers with prepaid profile
 		\%profile_info, $provider_info->{package}, $r_cost, \$real_cost, $r_free_time,
-		$r_rating_duration, \$onpeak, $provider_info->{balances})
+		$r_rating_duration, \$onpeak, \$extra_rate, $provider_info->{balances})
 		or FATAL "Error getting ".$dir."provider call cost\n";
 
 	my $snapshot_bal = get_snapshot_contract_balance($provider_info->{balances});
@@ -2914,6 +2940,7 @@ sub get_provider_call_cost {
 	$cdr->{$dir.$provider_type."billing_fee_id"} = $profile_info{fee_id};
 	$cdr->{$dir.$provider_type."billing_zone_id"} = $profile_info{zone_id};
 	$cdr->{'frag_'.$provider_type.'onpeak'} = $onpeak if $split_peak_parts;
+	$cdr->{$dir.$provider_type."extra_rate"} = $extra_rate;
 
 	unless($prepaid == 1) {
 		$cdr->{$dir.$provider_type."cash_balance_before"} = $snapshot_bal->{cash_balance_old};
