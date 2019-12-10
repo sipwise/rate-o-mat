@@ -530,9 +530,9 @@ EOS
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zones_history_id, use_free_time ".
-		#"onpeak_extra_second, onpeak_extra_rate, ".
-		#"offpeak_extra_second, offpeak_extra_rate ".
+		"billing_zones_history_id, use_free_time, ".
+		"onpeak_extra_second, onpeak_extra_rate, ".
+		"offpeak_extra_second, offpeak_extra_rate ".
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
 	) or FATAL "Error preparing profile info statement: ".$billdbh->errstr;
 
@@ -1896,10 +1896,10 @@ sub get_profile_info {
 	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
 	$b_info->{zone_id} = $res[11];
 	$b_info->{use_free_time} = $res[12];
-	#$b_info->{on_extra_second} = $res[13];
-	#$b_info->{on_extra_rate} = $res[14];
-	#$b_info->{off_extra_second} = $res[15];
-	#$b_info->{off_extra_rate} = $res[16];
+	$b_info->{on_extra_second} = $res[13];
+	$b_info->{on_extra_rate} = $res[14];
+	$b_info->{off_extra_second} = $res[15];
+	$b_info->{off_extra_rate} = $res[16];
 
 	$sth->finish;
 
@@ -2210,8 +2210,8 @@ sub get_call_cost {
 	DEBUG sub { "billing fee is ".(Dumper $r_profile_info) };
 
 	my @offpeak = ();
-	get_offpeak($profile_id, $subscriber_contract_id, $cdr->{start_time},
-		$cdr->{duration}, \@offpeak) or
+	get_offpeak($profile_id, $subscriber_contract_id, $cdr->{_start_time},
+		$cdr->{start_time} - $cdr->{_start_time} + $cdr->{duration}, \@offpeak) or
 		FATAL "Error getting offpeak info\n";
 	DEBUG sub { "offpeak info: " . Dumper \@offpeak; };
 
@@ -2222,9 +2222,16 @@ sub get_call_cost {
 	my $rate = 0;
 	my $offset = 0;
 	my $onpeak = 0;
-	#my $extra_second = undef;
-	#my $extra_rate = undef;
 	my $init = $cdr->{is_fragmented} // 0;
+	my $extra_second;
+	my $extra_rate;
+	if (is_offpeak($cdr->{_start_time}, 0, \@offpeak)) {
+		$extra_second = $r_profile_info->{off_extra_second};
+		$extra_rate = $r_profile_info->{off_extra_rate} // 0.0;
+	} else {
+		$extra_second = $r_profile_info->{on_extra_second};
+		$extra_rate = $r_profile_info->{on_extra_rate} // 0.0;
+	}
 	my $duration = (defined $cdr->{rating_duration} and $cdr->{rating_duration} < $cdr->{duration}) ? $cdr->{rating_duration} : $cdr->{duration};
 	my $prev_bal_id = undef;
 	my @cash_balance_rates = ();
@@ -2259,10 +2266,6 @@ sub get_call_cost {
 				$r_profile_info->{on_init_interval} : $r_profile_info->{off_init_interval};
 			$rate = $onpeak == 1 ?
 				$r_profile_info->{on_init_rate} : $r_profile_info->{off_init_rate};
-			#$extra_second = $onpeak == 1 ?
-			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
-			#$extra_rate = $onpeak == 1 ?
-			#	$r_profile_info->{on_extra_second} : $r_profile_info->{off_extra_second};
 			DEBUG "add init rate $rate per sec to costs";
 		} else {
 			$interval = $onpeak == 1 ?
@@ -2339,6 +2342,17 @@ sub get_call_cost {
 			$interval -= $bal->{free_time_balance};
 			$bal->{free_time_balance} = 0;
 			DEBUG "calculate cost for remaining interval chunk $interval";
+		}
+
+		if (defined $extra_second) {
+			my $extra_second_time = int($cdr->{_start_time}) + $extra_second;
+			if ($extra_second_time >= $current_call_time
+				and $extra_second_time < ($current_call_time + $interval)
+				and int($cdr->{start_time}) <= $extra_second_time) {
+				DEBUG "add extra second ($extra_second) cost $extra_rate to rate $rate";
+				$rate += $extra_rate;
+				undef $extra_second;
+			}
 		}
 
 		if (($rate > 0 || $prepaid) and $rate <= $bal->{cash_balance}) {
