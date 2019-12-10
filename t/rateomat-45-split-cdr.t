@@ -60,6 +60,8 @@ local $ENV{RATEOMAT_BATCH_SIZE} = 1;
 #    };
 #};
 
+my $extra_rate = 100;
+
 {
 
     my $call_minutes = 10; #divisible by 2
@@ -80,7 +82,7 @@ local $ENV{RATEOMAT_BATCH_SIZE} = 1;
     my @caller_costs = (
         $provider->{subscriber_fees}->[0]->{fees}->[0]->{offpeak_init_rate} * 60, #07:59:50 .. 08:00:50
 
-        $provider->{subscriber_fees}->[0]->{fees}->[0]->{onpeak_follow_rate} * 10,
+        $provider->{subscriber_fees}->[0]->{fees}->[0]->{onpeak_follow_rate} * 10 + $extra_rate,
 
         (map { ($provider->{subscriber_fees}->[0]->{fees}->[0]->{offpeak_follow_rate} * 60,
         $provider->{subscriber_fees}->[0]->{fees}->[0]->{onpeak_follow_rate} * 60); } (1..(int(($call_minutes - 1) / 2 + 0.99) - 1))), #4x on
@@ -119,6 +121,7 @@ local $ENV{RATEOMAT_BATCH_SIZE} = 1;
         Utils::Rateomat::check_cdr('cdr is fragmented: ',$cdr->{id},{ is_fragmented => '1' });
         Utils::Rateomat::check_cdr('cdr is reseller onpeak: ',$cdr->{id},{ frag_reseller_onpeak => "$onpeak" });
         Utils::Rateomat::check_cdr('cdr is customer onpeak: ',$cdr->{id},{ frag_customer_onpeak => "$onpeak" });
+        Utils::Rateomat::check_cdr_tag_data("extra rate: ",$cdr->{id},'source','customer','extra_rate',($i == 2 ? 100 : undef));
         Utils::Api::is_float_approx($cdr->{source_customer_cost},$caller_costs[$i-1],'caller costs: ');
         Utils::Api::check_interval_history("caller ",$caller->{customer}->{id},[{
                 debit => '~'.List::Util::sum(@caller_costs[0..$i-1])/100.0,
@@ -199,6 +202,11 @@ sub create_provider {
                     offpeak_init_interval    => 60,
                     offpeak_follow_rate      => sprintf("%.10f",1/60),
                     offpeak_follow_interval  => 1, #60,
+
+                    onpeak_extra_second     => 900,
+                    onpeak_extra_rate       => 200,
+                    offpeak_extra_second     => 60,
+                    offpeak_extra_rate       => $extra_rate,
                 },
             ],
             @peaktimes,

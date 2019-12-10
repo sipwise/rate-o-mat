@@ -38,9 +38,11 @@ our @EXPORT_OK = qw(
 	check_cdr_time_balance_data
 	check_cdr_cash_balance_data
 	check_cdr_relation_data
+	check_cdr_tag_data
 	get_cdr_time_balance_data
 	get_cdr_cash_balance_data
 	get_cdr_relation_data
+	get_cdr_tag_data
 	$rateomat_timeout
 );
 
@@ -736,6 +738,18 @@ sub get_cdr_relation_data {
     return $result->[0]->{val};
 }
 
+sub get_cdr_tag_data {
+	my $label = shift;
+	my $cdr_id = shift;
+	my $direction = shift;
+	my $provider = shift;
+	my $tag = shift;
+	$label .= 'cdr id '.$cdr_id.' '.$direction.'_'.$provider.'_'.$tag.' ';
+	my $result = _get_cdr_tag_data($cdr_id,$direction,$provider,$tag);
+	is(scalar @$result,1,$label.'number of records '.(scalar @$result).' = 1');
+    return $result->[0]->{val};
+}
+
 
 sub get_cdr_cash_balance_data {
 	my $label = shift;
@@ -770,6 +784,27 @@ sub check_cdr_relation_data {
 	my $expected = shift;
 	$label .= 'cdr id '.$cdr_id.' '.$direction.'_'.$provider.'_'.$relation.' ';
 	my $result = _get_cdr_relation_data($cdr_id,$direction,$provider,$relation);
+	if (defined $expected) {
+        if ((scalar @$result) == 1) {
+			return is($result->[0]->{val},$expected,$label.$result->[0]->{val}.' = '.$expected);
+		} else {
+			return is(scalar @$result,1,$label.'number of records '.(scalar @$result).' = 1');
+		}
+    } else {
+		return is(scalar @$result,0,$label.'number of records '.(scalar @$result).' = 0');
+	}
+
+}
+
+sub check_cdr_tag_data {
+	my $label = shift;
+	my $cdr_id = shift;
+	my $direction = shift;
+	my $provider = shift;
+	my $tag = shift;
+	my $expected = shift;
+	$label .= 'cdr id '.$cdr_id.' '.$direction.'_'.$provider.'_'.$tag.' ';
+	my $result = _get_cdr_tag_data($cdr_id,$direction,$provider,$tag);
 	if (defined $expected) {
         if ((scalar @$result) == 1) {
 			return is($result->[0]->{val},$expected,$label.$result->[0]->{val}.' = '.$expected);
@@ -839,6 +874,27 @@ sub _get_cdr_relation_data {
 			{ type => $direction, table => 'accounting.cdr_direction', data_col => 'direction_id' },
 			{ type => $provider, table => 'accounting.cdr_provider', data_col => 'provider_id' },
 			{ type => $relation, table => 'accounting.cdr_relation', data_col => 'relation_id' },
+		]);
+		_disconnect_db($dbh);
+	};
+	if ($@) {
+		diag($@);
+	}
+	return $result;
+}
+
+sub _get_cdr_tag_data {
+	my $id = shift;
+	my $direction = shift;
+	my $provider = shift;
+	my $tag = shift;
+	my $result = undef;
+	eval {
+		my $dbh = _connect_accounting_db();
+		$result = _get_cdr_data($dbh,$id,'accounting.cdr_tag_data',[
+			{ type => $direction, table => 'accounting.cdr_direction', data_col => 'direction_id' },
+			{ type => $provider, table => 'accounting.cdr_provider', data_col => 'provider_id' },
+			{ type => $tag, table => 'accounting.cdr_tag', data_col => 'tag_id' },
 		]);
 		_disconnect_db($dbh);
 	};
@@ -920,6 +976,7 @@ sub _delete_all_cdr_data {
 	_delete_cdr_data($dbh,$ids,'accounting.cdr_relation_data');
 	_delete_cdr_data($dbh,$ids,'accounting.cdr_cash_balance_data');
 	_delete_cdr_data($dbh,$ids,'accounting.cdr_time_balance_data');
+	_delete_cdr_data($dbh,$ids,'accounting.cdr_tag_data');
 }
 
 sub _delete_cdr_data { # as long as no triggers are present
