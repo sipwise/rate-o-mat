@@ -14,7 +14,7 @@ use Test::More;
 ### onnet calls of callers with profile + billing
 ### network billing mappings
 ###
-### this tests verify that rates are correctly choosen
+### this tests verify that rates are correctly chosen
 ### depending on the caller (source) ip.
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;

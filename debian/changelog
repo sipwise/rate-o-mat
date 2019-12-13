@@ -226,7 +226,7 @@ ngcp-rate-o-mat (5.4.0.0+0~mr5.4.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
   * [7cb755c] TT#8162 add source/destination_user_out cols for cdr duplication
-  * [87e0759] TT#15652 disable populating accouting.*_data
+  * [87e0759] TT#15652 disable populating accounting.*_data
 
   [ Sipwise Jenkins Builder ]
 
@@ -620,7 +620,7 @@ ngcp-rate-o-mat (0.3.0) unstable; urgency=low
 ngcp-rate-o-mat (0.2.0-1) unstable; urgency=low
 
   * ignoring customer/reseller/provider if no billing_profile is found
-  * added some debuging messages for cdr splitting
+  * added some debugging messages for cdr splitting
   * fixed rating duration initialization
   * fixed some warnings on uninitialized values and unfinished sth's
   * fixed some frag_* column names

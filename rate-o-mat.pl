@@ -988,7 +988,7 @@ sub lock_contracts {
 	# guaranteed. this final lock statement must avoid joins, otherwise
 	# all rows of joined tables can get locked, since innodb poorly
 	# locks rows by touching an index value. to prepare the lock
-	# statement, we need to determine the 4 contract ids sperately
+	# statement, we need to determine the 4 contract ids saparately
 	# before:
 	my %provider_cids = ();
 	# caller "provider" contract:
@@ -2009,7 +2009,7 @@ sub get_unrated_cdrs {
 		check_shutdown() and return 0;
 	}
 
-	# the while above may have been interupted because there is no
+	# the while above may have been interrupted because there is no
 	# data left, or because there was an error. To decide what
 	# happened, we have to query $sth->err()
 	FATAL "Error fetching unrated cdr's: ". $sth->errstr
