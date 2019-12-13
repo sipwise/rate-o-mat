@@ -2356,6 +2356,7 @@ sub get_call_cost {
 			my $extra_second_time = int($cdr->{_start_time}) + $extra_second;
 			if ($extra_second_time >= $current_call_time
 				and $extra_second_time < ($current_call_time + $interval)
+				and ($current_call_time + int($duration)) >= $extra_second_time
 				and int($cdr->{start_time}) <= $extra_second_time) {
 				DEBUG "add extra second ($extra_second) cost $extra_rate to rate $rate";
 				$rate += $extra_rate;

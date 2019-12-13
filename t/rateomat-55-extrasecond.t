@@ -61,7 +61,7 @@ foreach my $extra_second (undef, 0, 60, $init_secs + $follow_secs - 1,$init_secs
     if (ok((scalar @cdr_ids) > 0 && Utils::Rateomat::run_rateomat_threads(),'rate-o-mat executed')) {
         my $caller_cdr_map = {};
 
-        my $label = 'extra_second ' . $extra_second . 'extra_rate ' . $extra_second . ': ';
+        my $label = 'extra_second ' . ($extra_second // '(none)') . 'extra_rate ' . $extra_second . ': ';
         ok(Utils::Rateomat::check_cdrs($label,
             map {
                 my $cdr = Utils::Rateomat::get_cdrs($_);
