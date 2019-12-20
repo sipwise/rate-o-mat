@@ -530,7 +530,7 @@ EOS
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zones_history_id, use_free_time, ".
+		"billing_zones_history_id, offpeak_use_free_time, onpeak_use_free_time, ".
 		"onpeak_extra_second, onpeak_extra_rate, ".
 		"offpeak_extra_second, offpeak_extra_rate ".
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,?,?,null)"
@@ -554,7 +554,7 @@ EOS
 		"onpeak_follow_rate, onpeak_follow_interval, ".
 		"offpeak_init_rate, offpeak_init_interval, ".
 		"offpeak_follow_rate, offpeak_follow_interval, ".
-		"billing_zones_history_id, use_free_time ".
+		"billing_zones_history_id, offpeak_use_free_time, onpeak_use_free_time ".
 		"FROM billing.billing_fees_history WHERE id = billing.get_billing_fee_id(?,?,?,null,?,\"exact_destination\")"
 	) or FATAL "Error preparing LNP profile info statement: ".$billdbh->errstr;
 
@@ -1895,11 +1895,12 @@ sub get_profile_info {
 	$b_info->{off_follow_rate} = $res[9];
 	$b_info->{off_follow_interval} = $res[10] == 0 ? 1 : $res[10];
 	$b_info->{zone_id} = $res[11];
-	$b_info->{use_free_time} = $res[12];
-	$b_info->{on_extra_second} = $res[13];
-	$b_info->{on_extra_rate} = $res[14];
-	$b_info->{off_extra_second} = $res[15];
-	$b_info->{off_extra_rate} = $res[16];
+	$b_info->{off_use_free_time} = $res[12];
+	$b_info->{on_use_free_time} = $res[13];
+	$b_info->{on_extra_second} = $res[14];
+	$b_info->{on_extra_rate} = $res[15];
+	$b_info->{off_extra_second} = $res[16];
+	$b_info->{off_extra_rate} = $res[17];
 
 	$sth->finish;
 
@@ -2233,12 +2234,15 @@ sub get_call_cost {
 	my $init = $cdr->{is_fragmented} // 0;
 	my $extra_second;
 	my $extra_rate;
+	my $use_free_time;
 	if (is_offpeak($cdr->{_start_time}, 0, \@offpeak)) {
 		$extra_second = $r_profile_info->{off_extra_second};
 		$extra_rate = $r_profile_info->{off_extra_rate} // 0.0;
+		$use_free_time = $r_profile_info->{off_use_free_time};
 	} else {
 		$extra_second = $r_profile_info->{on_extra_second};
 		$extra_rate = $r_profile_info->{on_extra_rate} // 0.0;
+		$use_free_time = $r_profile_info->{on_use_free_time};
 	}
 	my $duration = (defined $cdr->{rating_duration} and $cdr->{rating_duration} < $cdr->{duration}) ? $cdr->{rating_duration} : $cdr->{duration};
 	my $prev_bal_id = undef;
@@ -2330,7 +2334,7 @@ sub get_call_cost {
 			$prev_cash_balance = $bal->{cash_balance};
 		}
 
-		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} >= $interval) {
+		if ($use_free_time && $bal->{free_time_balance} >= $interval) {
 			DEBUG "subtracting $interval sec from free_time_balance $$bal{free_time_balance} and skip costs for this interval";
 			$$r_rating_duration += $interval;
 			$duration -= $interval;
@@ -2340,7 +2344,7 @@ sub get_call_cost {
 			next;
 		}
 
-		if ($r_profile_info->{use_free_time} && $bal->{free_time_balance} > 0) {
+		if ($use_free_time && $bal->{free_time_balance} > 0) {
 			DEBUG "using $$bal{free_time_balance} sec free time for this interval and calculate cost for remaining interval chunk";
 			$$r_free_time += $bal->{free_time_balance};
 			$$r_rating_duration += $bal->{free_time_balance};
