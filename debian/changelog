@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (8.3.0.0+0~mr8.3.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [f5aa3a4] TT#73252 onpeak/offpeak handling for use_free_time
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 27 Jan 2020 12:25:26 +0100
+
 ngcp-rate-o-mat (8.2.0.0+0~mr8.2.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
