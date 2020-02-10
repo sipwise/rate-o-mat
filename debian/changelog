@@ -1,3 +1,9 @@
+ngcp-rate-o-mat (7.5.3.1+0~mr7.5.3.1) unstable; urgency=medium
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 10 Feb 2020 16:37:07 +0100
+
 ngcp-rate-o-mat (7.5.3.0+0~mr7.5.3.0) unstable; urgency=medium
 
   [ Alexander Lutay ]
