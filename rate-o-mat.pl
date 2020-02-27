@@ -34,13 +34,6 @@ my $shuffle_batch = ((defined $ENV{RATEOMAT_SHUFFLE_BATCH} && $ENV{RATEOMAT_SHUF
 # is below this limit:
 my $prepaid_costs_cache_limit = ((defined $ENV{RATEOMAT_PREPAID_COSTS_CACHE} && $ENV{RATEOMAT_PREPAID_COSTS_CACHE} > 0) ? int $ENV{RATEOMAT_PREPAID_COSTS_CACHE} : 10000);
 
-# if the LNP database is used not just for LNP, but also for on-net
-# billing, special routing or similar things, this should be set to
-# better guess the correct LNP provider ID when selecting ported numbers
-# e.g.:
-# my @lnp_order_by = ("lnp_provider_id ASC");
-my @lnp_order_by = ();
-
 # if split_peak_parts is set to true, rate-o-mat will create a separate
 # CDR every time a peak time border is crossed for either the customer,
 # the reseller or the carrier billing profile.
@@ -512,15 +505,8 @@ EOS
 EOS
 	) or FATAL "Error preparing billing info statement: ".$billdbh->errstr;
 
-	$sth_lnp_number = $billdbh->prepare(<<EOS
-		SELECT lnp_provider_id
-		  FROM billing.lnp_numbers
-		 WHERE ? LIKE CONCAT(number,'%')
-		   AND (start <= FROM_UNIXTIME(?) OR start IS NULL)
-		   AND (end > FROM_UNIXTIME(?) OR end IS NULL)
-EOS
-		. join(", ", "ORDER BY LENGTH(number) DESC", @lnp_order_by) .
-		" LIMIT 1"
+	$sth_lnp_number = $billdbh->prepare(
+		"SELECT lnp_provider_id FROM billing.lnp_numbers WHERE id = billing.get_lnp_number_id(?,?)"
 	) or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
@@ -1851,7 +1837,7 @@ sub get_profile_info {
 
 	if(defined $lnp_number and $lnp_number =~ /^\d+$/) {
 		# let's see if we find the number in our LNP database
-		$sth_lnp_number->execute($lnp_number, $start_time, $start_time)
+		$sth_lnp_number->execute($lnp_number, $start_time)
 			or FATAL "Error executing LNP number statement: ".$sth_lnp_number->errstr;
 		my ($lnppid) = $sth_lnp_number->fetchrow_array();
 
