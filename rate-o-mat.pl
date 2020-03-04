@@ -2169,25 +2169,35 @@ sub get_prepaid_cost {
 
 	my $cdr = shift;
 	my $entry = undef;
+	my @call_ids = (
+		$cdr->{call_id},
+		$cdr->{call_id} . '_pbx-1',
+	);
 	if (defined $prepaid_costs_cache) {
-		if (exists $prepaid_costs_cache->{$cdr->{call_id}}) {
-			my $map = $prepaid_costs_cache->{$cdr->{call_id}};
-			if (exists $map->{$cdr->{source_user_id}}) {
-				$map = $map->{$cdr->{source_user_id}};
-				if (exists $map->{$cdr->{destination_user_id}}) {
-					DEBUG "prepaid_costs call_id = $cdr->{call_id}, source_user_id = $cdr->{source_user_id}, destination_user_id = $cdr->{destination_user_id} found in cache";
-					$entry = $map->{$cdr->{destination_user_id}};
+		foreach my $call_id (@call_ids) {
+			if (exists $prepaid_costs_cache->{$call_id}) {
+				my $map = $prepaid_costs_cache->{$call_id};
+				if (exists $map->{$cdr->{source_user_id}}) {
+					$map = $map->{$cdr->{source_user_id}};
+					if (exists $map->{$cdr->{destination_user_id}}) {
+						DEBUG "prepaid_costs call_id = $cdr->{call_id}, source_user_id = $cdr->{source_user_id}, destination_user_id = $cdr->{destination_user_id} found in cache";
+						$entry = $map->{$cdr->{destination_user_id}};
+						last;
+					}
 				}
 			}
 		}
 	} else {
-		$sth_prepaid_cost->execute($cdr->{call_id},$cdr->{source_user_id},$cdr->{destination_user_id})
-			or FATAL "Error executing get prepaid cost statement: ".$sth_prepaid_cost->errstr;
-		my $prepaid_cost = $sth_prepaid_cost->fetchall_hashref('destination_user_id');
-		if ($prepaid_cost && exists $prepaid_cost->{$cdr->{destination_user_id}}) {
-            DEBUG "prepaid cost record for call ID $cdr->{call_id} retrieved";
-			$entry = $prepaid_cost->{$cdr->{destination_user_id}};
-        }
+		foreach my $call_id (@call_ids) {
+			$sth_prepaid_cost->execute($call_id,$cdr->{source_user_id},$cdr->{destination_user_id})
+				or FATAL "Error executing get prepaid cost statement: ".$sth_prepaid_cost->errstr;
+			my $prepaid_cost = $sth_prepaid_cost->fetchall_hashref('destination_user_id');
+			if ($prepaid_cost && exists $prepaid_cost->{$cdr->{destination_user_id}}) {
+				DEBUG "prepaid cost record for call ID $cdr->{call_id} retrieved";
+				$entry = $prepaid_cost->{$cdr->{destination_user_id}};
+				last;
+			}
+		}
 	}
 	return $entry;
 
