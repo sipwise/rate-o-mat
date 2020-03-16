@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (8.3.1.0+0~mr8.3.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [e7c5fa1] TT#76457 refactor lnp_number lookup
+  * [2e03c2f] TT#76401 lookup prepaid cost incl. _pbx-1 callid suffix
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 16 Mar 2020 11:17:16 +0100
+
 ngcp-rate-o-mat (8.3.0.0+0~mr8.3.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
