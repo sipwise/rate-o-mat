@@ -2050,8 +2050,8 @@ sub update_cdr {
 			$cdr->{start_time},
 			$cdr->{duration},
 			$cdr->{source_customer_billing_profile_id},
-			$cdr->{source_customer_cost},
-			$cdr->{source_reseller_cost},
+			-1.0 * ($cdr->{source_customer_cost_old} || 0.0) + $cdr->{source_customer_cost},
+			-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},
 		) unless $dupdbh;
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
@@ -2071,8 +2071,8 @@ sub update_cdr {
 					$cdr->{start_time},
 					$cdr->{duration},
 					$cdr->{source_customer_billing_profile_id},
-					$cdr->{source_customer_cost},
-					$cdr->{source_reseller_cost},
+					-1.0 * ($cdr->{source_customer_cost_old} || 0.0) + $cdr->{source_customer_cost},
+					-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},					
 				);
 
 				write_cdr_cols($cdr,$dup_cdr_id,
@@ -3267,9 +3267,11 @@ RATING_DURATION_FOUND:
 			$cdr->{duration} = $rating_duration;
 		}
 	}
-
+	
 	$cdr->{source_carrier_cost} = $source_carrier_cost;
+	$cdr->{source_reseller_cost_old} = $cdr->{source_reseller_cost};
 	$cdr->{source_reseller_cost} = $source_reseller_cost;
+	$cdr->{source_customer_cost_old} = $cdr->{source_customer_cost};
 	$cdr->{source_customer_cost} = $source_customer_cost;
 	$cdr->{source_carrier_free_time} = $source_carrier_free_time;
 	$cdr->{source_reseller_free_time} = $source_reseller_free_time;
