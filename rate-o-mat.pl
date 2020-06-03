@@ -13,6 +13,7 @@ use Data::Dumper;
 use Time::HiRes qw(); #for debugging info only
 use List::Util qw(shuffle);
 use Storable qw(dclone);
+use JSON::XS qw(encode_json decode_json);
 
 # constants: ###########################################################
 
@@ -1464,6 +1465,7 @@ sub get_timely_end {
 
 sub catchup_contract_balance {
 
+	my $cdr = shift;
 	my $call_start_time = shift;
 	my $call_end_time = shift;
 	my $contract_id = shift;
@@ -1689,7 +1691,7 @@ PREPARE_BALANCE_CATCHUP:
 					$bal->{underrun_profile_time} = $now;
 				}
 			}
-			update_contract_balance([$bal])
+			update_contract_balance($cdr,[$bal])
 				or FATAL "Error updating customer contract balance\n";
 		}
 	}
@@ -1719,7 +1721,7 @@ sub get_contract_balances {
 	my $start_time = $cdr->{start_time};
 	my $duration = $cdr->{duration};
 
-	catchup_contract_balance(int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
+	catchup_contract_balance($cdr,int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
 
 	my $sth = $sth_get_cbalances;
 	$sth->execute($contract_id, int($start_time))
@@ -1731,6 +1733,15 @@ sub get_contract_balances {
 		# balances savepoint:
 		$bal->{cash_balance_old} = $bal->{cash_balance};
 		$bal->{free_time_balance_old} = $bal->{free_time_balance};
+		$bal->{cash_balance_interval_old} = $bal->{cash_balance_interval};
+		$bal->{free_time_balance_interval_old} = $bal->{free_time_balance_interval};
+		
+		write_cdr_col_data($acc_tag_col_model_key,$cdr,$cdr->{id},
+{ direction => 'source', provider => 'customer', tag => 'XXX' }, @values);
+		
+		@values = get_cdr_col_data($acc_tag_col_model_key,$cdr->{id},
+{ direction => 'source', provider => 'customer', tag => 'XXX' });
+		
 		push(@$r_balances,$bal);
 	}
 
@@ -1766,6 +1777,10 @@ sub update_contract_balance {
 		$sth->execute(@bind_parms) or FATAL "Error executing update contract balance statement: ".$sth->errstr;
 		$sth->finish;
 		$changed++;
+		set_balance_delta($cdr, $bal->{id}, "cash_balance", ($bal->{cash_balance} // 0.0) - ($bal->{cash_balance_old} // 0.0));
+		set_balance_delta($cdr, $bal->{id}, "cash_balance_interval", $bal->{cash_balance_interval} - $bal->{cash_balance_interval_old});
+		set_balance_delta($cdr, $bal->{id}, "free_time_balance", ($bal->{free_time_balance} // 0.0) - ($bal->{free_time_balance_old} // 0.0));
+		set_balance_delta($cdr, $bal->{id}, "free_time_balance_interval", $bal->{free_time_balance_interval} - $bal->{free_time_balance_interval_old});
 	}
 
 	DEBUG $changed . " contract balance row(s) updated";
@@ -2018,6 +2033,73 @@ sub get_unrated_cdrs {
 
 }
 
+sub get_balance_delta_field {
+	my $field = shift;
+	return unless $field;
+	return 'cb' if $field eq 'cash_balance';
+	return 'cbi' if $field eq 'cash_balance_interval';
+	return 'ftb' if $field eq 'free_time_balance';
+	return 'ftbi' if $field eq 'free_time_balance_interval';
+}
+
+sub get_balance_delta {
+	
+	my $cdr = shift;
+	my $bal_id = shift;
+	my $field = shift;
+	unless ($cdr->{balance_delta_old}) {
+		($cdr->{balance_delta_old}) = get_cdr_col_data($acc_tag_col_model_key,$cdr->{id},
+			{ direction => 'source', provider => 'customer', tag => 'balance_delta' });
+		if ($cdr->{balance_delta_old}) {
+			my $deserialized = decode_json($cdr->{balance_delta_old});
+			$cdr->{balance_delta_old} = $deserialized;
+		}
+		$cdr->{balance_delta_old} //= {};
+	}
+	if ($bal_id and $field = get_balance_delta_field($field)
+		and exists $cdr->{balance_delta_old}->{$bal_id}
+		and exists $cdr->{balance_delta_old}->{$bal_id}->{$field}) {
+        return $cdr->{balance_delta_old}->{$bal_id}->{$field};
+    }
+	return undef;
+	
+}
+
+sub set_balance_delta {
+	
+	my $cdr = shift;
+	my $bal_id = shift;
+	my $field = shift;
+	my $val = shift;
+	
+	return unless $val;
+	return unless $bal_id;
+	return unless $field = get_balance_delta_field($field);
+	
+	unless ($cdr->{balance_delta}) {
+		$cdr->{balance_delta} = {};
+	}
+	unless ($cdr->{balance_delta}->{$bal_id}) {
+		$cdr->{balance_delta}->{$bal_id} = {};
+	}
+    $cdr->{balance_delta}->{$bal_id}->{$field} = $val;
+	
+}
+
+sub save_balance_delta {
+	
+	my $cdr = shift;
+	if ($cdr->{balance_delta}) {
+		my $serialized = encode_json($cdr->{balance_delta});
+        return write_cdr_col_data($acc_tag_col_model_key,$cdr,$cdr->{id},
+			{ direction => 'source', provider => 'customer', tag => 'balance_delta' }, $serialized);
+    #} elsif ($cdr->{balance_delta_old}) {
+	#	delete
+	}
+	return 0;
+	
+}
+
 sub update_cdr {
 
 	my $cdr = shift;
@@ -2058,6 +2140,7 @@ sub update_cdr {
 			$acc_time_balance_col_model_key,
 			$acc_relation_col_model_key,
 			$acc_tag_col_model_key);
+		save_balance_delta($cdr);
 		if ($dupdbh) {
 			$sth_duplicate_cdr->execute(@$cdr{@cdr_fields})
 			or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
@@ -2855,7 +2938,7 @@ sub get_customer_call_cost {
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
 			if ((not $readonly) and $prepaid_update_balance) {
-				update_contract_balance(\@balances)
+				update_contract_balance($cdr,\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
 			$$r_cost = $real_cost; #prepaid: update balance AND show full costs
@@ -2874,7 +2957,7 @@ sub get_customer_call_cost {
 			}
 		}
 		unless ($readonly) {
-			update_contract_balance(\@balances)
+			update_contract_balance($cdr,\@balances)
 				or FATAL "Error updating ".$dir."customer contract balance\n";
 		}
 		$cdr->{$dir."customer_cash_balance_after"} = $snapshot_bal->{cash_balance};
@@ -2950,7 +3033,7 @@ sub get_provider_call_cost {
 		$cdr->{$dir.$provider_type."free_time_balance_after"} = $snapshot_bal->{free_time_balance_old};
 
 		unless ($readonly) {
-			update_contract_balance($provider_info->{balances})
+			update_contract_balance($cdr,$provider_info->{balances})
 				or FATAL "Error updating ".$dir.$provider_type."provider contract balance\n";
 		}
 
