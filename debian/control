@@ -13,6 +13,7 @@ Architecture: all
 Depends:
  libdbd-mysql-perl,
  libexception-class-perl,
+ libjson-xs-perl,
  libnetaddr-ip-perl,
  ${misc:Depends},
  ${perl:Depends},

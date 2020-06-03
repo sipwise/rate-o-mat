@@ -13,6 +13,7 @@ use Data::Dumper;
 use Time::HiRes qw(); #for debugging info only
 use List::Util qw(shuffle);
 use Storable qw(dclone);
+use JSON::XS qw(encode_json decode_json);
 
 # constants: ###########################################################
 
@@ -602,7 +603,7 @@ EOS
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
 	my $upsert_cdr_period_costs_stmt = "INSERT INTO accounting.cdr_period_costs (" .
-	    "  id," .
+		"  id," .
 		"  contract_id," .
 		"  period," .
 		"  period_date," .
@@ -628,8 +629,8 @@ EOS
 		"  ?," . #_reseller_cost," .
 		"  1," .
 		"  if(? > 0," . #_fraud_use_reseller_rates
-		"	if(coalesce(? + 0.0 >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(coalesce(? + 0.0 >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
+		"   if(coalesce(? + 0.0 >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
+		"   if(coalesce(? + 0.0 >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
 		"  ?," . #_fraud_limit_type," .
 		"  ?," . #_cdr_start_time," .
 		"  ?," . #_cdr_id," .
@@ -639,24 +640,24 @@ EOS
 		  #billing_profile_id = _billing_profile_id,
 		"  id = LAST_INSERT_ID(id)," . #_customer_cost," .
 		"  fraud_limit_exceeded = if(? > 0," . #_fraud_use_reseller_rates
-		"	if(coalesce(? + reseller_cost >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
-		"	if(coalesce(? + customer_cost >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
+		"   if(coalesce(? + reseller_cost >= ? + 0.0,0),1,0)," . #_reseller_cost _fraud_interval_limit
+		"   if(coalesce(? + customer_cost >= ? + 0.0,0),1,0))," . #_customer_cost _fraud_interval_limit
 		"  customer_cost = ? + customer_cost," . #_customer_cost," .
 		"  reseller_cost = ? + reseller_cost," . #_reseller_cost," .
 		"  cdr_count = cdr_count + 1," .
 		"  fraud_limit_type = ?," . #_fraud_limit_type
 		"  first_cdr_start_time = if(? + 0.0 < first_cdr_start_time," . #_cdr_start_time
-		"	?," . #_cdr_start_time
-		"	first_cdr_start_time)," .
+		"   ?," . #_cdr_start_time
+		"   first_cdr_start_time)," .
 		"  first_cdr_id = if(? + 0 < first_cdr_id," . #_cdr_id
-		"	?," . #_cdr_id
-		"	first_cdr_id)," .
+		"   ?," . #_cdr_id
+		"   first_cdr_id)," .
 		"  last_cdr_start_time = if(? + 0.0 > last_cdr_start_time," . #_cdr_start_time
-		"	?," . #_cdr_start_time
-		"	last_cdr_start_time)," .
+		"   ?," . #_cdr_start_time
+		"   last_cdr_start_time)," .
 		"  last_cdr_id = if(? + 0 > last_cdr_id," . #_cdr_id
-		"	?," . #_cdr_id
-		"	last_cdr_id)";
+		"   ?," . #_cdr_id
+		"   last_cdr_id)";
 
 	my $get_cdr_period_costs_stmt = "SELECT " .
 		"cpc.fraud_limit_exceeded, cpc.customer_cost, cpc.reseller_cost, cpc.cdr_count " .
@@ -990,7 +991,7 @@ sub lock_contracts {
 			"WHERE c.id IN (" . substr(',?' x $pcid_count,1) . ")")
 			 or FATAL "Error preparing contract row lock selection statement: ".$billdbh->errstr;
 		$sth->execute(@pcids)
-		 	 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
+			 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
 		while (my @res = $sth->fetchrow_array) {
 			$lock_cids{$res[0]} = 1;
 		}
@@ -1011,7 +1012,7 @@ sub lock_contracts {
 			"WHERE s.uuid IN (" . substr(',?' x $uuid_count,1) . ")")
 			 or FATAL "Error preparing subscriber contract row lock selection statement: ".$billdbh->errstr;
 		$sth->execute(@uuids)
-		     or FATAL "Error executing subscriber contract row lock selection statement: ".$sth->errstr;
+			 or FATAL "Error executing subscriber contract row lock selection statement: ".$sth->errstr;
 		while (my @res = $sth->fetchrow_array) {
 			$lock_cids{$res[0]} = 1;
 		}
@@ -1026,7 +1027,7 @@ sub lock_contracts {
 			 or FATAL "Error preparing contract row lock statement: ".$billdbh->errstr;
 		#finally lock the contract rows at this point:
 		$sth->execute(@cids)
-		     or FATAL "Error executing contract row lock statement: ".$sth->errstr;
+			 or FATAL "Error executing contract row lock statement: ".$sth->errstr;
 		$sth->finish;
 		DEBUG "$lock_count contract(s) locked: ".join(', ',@cids);
 	}
@@ -1126,8 +1127,8 @@ sub set_subscriber_first_int_attribute_value {
 			if (defined $val_id) {
 				if ($readonly) {
 					if ($old_value != $new_value) {
-                        WARNING "'$attribute' usr preference value ID $val_id should be '$new_value' instead of '$old_value'";
-                    } else {
+						WARNING "'$attribute' usr preference value ID $val_id should be '$new_value' instead of '$old_value'";
+					} else {
 						DEBUG "'$attribute' usr preference value ID $val_id value '$new_value' is correct";
 					}
 				} else {
@@ -1147,7 +1148,7 @@ sub set_subscriber_first_int_attribute_value {
 				}
 			} elsif ($new_value > 0) {
 				if ($readonly) {
-                    WARNING "creating '$attribute' usr preference value '$new_value' skipped for prov subscriber ID $prov_subs_id";
+					WARNING "creating '$attribute' usr preference value '$new_value' skipped for prov subscriber ID $prov_subs_id";
 				} else {
 					$sth = $sth_create_usr_preference_value;
 					$sth->execute($prov_subs_id,$attr_id,$new_value)
@@ -1233,7 +1234,7 @@ sub add_period_costs {
 	my $reseller_cost = shift;
 
 	$sth_profile_fraud_info->execute($billing_profile_id)
-	    or FATAL "Error executing profile fraud info statement: ".$sth_profile_fraud_info->errstr;
+		or FATAL "Error executing profile fraud info statement: ".$sth_profile_fraud_info->errstr;
 	my ($profile_fraud_interval_limit,
 		$profile_fraud_daily_limit,
 		$profile_fraud_interval_lock,
@@ -1241,7 +1242,7 @@ sub add_period_costs {
 		$fraud_use_reseller_rates) = $sth_profile_fraud_info->fetchrow_array();
 
 	$sth_contract_fraud_info->execute($contract_id)
-	    or FATAL "Error executing contracts fraud info statement: ".$sth_contract_fraud_info->errstr;
+		or FATAL "Error executing contracts fraud info statement: ".$sth_contract_fraud_info->errstr;
 	my ($contract_fraud_interval_limit,
 		$contract_fraud_daily_limit,
 		$contract_fraud_interval_lock,
@@ -1464,6 +1465,7 @@ sub get_timely_end {
 
 sub catchup_contract_balance {
 
+	my $cdr = shift;
 	my $call_start_time = shift;
 	my $call_end_time = shift;
 	my $contract_id = shift;
@@ -1689,7 +1691,7 @@ PREPARE_BALANCE_CATCHUP:
 					$bal->{underrun_profile_time} = $now;
 				}
 			}
-			update_contract_balance([$bal])
+			update_contract_balance($cdr,[$bal])
 				or FATAL "Error updating customer contract balance\n";
 		}
 	}
@@ -1719,7 +1721,7 @@ sub get_contract_balances {
 	my $start_time = $cdr->{start_time};
 	my $duration = $cdr->{duration};
 
-	catchup_contract_balance(int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
+	catchup_contract_balance($cdr,int($start_time),int($start_time + $duration),$contract_id,$r_package_info);
 
 	my $sth = $sth_get_cbalances;
 	$sth->execute($contract_id, int($start_time))
@@ -1728,9 +1730,15 @@ sub get_contract_balances {
 	$sth->finish;
 
 	foreach my $bal (@$res) {
-		# balances savepoint:
+		# restore balances & create balances savepoint:
+		$bal->{cash_balance} -= (get_balance_delta($cdr, $bal->{id}, "cash_balance") // 0.0);
 		$bal->{cash_balance_old} = $bal->{cash_balance};
+		$bal->{free_time_balance} -= (get_balance_delta($cdr, $bal->{id}, "free_time_balance") // 0);
 		$bal->{free_time_balance_old} = $bal->{free_time_balance};
+		$bal->{cash_balance_interval} -= (get_balance_delta($cdr, $bal->{id}, "cash_balance_interval") // 0.0);
+		$bal->{cash_balance_interval_old} = $bal->{cash_balance_interval};
+		$bal->{free_time_balance_interval} -= (get_balance_delta($cdr, $bal->{id}, "free_time_balance_interval") // 0);
+		$bal->{free_time_balance_interval_old} = $bal->{free_time_balance_interval};
 		push(@$r_balances,$bal);
 	}
 
@@ -1740,6 +1748,7 @@ sub get_contract_balances {
 
 sub update_contract_balance {
 
+	my $cdr = shift;
 	my $r_balances = shift;
 
 	my $changed = 0;
@@ -1766,6 +1775,10 @@ sub update_contract_balance {
 		$sth->execute(@bind_parms) or FATAL "Error executing update contract balance statement: ".$sth->errstr;
 		$sth->finish;
 		$changed++;
+		set_balance_delta($cdr, $bal->{id}, "cash_balance", ($bal->{cash_balance} // 0.0) - ($bal->{cash_balance_old} // 0.0));
+		set_balance_delta($cdr, $bal->{id}, "cash_balance_interval", $bal->{cash_balance_interval} - $bal->{cash_balance_interval_old});
+		set_balance_delta($cdr, $bal->{id}, "free_time_balance", ($bal->{free_time_balance} // 0) - ($bal->{free_time_balance_old} // 0));
+		set_balance_delta($cdr, $bal->{id}, "free_time_balance_interval", $bal->{free_time_balance_interval} - $bal->{free_time_balance_interval_old});
 	}
 
 	DEBUG $changed . " contract balance row(s) updated";
@@ -2008,14 +2021,79 @@ sub get_unrated_cdrs {
 		# can be a contention due to waits on same caller/callee contract
 		# lock attempts when they start processing the batch in the same order.
 		foreach my $cdr (shuffle @cdrs) {
-		    push(@$r_cdrs,$cdr);
+			push(@$r_cdrs,$cdr);
 		}
-    } else {
+	} else {
 		@$r_cdrs = @cdrs;
 	}
 
 	return 1;
 
+}
+
+sub get_balance_delta_field {
+	my $field = shift;
+	return unless $field;
+	return 'cb' if $field eq 'cash_balance';
+	return 'cbi' if $field eq 'cash_balance_interval';
+	return 'ftb' if $field eq 'free_time_balance';
+	return 'ftbi' if $field eq 'free_time_balance_interval';
+}
+
+sub get_balance_delta {
+	
+	my $cdr = shift;
+	my $bal_id = shift;
+	my $field = shift;
+	unless ($cdr->{balance_delta_old}) {
+		($cdr->{balance_delta_old}) = get_cdr_col_data($acc_tag_col_model_key,$cdr->{id},
+			{ direction => 'source', provider => 'customer', tag => 'balance_delta' });
+		if ($cdr->{balance_delta_old}) {
+			my $deserialized = decode_json($cdr->{balance_delta_old});
+			$cdr->{balance_delta_old} = $deserialized;
+		}
+		$cdr->{balance_delta_old} //= {};
+	}
+	if ($bal_id and $field = get_balance_delta_field($field)
+		and exists $cdr->{balance_delta_old}->{$bal_id}
+		and exists $cdr->{balance_delta_old}->{$bal_id}->{$field}) {
+		return $cdr->{balance_delta_old}->{$bal_id}->{$field};
+	}
+	return;
+	
+}
+
+sub set_balance_delta {
+	
+	my $cdr = shift;
+	my $bal_id = shift;
+	my $field = shift;
+	my $val = shift;
+	
+	return unless $val;
+	return unless $bal_id;
+	return unless $field = get_balance_delta_field($field);
+	
+	unless ($cdr->{balance_delta}) {
+		$cdr->{balance_delta} = {};
+	}
+	unless ($cdr->{balance_delta}->{$bal_id}) {
+		$cdr->{balance_delta}->{$bal_id} = {};
+	}
+	$cdr->{balance_delta}->{$bal_id}->{$field} = $val;
+	
+}
+
+sub save_balance_delta {
+	
+	my $cdr = shift;
+	if ($cdr->{balance_delta}) {
+		my $serialized = encode_json($cdr->{balance_delta});
+		return write_cdr_col_data($acc_tag_col_model_key,$cdr,$cdr->{id},
+			{ direction => 'source', provider => 'customer', tag => 'balance_delta' }, $serialized);
+	}
+	return 0;
+	
 }
 
 sub update_cdr {
@@ -2058,6 +2136,7 @@ sub update_cdr {
 			$acc_time_balance_col_model_key,
 			$acc_relation_col_model_key,
 			$acc_tag_col_model_key);
+		save_balance_delta($cdr);
 		if ($dupdbh) {
 			$sth_duplicate_cdr->execute(@$cdr{@cdr_fields})
 			or FATAL "Error executing duplicate cdr statement: ".$sth_duplicate_cdr->errstr;
@@ -2072,7 +2151,7 @@ sub update_cdr {
 					$cdr->{duration},
 					$cdr->{source_customer_billing_profile_id},
 					-1.0 * ($cdr->{source_customer_cost_old} || 0.0) + $cdr->{source_customer_cost},
-					-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},					
+					-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},                    
 				);
 
 				write_cdr_cols($cdr,$dup_cdr_id,
@@ -2622,7 +2701,7 @@ sub init_cdr_col_model {
 	FATAL "unknown column model key $col_model_key" unless exists $cdr_col_models{$col_model_key};
 	my $model = $cdr_col_models{$col_model_key};
 	$model->{dimension_dictionaries} = {};
-    foreach my $dimension (keys %{$model->{dimension_sths}}) {
+	foreach my $dimension (keys %{$model->{dimension_sths}}) {
 		my $sth = $model->{dimension_sths}->{$dimension}->{sth};
 		$sth->execute()
 			or FATAL "Error executing ".
@@ -2630,7 +2709,7 @@ sub init_cdr_col_model {
 			." statement: ".$sth->errstr;
 		$model->{dimension_dictionaries}->{$dimension} = $sth->fetchall_hashref('type');
 		$sth->finish;
-    }
+	}
 	INFO $model->{description} . " loaded\n";
 
 }
@@ -2662,9 +2741,9 @@ sub write_cdr_col_data {
 	}
 
 	if ((scalar @vals) == 0 || (scalar grep { defined $_ } @vals) == 0) {
-        DEBUG "empty '$virtual_col_name' ".$model->{description_prefix}." col data for cdr id ".$cdr_id.', skipping';
+		DEBUG "empty '$virtual_col_name' ".$model->{description_prefix}." col data for cdr id ".$cdr_id.', skipping';
 		return 0;
-    } else {
+	} else {
 		push(@bind_parms,@vals);
 		push(@bind_parms,@vals);
 	}
@@ -2679,7 +2758,7 @@ sub write_cdr_col_data {
 	} elsif ($sth->rows > 1) {
 		DEBUG $model->{description_prefix}.' col data updated for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	#} else {
-	#	DEBUG 'no '.$model->{description_prefix}.' col data written for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
+	#   DEBUG 'no '.$model->{description_prefix}.' col data written for cdr id '.$cdr_id.", column '$virtual_col_name': ".join(', ',@vals);
 	}
 	return $sth->rows;
 
@@ -2855,7 +2934,7 @@ sub get_customer_call_cost {
 			# in that case we should bail out here.
 			WARNING "no prepaid cost record found for call ID $cdr->{call_id}, applying calculated costs";
 			if ((not $readonly) and $prepaid_update_balance) {
-				update_contract_balance(\@balances)
+				update_contract_balance($cdr,\@balances)
 					or FATAL "Error updating ".$dir."customer contract balance\n";
 			}
 			$$r_cost = $real_cost; #prepaid: update balance AND show full costs
@@ -2874,7 +2953,7 @@ sub get_customer_call_cost {
 			}
 		}
 		unless ($readonly) {
-			update_contract_balance(\@balances)
+			update_contract_balance($cdr,\@balances)
 				or FATAL "Error updating ".$dir."customer contract balance\n";
 		}
 		$cdr->{$dir."customer_cash_balance_after"} = $snapshot_bal->{cash_balance};
@@ -2950,7 +3029,7 @@ sub get_provider_call_cost {
 		$cdr->{$dir.$provider_type."free_time_balance_after"} = $snapshot_bal->{free_time_balance_old};
 
 		unless ($readonly) {
-			update_contract_balance($provider_info->{balances})
+			update_contract_balance($cdr,$provider_info->{balances})
 				or FATAL "Error updating ".$dir.$provider_type."provider contract balance\n";
 		}
 
@@ -3052,14 +3131,14 @@ sub rate_cdr {
 	};
 	DEBUG sub { "destination_provider_info is ".(Dumper $destination_provider_info) };
 
-    $cdr->{_start_time} = get_start_time($cdr);
+	$cdr->{_start_time} = get_start_time($cdr);
 
 	my @rating_durations;
 	my $rating_attempts = 0;
 	my $readonly;
 	$cdr->{rating_duration} = undef;
 RATING_DURATION_FOUND:
-    $rating_attempts += 1;
+	$rating_attempts += 1;
 	@rating_durations = ();
 	$source_customer_cost = 0;
 	$source_carrier_cost = 0;
@@ -3313,8 +3392,8 @@ sub notify_send {
 	if ($ENV{NOTIFY_SOCKET}) {
 		my $addr = $ENV{NOTIFY_SOCKET} =~ s/^@/\0/r;
 		my $sock = IO::Socket::UNIX->new(
-		    Type => SOCK_DGRAM(),
-		    Peer => $addr,
+			Type => SOCK_DGRAM(),
+			Peer => $addr,
 		) or warn "cannot connect to socket $ENV{NOTIFY_SOCKET}: $!\n";
 		if ($sock) {
 			$sock->autoflush(1);
@@ -3532,7 +3611,7 @@ sub main {
 		};
 		$log_fatal = 1;
 		$error = $@;
-		if ($error)	{
+		if ($error) {
 			if (defined $DBI::err) {
 				INFO "Caught DBI:err ".$DBI::err, "\n";
 				if ($DBI::err == 2006) {
@@ -3651,3 +3730,4 @@ sub main {
 	close $pidfh;
 	unlink $pidfile;
 }
+
