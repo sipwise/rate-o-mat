@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "63102fc4_38f35566",
+        "filename": "rate-o-mat.pl",
+        "patchSetId": 1
+      },
+      "lineNbr": 20,
+      "author": {
+        "id": 1000013
+      },
+      "writtenOn": "2020-06-12T10:06:21Z",
+      "side": 1,
+      "message": "not needed as the defaults file sets \"0\" for this ever since.\n\ni however need to check if the testsuite still works.",
+      "revId": "02d1f129fe507f0741f277c53ccc1cfab5531c0c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
