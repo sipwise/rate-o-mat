@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (8.6.0.0+0~mr8.6.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [ce8bcf2] TT#82318 handle period costs when re-rating
+
+  [ Guillem Jover ]
+  * [02d1f12] TT#83400 Change default to not daemonize
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 14 Jul 2020 11:54:21 +0200
+
 ngcp-rate-o-mat (8.5.0.0+0~mr8.5.0.0) unstable; urgency=medium
 
   * New release.
