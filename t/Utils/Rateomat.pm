@@ -25,6 +25,7 @@ our @EXPORT_OK = qw(
 	prepare_cdr
 	check_cdr
 	check_cdrs
+	update_cdrs
 	delete_cdrs
 	create_prepaid_costs_cdrs
 	get_prepaid_costs_cdrs
@@ -535,6 +536,51 @@ sub get_cdrs_by_call_id {
 	return $result;
 }
 
+sub update_cdrs {
+	my ($cdrs) = @_;
+	my $is_ary = 'ARRAY' eq ref $cdrs;
+	my $result = ($is_ary ? [] : undef);
+	my $dbh;
+	eval {
+		$dbh = _connect_accounting_db();
+		if ($is_ary) {
+			_begin_transaction($dbh);
+			$result = _update_cdrs($dbh,$cdrs);
+			_commit_transaction($dbh);
+		} else {
+			$result = _update_cdr($dbh,@_);
+		}
+	};
+	if ($@) {
+		diag($@);
+		eval { _rollback_transaction($dbh); } if $is_ary;
+	}
+	_disconnect_db($dbh);
+	return $result;
+}
+
+sub _update_cdr {
+	my ($dbh,%values) = @_;
+	if ($dbh) {
+		my ($id) = _update($dbh,'accounting.cdr','id',\%values);
+		return _get_cdr($dbh,$id,1);
+	}
+	return;
+}
+
+sub _update_cdrs {
+	my ($dbh,$cdrs) = @_;
+	if ($dbh) {
+		my @ids = ();
+		foreach my $values (@$cdrs) {
+			my ($id) = _update($dbh,'accounting.cdr','id',$values);
+			push(@ids,$id);
+		}
+		return _get_cdrs($dbh,\@ids,1);
+	};
+	return [];
+}
+
 sub delete_cdrs {
 	my $ids = shift;
 	my $is_ary = 'ARRAY' eq ref $ids;
@@ -687,6 +733,26 @@ sub _insert {
 		$sth->finish();
 	}
 	return $id;
+}
+
+sub _update {
+	my ($dbh,$table,@args) = @_;
+	my @pk_fields = ();
+	my @pk_values = ();
+	my $values = pop @args;
+	foreach my $arg (@args) {
+		push(@pk_fields,$arg);
+		push(@pk_values,delete $values->{$arg});
+	}
+	if ($dbh) {
+		my $sth = $dbh->prepare('UPDATE ' . $table . ' SET ' .
+			join(', ', map { $_ . ' = ?'; } keys %$values) .
+			' WHERE ' . join(' AND ', map { $_ . ' = ?'; } @pk_fields)
+		) or die("Error preparing update statement: ".$dbh->errstr);
+		$sth->execute(values %$values,@pk_values);
+		$sth->finish();
+	}
+	return @pk_values;
 }
 
 sub _delete_cdrs {
