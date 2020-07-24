@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (8.5.1.1+0~mr8.5.1.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [87a2bf4] TT#82317 handle contract balances when re-rating
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 24 Jul 2020 13:50:26 +0200
+
 ngcp-rate-o-mat (8.5.1.0+0~mr8.5.1.0) unstable; urgency=medium
 
   [ Rene Krenn ]
