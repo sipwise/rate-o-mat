@@ -2014,15 +2014,24 @@ sub update_cdr {
 	if ($sth->rows > 0) {
 		DEBUG "cdr ID $cdr->{id} updated";
 		my $fraud_lock;
-		$fraud_lock = add_period_costs(0,
-			$cdr->{id},
-			$cdr->{source_account_id},
-			$cdr->{start_time},
-			$cdr->{duration},
-			$cdr->{source_customer_billing_profile_id},
-			$cdr->{source_customer_cost},
-			$cdr->{source_reseller_cost},
-		) unless $dupdbh;
+		if (not $dupdbh
+			and $cdr->{source_account_id}) {
+			unless ($cdr->{source_customer_billing_profile_id}) {
+                my %billing_info = ();
+				get_billing_info($cdr->{start_time}, $cdr->{source_account_id}, $cdr->{source_ip}, \%billing_info) or
+					FATAL "Error getting source_customer billing info\n";
+				$cdr->{source_customer_billing_profile_id} = $billing_info{profile_id};
+            }
+			$fraud_lock = add_period_costs(0,
+				$cdr->{id},
+				$cdr->{source_account_id},
+				$cdr->{start_time},
+				$cdr->{duration},
+				$cdr->{source_customer_billing_profile_id},
+				$cdr->{source_customer_cost},
+				$cdr->{source_reseller_cost},
+			) if $cdr->{source_customer_billing_profile_id};
+		}
 		write_cdr_cols($cdr,$cdr->{id},
 			$acc_cash_balance_col_model_key,
 			$acc_time_balance_col_model_key,
@@ -2033,16 +2042,23 @@ sub update_cdr {
 			my $dup_cdr_id = $dupdbh->{'mysql_insertid'};
 			if ($dup_cdr_id) {
 				DEBUG "local cdr ID $cdr->{id} was duplicated to duplication cdr ID $dup_cdr_id";
-
-				$fraud_lock = add_period_costs(1,
-					$dup_cdr_id,
-					$cdr->{source_account_id},
-					$cdr->{start_time},
-					$cdr->{duration},
-					$cdr->{source_customer_billing_profile_id},
-					$cdr->{source_customer_cost},
-					$cdr->{source_reseller_cost},
-				);
+				if ($cdr->{source_account_id}) {
+					unless ($cdr->{source_customer_billing_profile_id}) {
+						my %billing_info = ();
+						get_billing_info($cdr->{start_time}, $cdr->{source_account_id}, $cdr->{source_ip}, \%billing_info) or
+							FATAL "Error getting source_customer billing info\n";
+						$cdr->{source_customer_billing_profile_id} = $billing_info{profile_id};
+					}
+					$fraud_lock = add_period_costs(1,
+						$dup_cdr_id,
+						$cdr->{source_account_id},
+						$cdr->{start_time},
+						$cdr->{duration},
+						$cdr->{source_customer_billing_profile_id},
+						$cdr->{source_customer_cost},
+						$cdr->{source_reseller_cost},
+					) if $cdr->{source_customer_billing_profile_id};
+				}
 				write_cdr_cols($cdr,$dup_cdr_id,
 					$dup_cash_balance_col_model_key,
 					$dup_time_balance_col_model_key,
