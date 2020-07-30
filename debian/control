@@ -17,7 +17,5 @@ Depends:
  libnetaddr-ip-perl,
  ${misc:Depends},
  ${perl:Depends},
-Conflicts:
- ngcp-ossbss-billing (<= 3),
 Description: Rating daemon for the NGCP
  Perl daemon to rate CDRs in an NGCP.
