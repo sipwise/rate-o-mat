@@ -506,7 +506,7 @@ EOS
 	) or FATAL "Error preparing billing info statement: ".$billdbh->errstr;
 
 	$sth_lnp_number = $billdbh->prepare(
-		"SELECT lnp_provider_id FROM billing.lnp_numbers WHERE id = billing.get_lnp_number_id(?,?)"
+		"SELECT lnp_provider_id,type FROM billing.lnp_numbers WHERE id = billing.get_lnp_number_id(?,?)"
 	) or FATAL "Error preparing LNP number statement: ".$billdbh->errstr;
 
 	$sth_profile_info = $billdbh->prepare(
@@ -1835,25 +1835,35 @@ sub get_profile_info {
 
 	my @res;
 
-	if(defined $lnp_number and $lnp_number =~ /^\d+$/) {
+	if (defined $lnp_number and $lnp_number =~ /^\d+$/) {
 		# let's see if we find the number in our LNP database
 		$sth_lnp_number->execute($lnp_number, $start_time)
 			or FATAL "Error executing LNP number statement: ".$sth_lnp_number->errstr;
-		my ($lnppid) = $sth_lnp_number->fetchrow_array();
+		my ($lnppid,$lnpnumbertype) = $sth_lnp_number->fetchrow_array();
 
-		if(defined $lnppid and $lnppid =~ /^\d+$/) {
+		if ($lnppid) {
 			# let's see if we have a billing fee entry for the LNP provider ID
 			$sth_lnp_profile_info->execute($bpid, $type, $direction, 'lnp:'.$lnppid)
 				or FATAL "Error executing LNP profile info statement: ".$sth_lnp_profile_info->errstr;
 			@res = $sth_lnp_profile_info->fetchrow_array();
 			FATAL "Error fetching LNP profile info: ".$sth_lnp_profile_info->errstr
 				if $sth_lnp_profile_info->err;
+			
+			unless (@res) {
+				if (length($lnpnumbertype)) {
+					$sth_lnp_profile_info->execute($bpid, $type, $direction, 'lnpnumbertype:'.$lnpnumbertype)
+						or FATAL "Error executing LNP profile info statement: ".$sth_lnp_profile_info->errstr;
+					@res = $sth_lnp_profile_info->fetchrow_array();
+					FATAL "Error fetching LNP profile info: ".$sth_lnp_profile_info->errstr
+						if $sth_lnp_profile_info->err;
+				}
+			}
 		}
 	}
 
 	my $sth = $sth_profile_info;
 
-	unless(@res) {
+	unless (@res) {
 		$sth->execute($bpid, $type, $direction, $source, $destination)
 			or FATAL "Error executing profile info statement: ".$sth->errstr;
 		@res = $sth->fetchrow_array();
