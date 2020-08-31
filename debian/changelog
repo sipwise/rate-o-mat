@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (9.1.0.0+0~mr9.1.0.0) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * [411cad3] TT#88050 Remove dependencies on obsolete packages
+
+  [ Rene Krenn ]
+  * [8f216d3] TT#87508 fix fraud calculation for 'cancel', 'other' status
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 31 Aug 2020 21:55:48 +0200
+
 ngcp-rate-o-mat (9.0.0.0+0~mr9.0.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
