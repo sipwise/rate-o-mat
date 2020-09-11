@@ -53,7 +53,7 @@ echo "Testing MySQL connection to ${MYSQL_SERVER}:${MYSQL_PORT} ..."
 if !  mysql -u "${MYSQL_USER}" -h "${SERVER}" -P "${MYSQL_PORT}" -e 'select now()' >/dev/null ; then
   echo "ERROR: Cannot connect to MySQL on ${MYSQL_SERVER}:${MYSQL_PORT} using user '${MYSQL_USER}', cannot continue!" >&2
   echo "Hint:"
-  echo " [CE] remove 'skip_networking' from /etc/ngcp-config/templates/etc/mysql/my.cnf.tt2 && ngcpcfg apply 'Allow TCP for MySQL'"
+  echo " [CE] remove 'bind-address = ...' from /etc/ngcp-config/templates/etc/mysql/inc/my.mysqld1.cnf.tt2 && ngcpcfg apply 'Allow TCP for MySQL'"
   echo " [CE/PRO] run: mysql -u root -e \"GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY PASSWORD ''; FLUSH PRIVILEGES;\""
   exit 1
 fi
