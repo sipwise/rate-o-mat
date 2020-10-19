@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (8.5.3.0+0~mr8.5.3.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [6a6eb5c] TT#87508 fix fraud calculation for 'cancel', 'other' status
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Oct 2020 14:29:31 +0200
+
 ngcp-rate-o-mat (8.5.2.0+0~mr8.5.2.0) unstable; urgency=medium
 
   [ Rene Krenn ]
