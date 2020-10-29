@@ -3531,10 +3531,7 @@ sub main {
 	while (!$shutdown) {
 
 		$log_fatal = 1;
-		$billdbh->ping || init_db;
-		$acctdbh->ping || init_db;
-		$provdbh and ($provdbh->ping || init_db);
-		$dupdbh and ($dupdbh->ping || init_db);
+		init_db or FATAL "Error initializing database handlers\n";
 		clear_prepaid_cost_cache();
 
 		my $error;
@@ -3676,11 +3673,19 @@ sub main {
 			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
 		}
+		
+		close_db();
 
 	}
 
 	notify_send("STOPPING=1\n");
 	INFO "Shutting down.\n";
+
+	close $pidfh;
+	unlink $pidfile;
+}
+
+sub close_db {
 
 	$sth_get_subscriber_contract_id->finish;
 	$sth_billing_info_network->finish;
@@ -3742,7 +3747,5 @@ sub main {
 	$acctdbh->disconnect;
 	$provdbh and $provdbh->disconnect;
 	$dupdbh and $dupdbh->disconnect;
-	close $pidfh;
-	unlink $pidfile;
+	
 }
-
