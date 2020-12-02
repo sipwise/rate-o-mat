@@ -837,6 +837,10 @@ EOS
 		$dup_tag_col_model_key,
 		'duplication');
 	}
+	
+	foreach (keys %cdr_col_models) {
+		init_cdr_col_model($_);
+	}
 
 	return 1;
 
@@ -3524,9 +3528,7 @@ sub main {
 	my $rated = 0;
 	my $next_del = 10000;
 	my %failed_counter_map = ();
-	foreach (keys %cdr_col_models) {
-		init_cdr_col_model($_);
-	}
+	my $init = 0;
 
 	INFO "Up and running.\n";
 	notify_send("READY=1\n");
@@ -3534,7 +3536,9 @@ sub main {
 	while (!$shutdown) {
 
 		$log_fatal = 1;
-		init_db or FATAL "Error initializing database handlers\n";
+		if ($init) {
+            init_db or FATAL "Error initializing database handlers\n";
+		}
 		clear_prepaid_cost_cache();
 
 		my $error;
@@ -3678,6 +3682,7 @@ sub main {
 		}
 		
 		close_db();
+		$init = 1;
 
 	}
 
