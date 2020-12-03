@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (9.1.1.2+0~mr9.1.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [cbe0167] TT#98100 populate dictionaries each iteration
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 03 Dec 2020 11:11:24 +0100
+
 ngcp-rate-o-mat (9.1.1.1+0~mr9.1.1.1) unstable; urgency=medium
 
   * New release.
