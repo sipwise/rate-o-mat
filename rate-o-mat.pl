@@ -2922,6 +2922,9 @@ sub rate_cdr {
 	my $destination_customer_free_time = 0;
 	my $destination_carrier_free_time = 0;
 	my $destination_reseller_free_time = 0;
+	
+	$cdr->{source_user_id} = '0' if lc($cdr->{source_user_id}) eq '<null>';
+	$cdr->{destination_user_id} = '0' if lc($cdr->{destination_user_id}) eq '<null>';
 
 	unless($cdr->{call_status} eq "ok") {
 		DEBUG "cdr #$$cdr{id} has call_status $$cdr{call_status}, skip.";
