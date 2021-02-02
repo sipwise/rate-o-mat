@@ -3545,6 +3545,8 @@ sub main {
 			if ($error) {
 				if ($DBI::err == 2006) {
 					INFO "DB connection gone, retrying...";
+					close_db();
+					$init = 1;
 					next;
 				}
 				FATAL "Error getting next bunch of CDRs: " . $error;
@@ -3634,10 +3636,14 @@ sub main {
 					$provdbh and ($provdbh->disconnect);
 					$acctdbh->disconnect;
 					$dupdbh and ($dupdbh->disconnect);
+					close_db();
+					$init = 1;
 					next; #fetch new batch
 				} elsif ($DBI::err == 1213) {
 					INFO "Transaction concurrency problem, rolling back and retrying...";
 					rollback_all();
+					close_db();
+					$init = 1;
 					next; #fetch new batch
 				} else {
 					rollback_all();
