@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (7.5.6.2+0~mr7.5.6.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [23ba013] TT#106751 consider the *_user_id as '0' if '<null>'
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 11 Feb 2021 10:05:17 +0100
+
 ngcp-rate-o-mat (7.5.6.1+0~mr7.5.6.1) unstable; urgency=medium
 
   [ Rene Krenn ]
