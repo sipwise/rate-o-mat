@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (9.3.1.0+0~mr9.3.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [3081a7a] TT#106751 consider the *_user_id as '0' if '<null>'
+  * [7ef3dc7] TT#109483 re-init db connections after err 2006 and 1213
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 15 Feb 2021 17:54:28 +0100
+
 ngcp-rate-o-mat (9.3.0.0+0~mr9.3.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
