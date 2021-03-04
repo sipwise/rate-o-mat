@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (9.2.1.2+0~mr9.2.1.2) unstable; urgency=medium
+
+  [ Mykola Malkov ]
+  * [c62e781] TT#109000 Remove hardcoded values from tests parameters
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 04 Mar 2021 11:47:08 +0100
+
 ngcp-rate-o-mat (9.2.1.1+0~mr9.2.1.1) unstable; urgency=medium
 
   * New release.
