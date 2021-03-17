@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (7.5.6.3+0~mr7.5.6.3) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [8514264] TT#116150 lock processed cdr record
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 17 Mar 2021 16:03:31 +0100
+
 ngcp-rate-o-mat (7.5.6.2+0~mr7.5.6.2) unstable; urgency=medium
 
   [ Rene Krenn ]
