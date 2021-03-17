@@ -169,6 +169,7 @@ my $sth_duplicate_get_cdr_period_costs;
 my $sth_offpeak;
 my $sth_offpeak_subscriber;
 my $sth_unrated_cdrs;
+my $sth_lock_cdr;
 my $sth_update_cdr;
 my $sth_create_cdr_fragment;
 my $sth_mos_data;
@@ -577,8 +578,13 @@ EOS
 		"ORDER BY start_time ASC LIMIT " . $batch_size
 	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
 
+	$sth_lock_cdr = $acctdbh->prepare(
+		"SELECT id ".
+		"FROM accounting.cdr WHERE id = ? FOR UPDATE"
+	) or FATAL "Error preparing lock cdr statement: ".$acctdbh->errstr;
+
 	$sth_update_cdr = $acctdbh->prepare(
-		"UPDATE accounting.cdr SET ".
+		"UPDATE LOW_PRIORITY accounting.cdr SET ".
 		"source_carrier_cost = ?, source_reseller_cost = ?, source_customer_cost = ?, ".
 		"source_carrier_free_time = ?, source_reseller_free_time = ?, source_customer_free_time = ?, ".
 		"rated_at = ?, rating_status = ?, ".
@@ -954,6 +960,18 @@ sub prepare_cdr_col_models {
 		}
 	);
 
+}
+
+sub lock_cdr {
+	
+	my $cdr = shift;
+	my $sth = $sth_lock_cdr;
+	$sth->execute($cdr->{id})
+		or FATAL "Error executing cdr row lock selection statement: ".$sth->errstr;
+	my ($id) = $sth->fetchrow_array;
+	$sth->finish;			 
+	return $id;
+	
 }
 
 sub lock_contracts {
@@ -3407,6 +3425,8 @@ sub main {
 					$t = Time::HiRes::time();
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
+					begin_transaction($acctdbh);					
+					lock_cdr($cdr);
 					# required to avoid contract_balances duplications during catchup:
 					begin_transaction($billdbh,'READ COMMITTED');
 					# row locks are released upon commit/rollback and have to cover
@@ -3415,16 +3435,15 @@ sub main {
 					# billingdb transaction:
 					lock_contracts($cdr);
 					begin_transaction($provdbh);
-					begin_transaction($acctdbh);
 					begin_transaction($dupdbh);
 
 					INFO $info_prefix."rate CDR ID ".$cdr->{id};
 					rate_cdr($cdr, $type) && update_cdr($cdr);
 
 					# we would need a XA/distributed transaction manager for this:
+					commit_transaction($acctdbh);
 					commit_transaction($billdbh);
 					commit_transaction($provdbh);
-					commit_transaction($acctdbh);
 					commit_transaction($dupdbh);
 
 					$rated_batch++;
@@ -3527,6 +3546,7 @@ sub main {
 	$sth_offpeak->finish;
 	$sth_offpeak_subscriber->finish;
 	$sth_unrated_cdrs->finish;
+	$sth_lock_cdr->finish;
 	$sth_update_cdr->finish;
 	$split_peak_parts and $sth_create_cdr_fragment->finish;
 	$sth_mos_data->finish;
