@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (7.5.8.1+0~mr7.5.8.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [2b995b5] TT#106751 consider the *_user_id as '0' if '<null>'
+
+  [ Mykola Malkov ]
+  * [0b020ff] TT#109000 Remove hardcoded values from tests parameters
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 31 Mar 2021 09:49:14 +0200
+
 ngcp-rate-o-mat (7.5.8.0+0~mr7.5.8.0) unstable; urgency=medium
 
   * New release.
