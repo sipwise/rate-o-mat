@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (8.5.3.3+0~mr8.5.3.3) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [74b1198] TT#98100 re-init stmt handlers each iteration
+  * [5c0798e] TT#109483 re-init db connections after err 2006 and 1213
+  * [3dff3df] TT#116150 lock processed cdr record
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 01 Apr 2021 15:34:03 +0200
+
 ngcp-rate-o-mat (8.5.3.2+0~mr8.5.3.2) unstable; urgency=medium
 
   [ Mykola Malkov ]
