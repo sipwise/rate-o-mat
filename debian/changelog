@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (9.4.1.0+0~mr9.4.1.0) unstable; urgency=medium
+
+  [ Mykola Malkov ]
+  * [12f79e7] TT#109000 Remove hardcoded values from tests parameters
+
+  [ Rene Krenn ]
+  * [ecb0af2] TT#116150 lock processed cdr record
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 20 Apr 2021 11:59:33 +0200
+
 ngcp-rate-o-mat (9.4.0.0+0~mr9.4.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
