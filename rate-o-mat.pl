@@ -588,7 +588,7 @@ EOS
 	) or FATAL "Error preparing get cdr statement: ".$acctdbh->errstr;
 	
 	$sth_lock_cdr = $acctdbh->prepare(
-		"SELECT id ".
+		"SELECT id, rating_status ".
 		"FROM accounting.cdr WHERE id = ? FOR UPDATE"
 	) or FATAL "Error preparing lock cdr statement: ".$acctdbh->errstr;
 
@@ -605,7 +605,7 @@ EOS
 		"destination_carrier_billing_zone_id = ?, destination_reseller_billing_zone_id = ?, destination_customer_billing_zone_id = ?, ".
 		"frag_carrier_onpeak = ?, frag_reseller_onpeak = ?, frag_customer_onpeak = ?, is_fragmented = ?, ".
 		"duration = ? ".
-		"WHERE id = ? AND rating_status = 'unrated'"
+		"WHERE id = ?"
 	) or FATAL "Error preparing update cdr statement: ".$acctdbh->errstr;
 
 	my $upsert_cdr_period_costs_stmt = "INSERT INTO accounting.cdr_period_costs (" .
@@ -981,9 +981,9 @@ sub lock_cdr {
 	my $sth = $sth_lock_cdr;
 	$sth->execute($cdr->{id})
 		or FATAL "Error executing cdr row lock selection statement: ".$sth->errstr;
-	my ($id) = $sth->fetchrow_array;
+	my ($id,$rating_status) = $sth->fetchrow_array;
 	$sth->finish;			 
-	return $id;
+	return $rating_status;
 	
 }
 
@@ -3598,7 +3598,11 @@ sub main {
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
 					begin_transaction($acctdbh);					
-					lock_cdr($cdr);
+					if ('unrated' ne lock_cdr($cdr)) {
+						commit_transaction($acctdbh);
+						check_shutdown() and last;
+						next;
+					}
 					# required to avoid contract_balances duplications during catchup:
 					begin_transaction($billdbh,'READ COMMITTED');
 					# row locks are released upon commit/rollback and have to cover
