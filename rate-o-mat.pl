@@ -3529,6 +3529,7 @@ sub _update_cps {
 }
 
 sub main {
+	
 	my $pidfh;
 
 	if ($fork != 0) {
@@ -3561,7 +3562,7 @@ sub main {
 	INFO "Up and running.\n";
 	notify_send("READY=1\n");
 
-	while (!$shutdown) {
+	BATCH: while (!$shutdown) {
 
 		$log_fatal = 1;
 		if ($init) {
@@ -3582,7 +3583,7 @@ sub main {
 					INFO "DB connection gone, retrying...";
 					close_db();
 					$init = 1;
-					next;
+					next BATCH;
 				}
 				FATAL "Error getting next bunch of CDRs: " . $error;
 			}
@@ -3590,7 +3591,7 @@ sub main {
 			WARNING "no-op loop since mandatory db connections are n/a";
 		}
 
-		$shutdown and last;
+		$shutdown and last BATCH;
 
 		my $rated_batch = 0;
 		my $t;
@@ -3599,7 +3600,9 @@ sub main {
 		my $failed = 0;
 
 		eval {
-			foreach my $cdr (@cdrs) {
+			## no critic (TestingAndDebugging::ProhibitNoWarnings)
+			no warnings qw/ exiting /;
+			CDR: foreach my $cdr (@cdrs) {
 				$rollback = 0;
 				$log_fatal = 0;
 				$info_prefix = ($rated_batch + 1) . "/" . (scalar @cdrs) . " - ";
@@ -3610,8 +3613,8 @@ sub main {
 					begin_transaction($acctdbh);					
 					if ('unrated' ne lock_cdr($cdr)) {
 						commit_transaction($acctdbh);
-						check_shutdown() and last;
-						next;
+						check_shutdown() and last BATCH;
+						next CDR;
 					}
 					# required to avoid contract_balances duplications during catchup:
 					begin_transaction($billdbh,'READ COMMITTED');
@@ -3635,7 +3638,7 @@ sub main {
 					$rated_batch++;
 					delete $failed_counter_map{$cdr_id};
 					debug_rating_time($t,$cdr_id,0);
-					check_shutdown() and last;
+					check_shutdown() and last BATCH;
 					_update_cps(1); # unless ($rated_batch % 5);
 					_cps_delay();
 				};
@@ -3645,7 +3648,7 @@ sub main {
 					if ($rollback) {
 						INFO $info_prefix."rolling back changes for CDR ID $cdr_id";
 						rollback_all();
-						next; #move on to the next cdr of the batch
+						next CDR; #move on to the next cdr of the batch
 					} else {
 						$failed_counter_map{$cdr_id} = 0 if !exists $failed_counter_map{$cdr_id};
 						if ($failed_counter_map{$cdr_id} < $failed_cdr_max_retries && !defined $DBI::err) {
@@ -3655,7 +3658,7 @@ sub main {
 							$failed_counter_map{$cdr_id} = $failed_counter_map{$cdr_id} + 1;
 							$failed += 1;
 							rollback_all();
-							next; #move on to the next cdr of the batch
+							next CDR; #move on to the next cdr of the batch
 						} else {
 							die($error); #rethrow
 						}
@@ -3678,13 +3681,13 @@ sub main {
 					$dupdbh and ($dupdbh->disconnect);
 					close_db();
 					$init = 1;
-					next; #fetch new batch
+					next BATCH; #fetch new batch
 				} elsif ($DBI::err == 1213) {
 					INFO "Transaction concurrency problem, rolling back and retrying...";
 					rollback_all();
 					close_db();
 					$init = 1;
-					next; #fetch new batch
+					next BATCH; #fetch new batch
 				} else {
 					rollback_all();
 					FATAL $error; #terminate upon other DB errors
@@ -3706,7 +3709,7 @@ sub main {
 			sleep $loop_interval; #split peak parts testcase
 		}
 
-		$shutdown and last;
+		$shutdown and last BATCH;
 
 		if ($rated >= $next_del) { # not ideal imho
 			$next_del = $rated + 10000;
