@@ -2609,7 +2609,7 @@ sub populate_prepaid_cost_cache {
 				$map->{$prepaid_cost->{source_user_id}} //= {};
 				$map = $map->{$prepaid_cost->{source_user_id}};
 				if (exists $map->{$prepaid_cost->{destination_user_id}}) {
-					WARNING "duplicate prepaid_costs call_id = $prepaid_cost->{call_id}, source_user_id = $prepaid_cost->{source_user_id}, destination_user_id = $prepaid_cost->{destination_user_id}";
+					DEBUG "duplicate prepaid_costs call_id = $prepaid_cost->{call_id}, source_user_id = $prepaid_cost->{source_user_id}, destination_user_id = $prepaid_cost->{destination_user_id}";
 				}
 				$map->{$prepaid_cost->{destination_user_id}} = $prepaid_cost;
 			}
@@ -2659,7 +2659,7 @@ sub get_prepaid_cost {
 			if ($prepaid_cost && exists $prepaid_cost->{$cdr->{destination_user_id}}) {
 				DEBUG "prepaid cost record for call ID $cdr->{call_id} retrieved";
 				$entry = $prepaid_cost->{$cdr->{destination_user_id}};
-				last;
+				#last;
 			}
 		}
 	}
