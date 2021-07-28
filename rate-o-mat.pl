@@ -14,6 +14,7 @@ use Time::HiRes qw(); #for debugging info only
 use List::Util qw(shuffle);
 use Storable qw(dclone);
 use JSON::XS qw(encode_json decode_json);
+use Sys::Hostname qw(hostname);
 
 # constants: ###########################################################
 
@@ -434,7 +435,7 @@ sub init_db {
 	connect_provdbh;
 	connect_acctdbh;
 	connect_dupdbh;
-
+	
 	$sth_get_contract_info = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(c.create_timestamp),".
 		" UNIX_TIMESTAMP(c.modify_timestamp),".
@@ -2036,8 +2037,32 @@ sub get_unrated_cdrs {
 
 	my @cdrs = ();
 
+	my $nodename = hostname();
+	#set to undef if corosync reports there is no other working node left:
+	#$nodename = undef
+	
 	while (my $cdr = $sth->fetchrow_hashref()) {
-		push(@cdrs,$cdr);
+		if (not length($nodename) or $nodename eq 'spce') {
+			push(@cdrs,$cdr);
+		} elsif (substr($nodename,-1,1) eq '1' or substr($nodename,-1,1) eq 'a') {
+			push(@cdrs,$cdr) if (
+				(($cdr->{id} % 2) == 1
+				and ($cdr->{id} % 4) == 1)
+				or
+				(($cdr->{id} % 2) == 0
+				and ($cdr->{id} % 4) == 0)
+			);
+		} elsif (substr($nodename,-1,1) eq '2' or substr($nodename,-1,1) eq 'b') {
+			push(@cdrs,$cdr) if (
+				(($cdr->{id} % 2) == 1
+				and ($cdr->{id} % 4) == 3)
+				or
+				(($cdr->{id} % 2) == 0
+				and ($cdr->{id} % 4) == 2)
+			);
+		} else {
+			FATAL "Unknown hostname '$nodename'";
+		}
 		check_shutdown() and return 0;
 	}
 
@@ -2047,7 +2072,7 @@ sub get_unrated_cdrs {
 	FATAL "Error fetching unrated cdr's: ". $sth->errstr
 		if $sth->err;
 	$sth->finish;
-
+	
 	if ($shuffle_batch) {
 		# if concurrent rate-o-mat instances grab the same cdr batch, there
 		# can be a contention due to waits on same caller/callee contract
@@ -2157,11 +2182,11 @@ sub update_cdr {
 		if (not $dupdbh
 			and $cdr->{source_account_id}) {
 			unless ($cdr->{source_customer_billing_profile_id}) {
-                my %billing_info = ();
+				my %billing_info = ();
 				get_billing_info($cdr->{start_time}, $cdr->{source_account_id}, $cdr->{source_ip}, \%billing_info) or
 					FATAL "Error getting source_customer billing info\n";
 				$cdr->{source_customer_billing_profile_id} = $billing_info{profile_id};
-            }
+			}
 			$fraud_lock = add_period_costs(0,
 				$cdr->{id},
 				$cdr->{source_account_id},
@@ -3566,7 +3591,7 @@ sub main {
 
 		$log_fatal = 1;
 		if ($init) {
-            init_db or FATAL "Error initializing database handlers\n";
+			init_db or FATAL "Error initializing database handlers\n";
 		}
 		clear_prepaid_cost_cache();
 
