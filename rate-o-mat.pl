@@ -493,7 +493,7 @@ sub init_db {
 	$sth_billing_info_network = $billdbh->prepare(<<EOS
 		SELECT bp.id, bp.prepaid,
 			bp.interval_charge, bp.interval_free_time, bp.interval_free_cash,
-			bp.interval_unit, bp.interval_count
+			bp.interval_unit, bp.interval_count, bp.ignore_domain
 		FROM billing.billing_profiles bp
 		WHERE bp.id = billing.get_billing_profile_by_contract_id_network(?,?,?)
 EOS
@@ -502,7 +502,7 @@ EOS
 	$sth_billing_info = $billdbh->prepare(<<EOS
 		SELECT bp.id, bp.prepaid,
 			bp.interval_charge, bp.interval_free_time, bp.interval_free_cash,
-			bp.interval_unit, bp.interval_count
+			bp.interval_unit, bp.interval_count, bp.ignore_domain
 		FROM billing.billing_profiles bp
 		WHERE bp.id = billing.get_billing_profile_by_contract_id(?,?)
 EOS
@@ -1856,6 +1856,7 @@ sub get_billing_info {
 	$r_info->{int_free_cash} = $res[4];
 	$r_info->{int_unit} = $res[5];
 	$r_info->{int_count} = $res[6];
+	$r_info->{ignore_domain} = $res[7];
 
 	DEBUG "contract ID $contract_id billing mapping is profile id $r_info->{profile_id} for time $start" . $label;
 
@@ -2281,6 +2282,7 @@ sub get_call_cost {
 	my $contract_id = shift;
 	my $subscriber_contract_id = shift;
 	my $profile_id = shift;
+	my $ignore_domain = shift;
 	my $readonly = shift;
 	my $prepaid = shift;
 	my $r_profile_info = shift;
@@ -2307,11 +2309,11 @@ sub get_call_cost {
 	my $dst_user_domain = $cdr->{destination_user_in}.'@'.$cdr->{destination_domain};
 
 	DEBUG "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
-		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain";
+		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain" unless $ignore_domain;
 
-	unless(get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $dst_user,
+	if($ignore_domain or get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $dst_user,
 		$r_profile_info, $cdr->{start_time})) {
-		DEBUG "no match for full uris, trying user only for profile_id $profile_id with type $type, direction $direction, ".
+		DEBUG "trying user only for profile_id $profile_id with type $type, direction $direction, ".
 			"src_user_domain $src_user, dst_user_domain $dst_user";
 		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user, undef,
 			$r_profile_info, $cdr->{start_time})) {
@@ -2944,7 +2946,7 @@ sub get_customer_call_cost {
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,$contract_id,$subscriber_contract_id,
-		$billing_info{profile_id}, $readonly || ($outgoing_prepaid && defined $prepaid_cost_entry), $prepaid,
+		$billing_info{profile_id}, $billing_info{ignore_domain}, $readonly || ($outgoing_prepaid && defined $prepaid_cost_entry), $prepaid,
 		\%profile_info, \%package_info, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \$extra_rate, \@balances)
 		or FATAL "Error getting ".$dir."customer call cost\n";
@@ -3054,7 +3056,7 @@ sub get_provider_call_cost {
 
 	my %profile_info = ();
 	get_call_cost($cdr, $type, $direction,$contract_id,$subscriber_contract_id,
-		$provider_info->{billing}->{profile_id}, $readonly || $prepaid, $prepaid, # no underruns for providers with prepaid profile
+		$provider_info->{billing}->{profile_id}, $provider_info->{billing}->{ignore_domain}, $readonly || $prepaid, $prepaid, # no underruns for providers with prepaid profile
 		\%profile_info, $provider_info->{package}, $r_cost, \$real_cost, $r_free_time,
 		$r_rating_duration, \$onpeak, \$extra_rate, $provider_info->{balances})
 		or FATAL "Error getting ".$dir."provider call cost\n";
