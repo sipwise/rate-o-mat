@@ -2032,8 +2032,7 @@ sub get_unrated_cdrs {
 	my $r_cdrs = shift;
 
 	my $sth = $sth_unrated_cdrs;
-	$sth->execute
-		or FATAL "Error executing unrated cdr statement: ".$sth->errstr;
+	$sth->execute or die("Error executing unrated cdr statement: ".$sth->errstr);
 
 	my @cdrs = ();
 
@@ -2061,7 +2060,7 @@ sub get_unrated_cdrs {
 				and ($cdr->{id} % 4) == 2)
 			);
 		} else {
-			FATAL "Unknown hostname '$nodename'";
+			die("Unknown hostname '$nodename'");
 		}
 		check_shutdown() and return 0;
 	}
@@ -2069,8 +2068,7 @@ sub get_unrated_cdrs {
 	# the while above may have been interrupted because there is no
 	# data left, or because there was an error. To decide what
 	# happened, we have to query $sth->err()
-	FATAL "Error fetching unrated cdr's: ". $sth->errstr
-		if $sth->err;
+	die("Error fetching unrated cdr's: ". $sth->errstr) if $sth->err;
 	$sth->finish;
 	
 	if ($shuffle_batch) {
@@ -3604,7 +3602,7 @@ sub main {
 			};
 			$error = $@;
 			if ($error) {
-				if ($DBI::err == 2006) {
+				if ($DBI::err and $DBI::err == 2006) {
 					INFO "DB connection gone, retrying...";
 					close_db();
 					$init = 1;

@@ -101,8 +101,15 @@ sub run_rateomat {
 			kill 'HUP', 0;
 		} if defined $timeout;
 		alarm $timeout if defined $timeout;
-		die($!) if !defined do $rateomat_pl;
+		my $res = do $rateomat_pl;
 		alarm 0 if defined $timeout;
+		if ($@) {
+			diag("rate-o-mat: " . $@);
+			return 0;
+		} elsif (not $res) {
+			diag("rate-o-mat: " . $!);
+			return 0;
+		}
 		return 1;
 	};
 	alarm 0 if defined $timeout;
@@ -126,12 +133,12 @@ sub run_rateomat_threads {
 						diag("timeout for rate-o-mat thread $tid");
 						threads->exit();
 					} if defined $timeout;
-				eval {
-					die($!) if !defined do $rateomat_pl;
-					return 1;
-				};
+				my $res = do $rateomat_pl;
 				if ($@) {
 					diag("rate-o-mat thread $tid: " . $@);
+					return 0;
+				} elsif (not $res) {
+					diag("rate-o-mat thread $tid: " . $!);
 					return 0;
 				}
 				return 1;
