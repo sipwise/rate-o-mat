@@ -2060,7 +2060,8 @@ sub get_unrated_cdrs {
 				and ($cdr->{id} % 4) == 2)
 			);
 		} else {
-			die("Unknown hostname '$nodename'");
+                        push(@cdrs,$cdr);
+			INFO "Unknown hostname '$nodename'";
 		}
 		check_shutdown() and return 0;
 	}
