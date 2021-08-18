@@ -2311,7 +2311,7 @@ sub get_call_cost {
 	DEBUG "calculating call cost for profile_id $profile_id with type $type, direction $direction, ".
 		"src_user_domain $src_user_domain, dst_user_domain $dst_user_domain" unless $ignore_domain;
 
-	if($ignore_domain or get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $dst_user,
+	if($ignore_domain or not get_profile_info($profile_id, $type, $direction, $src_user_domain, $dst_user_domain, $dst_user,
 		$r_profile_info, $cdr->{start_time})) {
 		DEBUG "trying user only for profile_id $profile_id with type $type, direction $direction, ".
 			"src_user_domain $src_user, dst_user_domain $dst_user";
