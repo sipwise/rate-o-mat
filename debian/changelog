@@ -1,3 +1,17 @@
+ngcp-rate-o-mat (10.0.1.0+0~mr10.0.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [1346839] TT#129800 strictly skip rating already processed CDR
+  * [196c68f] TT#122400 strictly use latest prepaid_cost record
+  * [585e52e] TT#133100 proper loop controls when detecting colliding CDRs
+  * [a8778bb] TT#133500 implement cdr id modulo filter
+  * [dd1749e] TT#135050 properly report rate-o-mat failure reason
+  * [4e8f842] TT#133500 support cdr id modulo filter on docker
+  * [75f61ac] TT#134804 option to skip matching full uris
+  * [d9e9071] TT#136900 fix detecting fees not matching
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 24 Aug 2021 16:53:12 +0200
+
 ngcp-rate-o-mat (10.0.0.0+0~mr10.0.0.0) unstable; urgency=medium
 
   [ Manuel Montecelo ]
