@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (9.5.3.0+0~mr9.5.3.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [ea9619d] TT#134804 option to skip matching full uris
+  * [85d0c7b] TT#136900 fix detecting fees not matching
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 21 Sep 2021 16:28:30 +0200
+
 ngcp-rate-o-mat (9.5.2.0+0~mr9.5.2.0) unstable; urgency=medium
 
   * New release.
