@@ -14,7 +14,6 @@ use Time::HiRes qw(); #for debugging info only
 use List::Util qw(shuffle);
 use Storable qw(dclone);
 use JSON::XS qw(encode_json decode_json);
-use Sys::Hostname qw(hostname);
 
 # constants: ###########################################################
 
@@ -68,6 +67,9 @@ my $offnet_anonymous_source_cli_fallback = 1;
 my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
+
+my $hostname_filepath = '/etc/ngcp_hostname';
+$hostname_filepath = $ENV{RATEOMAT_HOSTNAME_FILEPATH} if exists $ENV{RATEOMAT_HOSTNAME_FILEPATH};
 
 #execute contract subscriber locks if fraud limits are exceeded after a call:
 my $apply_fraud_lock = ((defined $ENV{RATEOMAT_FRAUD_LOCK} && $ENV{RATEOMAT_FRAUD_LOCK}) ? int $ENV{RATEOMAT_FRAUD_LOCK} : 0);
@@ -2037,7 +2039,7 @@ sub get_unrated_cdrs {
 
 	my @cdrs = ();
 
-	my $nodename = hostname();
+	my $nodename = get_hostname();
 	#set to undef if corosync reports there is no other working node left:
 	#$nodename = undef
 	
@@ -2910,6 +2912,22 @@ sub copy_cdr_mos_data {
 		$row_count += 1;
 	}
 	return $row_count;
+
+}
+
+sub get_hostname {
+
+    return '' unless length($hostname_filepath);
+
+    my $fh;
+    if (not open($fh, '<', $hostname_filepath)) {
+      FATAL 'cannot open file ' . $hostname_filepath . ': ' . $!;
+    }
+    my @linebuffer = <$fh>;
+    close $fh;
+    my $hostname = $linebuffer[0];
+    chomp $hostname;
+    return $hostname;
 
 }
 
