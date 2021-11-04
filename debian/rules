@@ -9,4 +9,3 @@
 
 override_dh_auto_install:
 	install -m 755 rate-o-mat.pl ngcp-rate-o-mat
-	dh_install
