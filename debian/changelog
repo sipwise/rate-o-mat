@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (9.5.4.0+0~mr9.5.4.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [7fbd5e1] TT#122400 strictly use latest prepaid_cost record
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 Dec 2021 19:30:46 +0100
+
 ngcp-rate-o-mat (9.5.3.0+0~mr9.5.3.0) unstable; urgency=medium
 
   [ Rene Krenn ]
