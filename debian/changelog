@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (7.5.9.2+0~mr7.5.9.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [97d42fa] TT#88600 charge LNP number by type
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 16 Dec 2021 16:16:57 +0100
+
 ngcp-rate-o-mat (7.5.9.1+0~mr7.5.9.1) unstable; urgency=medium
 
   * New release.
