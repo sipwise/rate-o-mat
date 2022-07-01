@@ -3534,7 +3534,7 @@ sub debug_rating_time {
 
 sub _cps_delay {
 	if ($cps_info->{delay} > 0.0) {
-		DEBUG "sleep for ".sprintf("%.3f",$cps_info->{delay})." secs";
+		INFO "Sleeping for ".sprintf("%.3f",$cps_info->{delay})." seconds";
 		Time::HiRes::sleep($cps_info->{delay});
 	}
 }
