@@ -3578,6 +3578,8 @@ sub main {
 
 	my $pidfh;
 
+	INFO "Starting rate-o-mat.\n";
+
 	if ($fork != 0) {
 		$pidfh = daemonize($pidfile);
 	} elsif ($pidfile) {
@@ -3599,6 +3601,7 @@ sub main {
 		exit(0);
 	}
 
+	DEBUG "Init DB on start...\n";
 	init_db or FATAL "Error initializing database handlers\n";
 	my $rated = 0;
 	my $next_del = 10000;
@@ -3612,6 +3615,7 @@ sub main {
 
 		$log_fatal = 1;
 		if ($init) {
+			DEBUG "Init DB in loop...\n";
 			init_db or FATAL "Error initializing database handlers\n";
 		}
 		clear_prepaid_cost_cache();
@@ -3782,6 +3786,7 @@ sub main {
 }
 
 sub close_db {
+	DEBUG "Closing DB connections.\n";
 
 	$sth_get_subscriber_contract_id->finish;
 	$sth_billing_info_network->finish;
