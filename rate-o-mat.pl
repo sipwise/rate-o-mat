@@ -288,7 +288,7 @@ sub connect_billdbh {
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
 	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	INFO "Successfully connected to duplication db...";
+	INFO "Successfully connected to billing db...";
 
 }
 
