@@ -330,7 +330,7 @@ sub connect_dupdbh {
 
 	unless ($DupDB_User) {
 		undef $dupdbh;
-		WARNING "No duplication db credentials, disabled.";
+		INFO "No duplication db credentials, disabled.";
 		return;
 	}
 
