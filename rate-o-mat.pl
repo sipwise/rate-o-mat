@@ -2921,7 +2921,8 @@ sub get_hostname {
 
     my $fh;
     if (not open($fh, '<', $hostname_filepath)) {
-      FATAL 'cannot open file ' . $hostname_filepath . ': ' . $!;
+      DEBUG 'cannot open file ' . $hostname_filepath . ': ' . $!;
+      return '';
     }
     my @linebuffer = <$fh>;
     close $fh;
