@@ -146,7 +146,7 @@ my $cps_info = {
 	t_old => 0.0,
 	dt => 0.0,
 
-	delay => 0.0,
+	delay => $loop_interval,
 	cps => 0.0,
 
 	speedup => 0.02,
