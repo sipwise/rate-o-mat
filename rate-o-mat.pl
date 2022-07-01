@@ -437,7 +437,7 @@ sub init_db {
 	connect_provdbh;
 	connect_acctdbh;
 	connect_dupdbh;
-	
+
 	$sth_get_contract_info = $billdbh->prepare(
 		"SELECT UNIX_TIMESTAMP(c.create_timestamp),".
 		" UNIX_TIMESTAMP(c.modify_timestamp),".
@@ -589,7 +589,7 @@ EOS
 		"SELECT * ".
 		"FROM accounting.cdr WHERE id = ?"
 	) or FATAL "Error preparing get cdr statement: ".$acctdbh->errstr;
-	
+
 	$sth_lock_cdr = $acctdbh->prepare(
 		"SELECT id, rating_status ".
 		"FROM accounting.cdr WHERE id = ? FOR UPDATE"
@@ -846,7 +846,7 @@ EOS
 		$dup_tag_col_model_key,
 		'duplication');
 	}
-	
+
 	foreach (keys %cdr_col_models) {
 		init_cdr_col_model($_);
 	}
@@ -979,15 +979,15 @@ sub prepare_cdr_col_models {
 }
 
 sub lock_cdr {
-	
+
 	my $cdr = shift;
 	my $sth = $sth_lock_cdr;
 	$sth->execute($cdr->{id})
 		or FATAL "Error executing cdr row lock selection statement: ".$sth->errstr;
 	my ($id,$rating_status) = $sth->fetchrow_array;
-	$sth->finish;			 
+	$sth->finish;
 	return $rating_status;
-	
+
 }
 
 sub lock_contracts {
@@ -1895,7 +1895,7 @@ sub get_profile_info {
 			@res = $sth_lnp_profile_info->fetchrow_array();
 			FATAL "Error fetching LNP profile info: ".$sth_lnp_profile_info->errstr
 				if $sth_lnp_profile_info->err;
-			
+
 			unless (@res) {
 				if (length($lnpnumbertype)) {
 					$sth_lnp_profile_info->execute($bpid, $type, $direction, 'lnpnumbertype:'.$lnpnumbertype)
@@ -2010,7 +2010,7 @@ sub get_start_time {
 	if ($cdr->{is_fragmented}) {
 		my $id;
 		while (($id) = get_cdr_col_data($acc_relation_col_model_key,$cdr->{id},
-			   { direction => 'source', provider => 'customer', relation => 'prev_fragment_id' })) {
+				{ direction => 'source', provider => 'customer', relation => 'prev_fragment_id' })) {
 			$sth_get_cdr->execute($id) or FATAL "Error executing get cdr statement: ".$sth_get_cdr->errstr;
 			$cdr = $sth_get_cdr->fetchrow_hashref();
 			WARNING "missing cdr fragment ID $id" unless $cdr;
@@ -2042,7 +2042,7 @@ sub get_unrated_cdrs {
 	my $nodename = get_hostname();
 	#set to undef if corosync reports there is no other working node left:
 	#$nodename = undef
-	
+
 	while (my $cdr = $sth->fetchrow_hashref()) {
 		if (not length($nodename) or $nodename eq 'spce') {
 			push(@cdrs,$cdr);
@@ -2063,7 +2063,7 @@ sub get_unrated_cdrs {
 				and ($cdr->{id} % 4) == 2)
 			);
 		} else {
-                        push(@cdrs,$cdr);
+			push(@cdrs,$cdr);
 			INFO "Unknown hostname '$nodename'";
 		}
 		check_shutdown() and return 0;
@@ -2074,7 +2074,7 @@ sub get_unrated_cdrs {
 	# happened, we have to query $sth->err()
 	die("Error fetching unrated cdr's: ". $sth->errstr) if $sth->err;
 	$sth->finish;
-	
+
 	if ($shuffle_batch) {
 		# if concurrent rate-o-mat instances grab the same cdr batch, there
 		# can be a contention due to waits on same caller/callee contract
@@ -2100,7 +2100,7 @@ sub get_balance_delta_field {
 }
 
 sub get_balance_delta {
-	
+
 	my $cdr = shift;
 	my $bal_id = shift;
 	my $field = shift;
@@ -2119,20 +2119,20 @@ sub get_balance_delta {
 		return $cdr->{balance_delta_old}->{$bal_id}->{$field};
 	}
 	return;
-	
+
 }
 
 sub set_balance_delta {
-	
+
 	my $cdr = shift;
 	my $bal_id = shift;
 	my $field = shift;
 	my $val = shift;
-	
+
 	return unless $val;
 	return unless $bal_id;
 	return unless $field = get_balance_delta_field($field);
-	
+
 	unless ($cdr->{balance_delta}) {
 		$cdr->{balance_delta} = {};
 	}
@@ -2140,11 +2140,11 @@ sub set_balance_delta {
 		$cdr->{balance_delta}->{$bal_id} = {};
 	}
 	$cdr->{balance_delta}->{$bal_id}->{$field} = $val;
-	
+
 }
 
 sub save_balance_delta {
-	
+
 	my $cdr = shift;
 	if ($cdr->{balance_delta}) {
 		my $serialized = encode_json($cdr->{balance_delta});
@@ -2152,7 +2152,7 @@ sub save_balance_delta {
 			{ direction => 'source', provider => 'customer', tag => 'balance_delta' }, $serialized);
 	}
 	return 0;
-	
+
 }
 
 sub update_cdr {
@@ -2225,7 +2225,7 @@ sub update_cdr {
 						$cdr->{duration},
 						$cdr->{source_customer_billing_profile_id},
 						-1.0 * ($cdr->{source_customer_cost_old} || 0.0) + $cdr->{source_customer_cost},
-						-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},                    
+						-1.0 * ($cdr->{source_reseller_cost_old} || 0.0) + $cdr->{source_reseller_cost},
 					) if $cdr->{source_customer_billing_profile_id};
 				}
 				write_cdr_cols($cdr,$dup_cdr_id,
@@ -2323,9 +2323,9 @@ sub get_call_cost {
 
 	my $src_user;
 	if($offnet_anonymous_source_cli_fallback
-	   and $cdr->{source_user_id} eq "0"
-	   and $cdr->{source_cli} =~ /anonymous/i
-	   and $cdr->{source_user} =~ /^[+ 0-9]+$/) {
+		and $cdr->{source_user_id} eq "0"
+		and $cdr->{source_cli} =~ /anonymous/i
+		and $cdr->{source_user} =~ /^[+ 0-9]+$/) {
 		$src_user = $cdr->{source_user};
 	} else {
 		$src_user = $cdr->{source_cli};
@@ -2917,18 +2917,18 @@ sub copy_cdr_mos_data {
 
 sub get_hostname {
 
-    return '' unless length($hostname_filepath);
+	return '' unless length($hostname_filepath);
 
-    my $fh;
-    if (not open($fh, '<', $hostname_filepath)) {
-      DEBUG 'cannot open file ' . $hostname_filepath . ': ' . $!;
-      return '';
-    }
-    my @linebuffer = <$fh>;
-    close $fh;
-    my $hostname = $linebuffer[0];
-    chomp $hostname;
-    return $hostname;
+	my $fh;
+	if (not open($fh, '<', $hostname_filepath)) {
+	  DEBUG 'cannot open file ' . $hostname_filepath . ': ' . $!;
+	  return '';
+	}
+	my @linebuffer = <$fh>;
+	close $fh;
+	my $hostname = $linebuffer[0];
+	chomp $hostname;
+	return $hostname;
 
 }
 
@@ -3161,7 +3161,7 @@ sub rate_cdr {
 	my $destination_customer_free_time = 0;
 	my $destination_carrier_free_time = 0;
 	my $destination_reseller_free_time = 0;
-	
+
 	$cdr->{source_user_id} = '0' if lc($cdr->{source_user_id}) eq '<null>';
 	$cdr->{destination_user_id} = '0' if lc($cdr->{destination_user_id}) eq '<null>';
 
@@ -3441,7 +3441,7 @@ RATING_DURATION_FOUND:
 			$cdr->{duration} = $rating_duration;
 		}
 	}
-	
+
 	$cdr->{source_carrier_cost} = $source_carrier_cost;
 	$cdr->{source_reseller_cost_old} = $cdr->{source_reseller_cost};
 	$cdr->{source_reseller_cost} = $source_reseller_cost;
@@ -3538,6 +3538,7 @@ sub _cps_delay {
 		Time::HiRes::sleep($cps_info->{delay});
 	}
 }
+
 sub _update_cps {
 	my $num_of_cdrs = shift;
 
@@ -3574,7 +3575,7 @@ sub _update_cps {
 }
 
 sub main {
-	
+
 	my $pidfh;
 
 	if ($fork != 0) {
@@ -3655,7 +3656,7 @@ sub main {
 					$t = Time::HiRes::time();
 					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
-					begin_transaction($acctdbh);					
+					begin_transaction($acctdbh);
 					if ('unrated' ne lock_cdr($cdr)) {
 						commit_transaction($acctdbh);
 						check_shutdown() and last BATCH;
@@ -3767,7 +3768,7 @@ sub main {
 			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
 		}
-		
+
 		close_db();
 		$init = 1;
 
@@ -3843,5 +3844,5 @@ sub close_db {
 	$acctdbh->disconnect;
 	$provdbh and $provdbh->disconnect;
 	$dupdbh and $dupdbh->disconnect;
-	
+
 }
