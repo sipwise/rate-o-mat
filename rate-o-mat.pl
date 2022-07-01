@@ -3578,6 +3578,11 @@ sub main {
 
 	my $pidfh;
 
+	# Without autoflush logs are buffered due to
+	# journald which is buffering Perl STDOUT
+	# (STDERR flushed immediately which confusing)
+	select->autoflush(1);
+
 	INFO "Starting rate-o-mat.\n";
 
 	if ($fork != 0) {
