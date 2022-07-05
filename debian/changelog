@@ -1,3 +1,13 @@
+ngcp-rate-o-mat (10.5.1.2+0~mr10.5.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [f17e8e3] TT#139151 use hostname from /etc/ngcp_hostname
+
+  [ Mykola Malkov ]
+  * [79ec787] TT#139151 Do not fail on missing ngcp_hostname file
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 05 Jul 2022 10:37:54 +0200
+
 ngcp-rate-o-mat (10.5.1.1+0~mr10.5.1.1) unstable; urgency=medium
 
   * New release.
