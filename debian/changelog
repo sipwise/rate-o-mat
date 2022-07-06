@@ -1,3 +1,18 @@
+ngcp-rate-o-mat (10.5.1.3+0~mr10.5.1.3) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [f7be6f1] TT#182706 Fix initial rate-o-mat sleeping intervals on start
+  * [4007a9b] TT#182706 Print proper info message on billing DB connect
+  * [44887fb] TT#182706 Use tabs and remove trailing space from rate-o-mat.pl
+  * [ff7685c] TT#182706 Add more debug messages to trace DB reconnection
+  * [6cc5dad] TT#182706 Switch duplication DB warning to info
+  * [1a1be2c] TT#182706 Switch sleep duration information from DEBUG to INFO
+
+  [ Richard Fuchs ]
+  * [4952272] TT#183265 Autoflush all log messages
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 06 Jul 2022 10:16:35 +0200
+
 ngcp-rate-o-mat (10.5.1.2+0~mr10.5.1.2) unstable; urgency=medium
 
   [ Rene Krenn ]
