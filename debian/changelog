@@ -1,3 +1,24 @@
+ngcp-rate-o-mat (10.5.2.1+0~mr10.5.2.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [b3e4caf] TT#139151 use hostname from /etc/ngcp_hostname
+
+  [ Mykola Malkov ]
+  * [68b4e30] TT#139151 Do not fail on missing ngcp_hostname file
+
+  [ Alexander Lutay ]
+  * [24de9a2] TT#182706 Fix initial rate-o-mat sleeping intervals on start
+  * [f134667] TT#182706 Print proper info message on billing DB connect
+  * [9e740fd] TT#182706 Use tabs and remove trailing space from rate-o-mat.pl
+  * [563dd86] TT#182706 Add more debug messages to trace DB reconnection
+  * [eb971b3] TT#182706 Switch duplication DB warning to info
+  * [902f65e] TT#182706 Switch sleep duration information from DEBUG to INFO
+
+  [ Richard Fuchs ]
+  * [7b7bd84] TT#183265 Autoflush all log messages
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Sep 2022 14:37:43 +0200
+
 ngcp-rate-o-mat (10.5.2.0+0~mr10.5.2.0) unstable; urgency=medium
 
   * New release.
