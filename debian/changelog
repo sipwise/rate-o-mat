@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (9.5.5.2+0~mr9.5.5.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [8e63680] TT#190250 switch replication binlog_format
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 17 Oct 2022 17:04:36 +0200
+
 ngcp-rate-o-mat (9.5.5.1+0~mr9.5.5.1) unstable; urgency=medium
 
   * New release.
