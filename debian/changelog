@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (8.5.9.3+0~mr8.5.9.3) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [7eb2ecf] TT#190250 do not fail with when setting binlog_format
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 20 Oct 2022 14:15:41 +0200
+
 ngcp-rate-o-mat (8.5.9.2+0~mr8.5.9.2) unstable; urgency=medium
 
   [ Rene Krenn ]
