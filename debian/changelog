@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (11.0.1.2+0~mr11.0.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [6656b81] TT#190250 switch replication binlog_format
+  * [e38844f] TT#190250 do not fail with when setting binlog_format
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 20 Oct 2022 14:16:32 +0200
+
 ngcp-rate-o-mat (11.0.1.1+0~mr11.0.1.1) unstable; urgency=medium
 
   * New release.
