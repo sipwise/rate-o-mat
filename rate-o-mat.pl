@@ -71,6 +71,8 @@ my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 my $hostname_filepath = '/etc/ngcp_hostname';
 $hostname_filepath = $ENV{RATEOMAT_HOSTNAME_FILEPATH} if exists $ENV{RATEOMAT_HOSTNAME_FILEPATH};
 
+my $multi_master = ((defined $ENV{RATEOMAT_MUTLI_MASTER} && $ENV{RATEOMAT_MUTLI_MASTER}) ? int $ENV{RATEOMAT_MUTLI_MASTER} : 0);
+
 #execute contract subscriber locks if fraud limits are exceeded after a call:
 my $apply_fraud_lock = ((defined $ENV{RATEOMAT_FRAUD_LOCK} && $ENV{RATEOMAT_FRAUD_LOCK}) ? int $ENV{RATEOMAT_FRAUD_LOCK} : 0);
 
@@ -288,7 +290,7 @@ sub connect_billdbh {
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
 	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	#$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to billing db...";
 
 }
@@ -303,7 +305,7 @@ sub connect_acctdbh {
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
 	$acctdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	#$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to accounting db...";
 
 }
@@ -324,7 +326,7 @@ sub connect_provdbh {
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($provdbh);
 	$provdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	$provdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	#$provdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to provisioning db...";
 
 }
@@ -345,7 +347,7 @@ sub connect_dupdbh {
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($dupdbh);
 	$dupdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	$dupdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	#$dupdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to duplication db...";
 
 }
@@ -716,13 +718,13 @@ EOS
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance = $billdbh->prepare(
-		"INSERT IGNORE INTO billing.contract_balances (".
+		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, initial_cash_balance, cash_balance_interval, free_time_balance, initial_free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
 		") VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_infinite_future = $billdbh->prepare(
-		"INSERT IGNORE INTO billing.contract_balances (".
+		"INSERT INTO billing.contract_balances (".
 		" contract_id, cash_balance, initial_cash_balance, cash_balance_interval, free_time_balance, initial_free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
 		") VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
@@ -801,7 +803,7 @@ EOS
 			"SELECT id,value FROM provisioning.voip_usr_preferences WHERE attribute_id = ? AND subscriber_id = ?"
 		) or FATAL "Error preparing get usr preference value statement: ".$provdbh->errstr;
 		$sth_create_usr_preference_value = $provdbh->prepare(
-			"INSERT IGNORE INTO provisioning.voip_usr_preferences (subscriber_id, attribute_id, value) VALUES (?, ?, ?)"
+			"INSERT INTO provisioning.voip_usr_preferences (subscriber_id, attribute_id, value) VALUES (?, ?, ?)"
 		) or FATAL "Error preparing create usr preference value statement: ".$provdbh->errstr;
 		$sth_update_usr_preference_value = $provdbh->prepare(
 			"UPDATE provisioning.voip_usr_preferences SET value = ? WHERE id = ?"
@@ -2048,7 +2050,7 @@ sub get_unrated_cdrs {
 	#$nodename = undef
 
 	while (my $cdr = $sth->fetchrow_hashref()) {
-		if (not length($nodename) or $nodename eq 'spce') {
+		if (not $multi_master or not length($nodename) or $nodename eq 'spce') {
 			push(@cdrs,$cdr);
 		} elsif (substr($nodename,-1,1) eq '1' or substr($nodename,-1,1) eq 'a') {
 			push(@cdrs,$cdr) if (
@@ -3676,7 +3678,7 @@ sub main {
 						next CDR;
 					}
 					# required to avoid contract_balances duplications during catchup:
-					begin_transaction($billdbh); #,'READ COMMITTED');
+					begin_transaction($billdbh,'READ COMMITTED');
 					# row locks are released upon commit/rollback and have to cover
 					# the whole transaction. thus locking contract rows for preventing
 					# concurrent catchups will be our very first SQL statement in the
