@@ -2248,6 +2248,9 @@ sub update_cdr {
 
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
 					{ direction => 'destination', provider => 'customer', tag => 'header=Diversion' });
+				
+				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
+					{ direction => 'destination', provider => 'customer', tag => 'hg_ext_response' });
 
 				copy_cdr_mos_data($cdr,$cdr->{id},$dup_cdr_id);
 
