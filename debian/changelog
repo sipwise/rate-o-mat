@@ -1,3 +1,16 @@
+ngcp-rate-o-mat (8.5.11.0+0~mr8.5.11.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [5f7bb3a] TT#182706 Switch duplication DB warning to info
+
+  [ Rene Krenn ]
+  * [7c1fcd2] TT#190250 switch replication binlog_format
+  * [34cb069] TT#190250 do not fail with when setting binlog_format
+  * [f3ed7f0] Revert "TT#190250 do not fail with when setting binlog_format"
+  * [fd89bf4] Revert "TT#190250 switch replication binlog_format"
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 29 Nov 2022 16:41:09 +0100
+
 ngcp-rate-o-mat (8.5.10.0+0~mr8.5.10.0) unstable; urgency=medium
 
   * New release.
