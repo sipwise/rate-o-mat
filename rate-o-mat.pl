@@ -2055,18 +2055,18 @@ sub get_unrated_cdrs {
 		} elsif (substr($nodename,-1,1) eq '1' or substr($nodename,-1,1) eq 'a') {
 			push(@cdrs,$cdr) if (
 				(($cdr->{id} % 2) == 1
-				and ($cdr->{id} % 4) == 1)
-				or
-				(($cdr->{id} % 2) == 0
-				and ($cdr->{id} % 4) == 0)
-			);
-		} elsif (substr($nodename,-1,1) eq '2' or substr($nodename,-1,1) eq 'b') {
-			push(@cdrs,$cdr) if (
-				(($cdr->{id} % 2) == 1
 				and ($cdr->{id} % 4) == 3)
 				or
 				(($cdr->{id} % 2) == 0
 				and ($cdr->{id} % 4) == 2)
+			);
+		} elsif (substr($nodename,-1,1) eq '2' or substr($nodename,-1,1) eq 'b') {
+			push(@cdrs,$cdr) if (
+				(($cdr->{id} % 2) == 1
+				and ($cdr->{id} % 4) == 1)
+				or
+				(($cdr->{id} % 2) == 0
+				and ($cdr->{id} % 4) == 0)
 			);
 		} else {
 			push(@cdrs,$cdr);
@@ -2248,7 +2248,7 @@ sub update_cdr {
 
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
 					{ direction => 'destination', provider => 'customer', tag => 'header=Diversion' });
-				
+
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
 					{ direction => 'destination', provider => 'customer', tag => 'hg_ext_response' });
 
