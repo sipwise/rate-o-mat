@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (10.5.3.1+0~mr10.5.3.1) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [1fbfd50] TT#190250 switch replication binlog_format
+  * [2a4302c] TT#190250 do not fail with when setting binlog_format
+  * [6b996f5] MT#55808 option to disable active-active mode of rate-o-mat
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 22 Dec 2022 16:21:15 +0100
+
 ngcp-rate-o-mat (10.5.3.0+0~mr10.5.3.0) unstable; urgency=medium
 
   [ Rene Krenn ]
