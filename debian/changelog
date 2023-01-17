@@ -1,3 +1,14 @@
+ngcp-rate-o-mat (11.2.1.0+0~mr11.2.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [cf6b9b7] TT#190250 switch replication binlog_format
+  * [1f24f79] TT#190250 do not fail with when setting binlog_format
+  * [9b7f321] MT#55808 option to disable active-active mode of rate-o-mat
+  * [c884ef4] MT#56060 duplicate 'hg_ext_response' tagdata to central db
+  * [fe25170] MT#56123 swap nodeA<->nodeB ID modulus/offsets
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 17 Jan 2023 17:44:43 +0100
+
 ngcp-rate-o-mat (11.2.0.0+0~mr11.2.0.0) unstable; urgency=medium
 
   * New release.
