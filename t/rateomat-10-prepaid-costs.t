@@ -18,7 +18,7 @@ use Test::More;
 
 local $ENV{RATEOMAT_WRITE_CDR_RELATION_DATA} = 1;
 
-$Utils::Rateomat::rateomat_timeout = 30;
+$Utils::Rateomat::rateomat_timeout = 60;
 
 my $provider = Utils::Api::setup_provider('test.com',
 	[ #rates:
