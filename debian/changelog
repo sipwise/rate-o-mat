@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (11.4.0.0+0~mr11.4.0.0) unstable; urgency=medium
+
+  [ Michael Prokop ]
+  * [4603ce2] MT#56958 tests: increase timeout for prepaid-costs
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 24 Mar 2023 13:05:14 +0100
+
 ngcp-rate-o-mat (11.3.0.0+0~mr11.3.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
