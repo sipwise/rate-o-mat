@@ -2247,6 +2247,9 @@ sub update_cdr {
 					{ direction => 'source', provider => 'customer', tag => 'header=P-Asserted-Identity' });
 
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
+					{ direction => 'source', provider => 'customer', tag => 'header=P-Preferred-Identity' });
+
+				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
 					{ direction => 'destination', provider => 'customer', tag => 'header=Diversion' });
 
 				copy_cdr_col_data($acc_tag_col_model_key,$dup_tag_col_model_key,$cdr,$cdr->{id},$dup_cdr_id,
