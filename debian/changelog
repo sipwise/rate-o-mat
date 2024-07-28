@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (12.5.1.0+0~mr12.5.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [c529f65] MT#59993 duplicate P-Preferred-Identity header tag value
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 28 Jul 2024 12:04:09 +0200
+
 ngcp-rate-o-mat (12.5.0.0+0~mr12.5.0.0) unstable; urgency=medium
 
   * New release.
