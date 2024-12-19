@@ -289,8 +289,8 @@ sub connect_billdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
+	$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	#$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to billing db...";
 
 }
@@ -304,8 +304,8 @@ sub connect_acctdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
+	$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	$acctdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	#$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to accounting db...";
 
 }
@@ -325,8 +325,8 @@ sub connect_provdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($provdbh);
+	$provdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	$provdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	#$provdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to provisioning db...";
 
 }
@@ -346,8 +346,8 @@ sub connect_dupdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($dupdbh);
+	$dupdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	$dupdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
-	#$dupdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	INFO "Successfully connected to duplication db...";
 
 }
