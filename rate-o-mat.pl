@@ -591,7 +591,7 @@ EOS
 	$sth_unrated_cdrs = $acctdbh->prepare(
 		"SELECT * ".
 		"FROM accounting.cdr WHERE rating_status = 'unrated' ".
-		"ORDER BY start_time ASC LIMIT " . $batch_size
+		"AND id > ? ORDER BY start_time ASC LIMIT " . $batch_size
 	) or FATAL "Error preparing unrated cdr statement: ".$acctdbh->errstr;
 
 	$sth_get_cdr = $acctdbh->prepare(
@@ -2042,12 +2042,15 @@ sub check_shutdown {
 
 sub get_unrated_cdrs {
 	my $r_cdrs = shift;
+	my $r_last_cdr_id = shift;
 
 	my @cdrs;
 	my $nodename;
 
 	my $sth = $sth_unrated_cdrs;
-	$sth->execute or die("Error executing unrated cdr statement: ".$sth->errstr);
+
+FETCH_CDRS:	
+	$sth->execute($$r_last_cdr_id) or die("Error executing unrated cdr statement: ".$sth->errstr);
 
 	@cdrs = ();
 	$nodename = get_hostname();
@@ -2080,6 +2083,7 @@ sub get_unrated_cdrs {
 		}
 		check_shutdown() and return 0;
 		$cnt++;
+		$$r_last_cdr_id = $cdr->{id};
 	}
 
 	# the while above may have been interrupted because there is no
@@ -2089,7 +2093,7 @@ sub get_unrated_cdrs {
 	$sth->finish;
 
 	if ($cnt > 0 and (scalar @cdrs) == 0) {
-
+		goto FETCH_CDRS;
 	}
 
 	if ($shuffle_batch) {
@@ -3632,6 +3636,7 @@ sub main {
 	my $next_del = 10000;
 	my %failed_counter_map = ();
 	my $init = 0;
+	my $last_cdr_id = 0;
 
 	INFO "Up and running.\n";
 	notify_send("READY=1\n");
@@ -3649,7 +3654,7 @@ sub main {
 		my @cdrs = ();
 		if ($billdbh && $acctdbh && $provdbh) {
 			eval {
-				get_unrated_cdrs(\@cdrs);
+				get_unrated_cdrs(\@cdrs,\$last_cdr_id);
 				INFO "Grabbed ".(scalar @cdrs)." CDRs" if (scalar @cdrs) > 0;
 			};
 			$error = $@;
