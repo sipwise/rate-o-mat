@@ -289,7 +289,9 @@ sub connect_billdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
-	$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	if ($multi_master) {
+		$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	}
 	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to billing db...";
 
@@ -304,7 +306,9 @@ sub connect_acctdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
-	$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	if ($multi_master) {
+		$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+	}
 	$acctdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to accounting db...";
 
@@ -325,7 +329,6 @@ sub connect_provdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($provdbh);
-	$provdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
 	$provdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to provisioning db...";
 
@@ -2040,15 +2043,18 @@ sub check_shutdown {
 sub get_unrated_cdrs {
 	my $r_cdrs = shift;
 
+	my @cdrs;
+	my $nodename;
+
 	my $sth = $sth_unrated_cdrs;
 	$sth->execute or die("Error executing unrated cdr statement: ".$sth->errstr);
 
-	my @cdrs = ();
-
-	my $nodename = get_hostname();
+	@cdrs = ();
+	$nodename = get_hostname();
 	#set to undef if corosync reports there is no other working node left:
-	#$nodename = undef
+	#$nodename = undef;
 
+    my $cnt = 0;
 	while (my $cdr = $sth->fetchrow_hashref()) {
 		if (not $multi_master or not length($nodename) or $nodename eq 'spce') {
 			push(@cdrs,$cdr);
@@ -2073,6 +2079,7 @@ sub get_unrated_cdrs {
 			INFO "Unknown hostname '$nodename'";
 		}
 		check_shutdown() and return 0;
+		$cnt++;
 	}
 
 	# the while above may have been interrupted because there is no
@@ -2080,6 +2087,10 @@ sub get_unrated_cdrs {
 	# happened, we have to query $sth->err()
 	die("Error fetching unrated cdr's: ". $sth->errstr) if $sth->err;
 	$sth->finish;
+
+	if ($cnt > 0 and (scalar @cdrs) == 0) {
+
+	}
 
 	if ($shuffle_batch) {
 		# if concurrent rate-o-mat instances grab the same cdr batch, there
@@ -3681,7 +3692,11 @@ sub main {
 						next CDR;
 					}
 					# required to avoid contract_balances duplications during catchup:
-					begin_transaction($billdbh,'READ COMMITTED');
+					if ($multi_master) {
+						begin_transaction($billdbh);
+					} else {
+						begin_transaction($billdbh, 'READ COMMITTED');
+					}
 					# row locks are released upon commit/rollback and have to cover
 					# the whole transaction. thus locking contract rows for preventing
 					# concurrent catchups will be our very first SQL statement in the
