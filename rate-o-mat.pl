@@ -72,6 +72,7 @@ my $hostname_filepath = '/etc/ngcp_hostname';
 $hostname_filepath = $ENV{RATEOMAT_HOSTNAME_FILEPATH} if exists $ENV{RATEOMAT_HOSTNAME_FILEPATH};
 
 my $multi_master = ((defined $ENV{RATEOMAT_MUTLI_MASTER} && $ENV{RATEOMAT_MUTLI_MASTER}) ? int $ENV{RATEOMAT_MUTLI_MASTER} : 0);
+my $multi_master_stall = 1; # idle if other node repl is stopped
 
 #execute contract subscriber locks if fraud limits are exceeded after a call:
 my $apply_fraud_lock = ((defined $ENV{RATEOMAT_FRAUD_LOCK} && $ENV{RATEOMAT_FRAUD_LOCK}) ? int $ENV{RATEOMAT_FRAUD_LOCK} : 0);
@@ -721,13 +722,13 @@ EOS
 	) or FATAL "Error preparing get contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance = $billdbh->prepare(
-		"INSERT INTO billing.contract_balances (".
+		"INSERT IGNORE INTO billing.contract_balances (".
 		" contract_id, cash_balance, initial_cash_balance, cash_balance_interval, free_time_balance, initial_free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
 		") VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), FROM_UNIXTIME(?))"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
 
 	$sth_new_cbalance_infinite_future = $billdbh->prepare(
-		"INSERT INTO billing.contract_balances (".
+		"INSERT IGNORE INTO billing.contract_balances (".
 		" contract_id, cash_balance, initial_cash_balance, cash_balance_interval, free_time_balance, initial_free_time_balance, free_time_balance_interval, underrun_profiles, underrun_lock, start, end".
 		") VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 0, NULL, FROM_UNIXTIME(?)), IF(? = 0, NULL, FROM_UNIXTIME(?)), FROM_UNIXTIME(?), '9999-12-31 23:59:59')"
 	) or FATAL "Error preparing create contract balance statement: ".$billdbh->errstr;
@@ -1522,6 +1523,7 @@ sub catchup_contract_balance {
 		$carry_over_mode = "carry_over";
 	}
 
+RESTART_BALANCE_CATCHUP:
 	$sth = $sth_get_last_cbalance;
 	$sth->execute($contract_id) or FATAL "Error executing get latest contract balance statement: ".$sth->errstr;
 	my ($last_id,$last_start,$last_end,$last_cash_balance,$last_cash_balance_int,$last_free_balance,$last_free_balance_int,$last_topups,$last_timely_topups) = $sth->fetchrow_array();
@@ -1654,8 +1656,12 @@ PREPARE_BALANCE_CATCHUP:
 			($last_cash_balance) x 2,$last_cash_balance_int,($last_free_balance) x 2,$last_free_balance_int,
 			((defined $underrun_profiles_time ? $underrun_profiles_time : 0)) x 2,((defined $underrun_lock_time ? $underrun_lock_time : 0)) x 2,$stime);
 		push(@bind_parms,$etime) if defined $etime;
-		$sth->execute(@bind_parms)
-			or FATAL "Error executing new contract balance statement: ".$sth->errstr;
+		unless ($sth->execute(@bind_parms)
+			or FATAL "Error executing new contract balance statement: ".$sth->errstr) {
+			$sth->finish;
+			DEBUG "cash balance record was modified meanwhile, starting over";
+            goto RESTART_BALANCE_CATCHUP;
+		}
 		$sth->finish;
 		$balances_count++;
 
@@ -2050,7 +2056,7 @@ sub get_unrated_cdrs {
 	my $sth = $sth_unrated_cdrs;
 
 FETCH_CDRS:	
-	$sth->execute($$r_last_cdr_id) or die("Error executing unrated cdr statement: ".$sth->errstr);
+	$sth->execute($multi_master_stall ? 0 : $$r_last_cdr_id) or die("Error executing unrated cdr statement: ".$sth->errstr);
 
 	@cdrs = ();
 	$nodename = get_hostname();
@@ -2092,7 +2098,7 @@ FETCH_CDRS:
 	die("Error fetching unrated cdr's: ". $sth->errstr) if $sth->err;
 	$sth->finish;
 
-	if ($cnt > 0 and (scalar @cdrs) == 0) {
+	if ((not $multi_master_stall) and $cnt > 0 and (scalar @cdrs) == 0) {
 		goto FETCH_CDRS;
 	}
 
