@@ -735,29 +735,29 @@ EOS
 
 	$sth_update_cbalance_w_underrun_profiles_lock = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
-		"cash_balance = ?, cash_balance_interval = ?, ".
-		"free_time_balance = ?, free_time_balance_interval = ?, underrun_profiles = FROM_UNIXTIME(?), underrun_lock = FROM_UNIXTIME(?) ".
+		"cash_balance = cash_balance + ?, cash_balance_interval = cash_balance_interval + ?, ".
+		"free_time_balance = free_time_balance + ?, free_time_balance_interval = free_time_balance_interval + ?, underrun_profiles = FROM_UNIXTIME(?), underrun_lock = FROM_UNIXTIME(?) ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance_w_underrun_lock = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
-		"cash_balance = ?, cash_balance_interval = ?, ".
-		"free_time_balance = ?, free_time_balance_interval = ?, underrun_lock = FROM_UNIXTIME(?) ".
+		"cash_balance = cash_balance + ?, cash_balance_interval = cash_balance_interval + ?, ".
+		"free_time_balance = free_time_balance + ?, free_time_balance_interval = free_time_balance_interval + ?, underrun_lock = FROM_UNIXTIME(?) ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance_w_underrun_profiles = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
-		"cash_balance = ?, cash_balance_interval = ?, ".
-		"free_time_balance = ?, free_time_balance_interval = ?, underrun_profiles = FROM_UNIXTIME(?) ".
+		"cash_balance = cash_balance + ?, cash_balance_interval = cash_balance_interval + ?, ".
+		"free_time_balance = free_time_balance + ?, free_time_balance_interval = free_time_balance_interval + ?, underrun_profiles = FROM_UNIXTIME(?) ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
 	$sth_update_cbalance = $billdbh->prepare(
 		"UPDATE billing.contract_balances SET ".
-		"cash_balance = ?, cash_balance_interval = ?, ".
-		"free_time_balance = ?, free_time_balance_interval = ? ".
+		"cash_balance = cash_balance + ?, cash_balance_interval = cash_balance_interval + ?, ".
+		"free_time_balance = free_time_balance + ?, free_time_balance_interval = free_time_balance_interval + ? ".
 		"WHERE id = ?"
 	) or FATAL "Error preparing update contract balance statement: ".$billdbh->errstr;
 
@@ -1659,7 +1659,7 @@ PREPARE_BALANCE_CATCHUP:
 		unless ($sth->execute(@bind_parms)
 			or FATAL "Error executing new contract balance statement: ".$sth->errstr) {
 			$sth->finish;
-			DEBUG "cash balance record was modified meanwhile, starting over";
+			INFO "cash balance record ($contract_id, $stime) was created elsewhere, starting over";
             goto RESTART_BALANCE_CATCHUP;
 		}
 		$sth->finish;
@@ -1795,8 +1795,10 @@ sub update_contract_balance {
 
 	for my $bal (@$r_balances) {
 		my @bind_parms = (
-				$bal->{cash_balance}, $bal->{cash_balance_interval},
-				$bal->{free_time_balance}, $bal->{free_time_balance_interval});
+				($bal->{cash_balance} // 0.0) - ($bal->{cash_balance_old} // 0.0),
+				$bal->{cash_balance_interval} - $bal->{cash_balance_interval_old},
+				($bal->{free_time_balance} // 0) - ($bal->{free_time_balance_old} // 0),
+				$bal->{free_time_balance_interval} - $bal->{free_time_balance_interval_old});
 		my $sth;
 		if (defined $bal->{underrun_profile_time} && defined $bal->{underrun_lock_time}) {
 			push(@bind_parms,$bal->{underrun_profile_time});
