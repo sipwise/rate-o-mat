@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (10.5.8.3+0~mr10.5.8.3) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [f43d2d0] MT#61966 update contract balances by delta
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 27 Jan 2025 14:08:48 +0100
+
 ngcp-rate-o-mat (10.5.8.2+0~mr10.5.8.2) unstable; urgency=medium
 
   [ Rene Krenn ]
