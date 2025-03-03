@@ -1021,17 +1021,17 @@ sub lock_contracts {
 	my $pcid_count = scalar @pcids;
 	my $sth = undef;
 	my %lock_cids = ();
-	if ($pcid_count > 0) {
-		$sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
-			"WHERE c.id IN (" . substr(',?' x $pcid_count,1) . ")")
-			 or FATAL "Error preparing contract row lock selection statement: ".$billdbh->errstr;
-		$sth->execute(@pcids)
-			 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
-		while (my @res = $sth->fetchrow_array) {
-			$lock_cids{$res[0]} = 1;
-		}
-		$sth->finish;
-	}
+	#if ($pcid_count > 0) {
+	#	$sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
+	#		"WHERE c.id IN (" . substr(',?' x $pcid_count,1) . ")")
+	#		 or FATAL "Error preparing contract row lock selection statement: ".$billdbh->errstr;
+	#	$sth->execute(@pcids)
+	#		 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
+	#	while (my @res = $sth->fetchrow_array) {
+	#		$lock_cids{$res[0]} = 1;
+	#	}
+	#	$sth->finish;
+	#}
 	my %user_ids = ();
 	# callee subscriber contract:
 	WARNING "empty source_user_id for CDR ID $cdr->{id}" unless length($cdr->{source_user_id}) > 0;
@@ -1055,7 +1055,8 @@ sub lock_contracts {
 	}
 	my @cids = keys %lock_cids;
 	my $lock_count = scalar @cids;
-	if ($lock_count > 0) {
+	if ($pcid_count > 0 or $lock_count > 0) {
+		push(@cids,@pcids);
 		@cids = sort { $a <=> $b } @cids; #"Access your tables and rows in a fixed order."
 		my $sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
 			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ") FOR UPDATE")
