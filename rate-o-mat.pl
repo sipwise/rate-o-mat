@@ -68,6 +68,8 @@ my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
+my $lock_timeout = 5;
+
 my $hostname_filepath = '/etc/ngcp_hostname';
 $hostname_filepath = $ENV{RATEOMAT_HOSTNAME_FILEPATH} if exists $ENV{RATEOMAT_HOSTNAME_FILEPATH};
 
@@ -1057,9 +1059,10 @@ sub lock_contracts {
 	my $lock_count = scalar @cids;
 	if ($pcid_count > 0 or $lock_count > 0) {
 		push(@cids,@pcids);
+		$lock_count = scalar @cids;
 		@cids = sort { $a <=> $b } @cids; #"Access your tables and rows in a fixed order."
 		my $sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
-			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ") FOR UPDATE")
+			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ") FOR UPDATE WAIT $lock_timeout")
 			 or FATAL "Error preparing contract row lock statement: ".$billdbh->errstr;
 		#finally lock the contract rows at this point:
 		$sth->execute(@cids)
