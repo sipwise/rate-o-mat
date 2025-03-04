@@ -1,3 +1,14 @@
+ngcp-rate-o-mat (11.5.1.2+0~mr11.5.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [5e1229c] MT#61793 enable session binlog_format
+  * [96dfcaa] MT#61793 disable READ COMMITTED with stmt based repl
+  * [1cffab6] MT#61793 prevent stall in multimaster mode if repl is broken
+  * [2d8bc2d] MT#61793 restart balance catchup if modified by replication
+  * [f0cf7ec] MT#61966 update contract balances by delta
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 04 Mar 2025 12:44:55 +0100
+
 ngcp-rate-o-mat (11.5.1.1+0~mr11.5.1.1) unstable; urgency=medium
 
   * New release.
