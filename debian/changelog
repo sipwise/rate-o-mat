@@ -1,3 +1,11 @@
+ngcp-rate-o-mat (13.3.1.0+0~mr13.3.1.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [7b71efc] MT#62283 contract id lock order over both system and customer contracts
+  * [2bd44da] MT#62283 explicit contract id row lock timeout
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 10 Apr 2025 08:29:26 +0200
+
 ngcp-rate-o-mat (13.3.0.0+0~mr13.3.0.0) unstable; urgency=medium
 
   [ Rene Krenn ]
