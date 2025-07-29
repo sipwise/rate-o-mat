@@ -1,3 +1,20 @@
+ngcp-rate-o-mat (10.5.10.0+0~mr10.5.10.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [d8e1f98] MT#56060 duplicate 'hg_ext_response' tagdata to central db
+  * [2b52d00] MT#56123 swap nodeA<->nodeB ID modulus/offsets
+  * [64dec70] MT#59993 duplicate P-Preferred-Identity header tag value
+  * [e82eb3f] MT#61793 enable session binlog_format
+  * [8660132] MT#61793 disable READ COMMITTED with stmt based repl
+  * [0a9e0de] MT#61793 prevent stall in multimaster mode if repl is broken
+  * [671445e] MT#61793 restart balance catchup if modified by replication
+  * [a8f61fe] MT#61966 update contract balances by delta
+
+  [ Michael Prokop ]
+  * [d96d72e] MT#56958 tests: increase timeout for prepaid-costs
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 29 Jul 2025 11:33:10 +0200
+
 ngcp-rate-o-mat (10.5.9.0+0~mr10.5.9.0) unstable; urgency=medium
 
   * New release.
