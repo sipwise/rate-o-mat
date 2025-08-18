@@ -1800,9 +1800,9 @@ sub update_contract_balance {
 	for my $bal (@$r_balances) {
 		my @bind_parms = (
 				($bal->{cash_balance} // 0.0) - ($bal->{cash_balance_old} // 0.0),
-				$bal->{cash_balance_interval} - $bal->{cash_balance_interval_old},
+				($bal->{cash_balance_interval} // 0.0) - ($bal->{cash_balance_interval_old} // 0.0),
 				($bal->{free_time_balance} // 0) - ($bal->{free_time_balance_old} // 0),
-				$bal->{free_time_balance_interval} - $bal->{free_time_balance_interval_old});
+				($bal->{free_time_balance_interval} // 0.0) - ($bal->{free_time_balance_interval_old} // 0.0));
 		my $sth;
 		if (defined $bal->{underrun_profile_time} && defined $bal->{underrun_lock_time}) {
 			push(@bind_parms,$bal->{underrun_profile_time});
@@ -1822,9 +1822,9 @@ sub update_contract_balance {
 		$sth->finish;
 		$changed++;
 		set_balance_delta($cdr, $bal->{id}, "cash_balance", ($bal->{cash_balance} // 0.0) - ($bal->{cash_balance_old} // 0.0));
-		set_balance_delta($cdr, $bal->{id}, "cash_balance_interval", $bal->{cash_balance_interval} - $bal->{cash_balance_interval_old});
+		set_balance_delta($cdr, $bal->{id}, "cash_balance_interval", ($bal->{cash_balance_interval} // 0.0) - ($bal->{cash_balance_interval_old} // 0.0));
 		set_balance_delta($cdr, $bal->{id}, "free_time_balance", ($bal->{free_time_balance} // 0) - ($bal->{free_time_balance_old} // 0));
-		set_balance_delta($cdr, $bal->{id}, "free_time_balance_interval", $bal->{free_time_balance_interval} - $bal->{free_time_balance_interval_old});
+		set_balance_delta($cdr, $bal->{id}, "free_time_balance_interval", ($bal->{free_time_balance_interval} // 0.0) - ($bal->{free_time_balance_interval_old} // 0.0));
 	}
 
 	DEBUG $changed . " contract balance row(s) updated";
