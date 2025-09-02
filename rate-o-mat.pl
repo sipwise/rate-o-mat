@@ -3721,7 +3721,13 @@ sub main {
 					# the whole transaction. thus locking contract rows for preventing
 					# concurrent catchups will be our very first SQL statement in the
 					# billingdb transaction:
-					lock_contracts($cdr);
+					eval { lock_contracts($cdr); };
+					if ($@) {
+						commit_transaction($acctdbh);
+						commit_transaction($billdbh);
+						check_shutdown() and last BATCH;
+						next CDR;
+					}
 					begin_transaction($provdbh);
 					begin_transaction($dupdbh);
 
