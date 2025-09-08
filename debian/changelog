@@ -1,3 +1,14 @@
+ngcp-rate-o-mat (13.5.1.0+0~mr13.5.1.0) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * [0bdaec3] MT#62899 Update packaging for Debian trixie
+
+  [ Rene Krenn ]
+  * [ede43a2] MT#63367 prevent unitialized cash_balance_interval (from delta)
+  * [840ccb3] MT#63500 skip cdr if failing to acquire contract lock
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 08 Sep 2025 11:46:01 +0200
+
 ngcp-rate-o-mat (13.5.0.0+0~mr13.5.0.0) unstable; urgency=medium
 
   * New release.
