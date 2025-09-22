@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (12.5.1.5+0~mr12.5.1.5) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [86e4385] MT#63500 skip cdr if failing to acquire contract lock
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 22 Sep 2025 17:01:31 +0200
+
 ngcp-rate-o-mat (12.5.1.4+0~mr12.5.1.4) unstable; urgency=medium
 
   [ Rene Krenn ]
