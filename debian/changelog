@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (12.5.1.4+0~mr12.5.1.4) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [5385665] MT#63367 prevent unitialized cash_balance_interval (from delta)
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 22 Sep 2025 14:04:24 +0200
+
 ngcp-rate-o-mat (12.5.1.3+0~mr12.5.1.3) unstable; urgency=medium
 
   [ Rene Krenn ]
