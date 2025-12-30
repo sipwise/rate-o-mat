@@ -1,6 +1,5 @@
 Source: ngcp-rate-o-mat
 Section: comm
-Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
 Homepage: https://www.sipwise.com/
 Standards-Version: 4.7.2
