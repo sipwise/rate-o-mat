@@ -1660,8 +1660,9 @@ PREPARE_BALANCE_CATCHUP:
 			($last_cash_balance) x 2,$last_cash_balance_int,($last_free_balance) x 2,$last_free_balance_int,
 			((defined $underrun_profiles_time ? $underrun_profiles_time : 0)) x 2,((defined $underrun_lock_time ? $underrun_lock_time : 0)) x 2,$stime);
 		push(@bind_parms,$etime) if defined $etime;
-		unless ($sth->execute(@bind_parms)
-			or FATAL "Error executing new contract balance statement: ".$sth->errstr) {
+		my $res = $sth->execute(@bind_parms);
+		FATAL "Error executing new contract balance statement: ".$sth->errstr unless defined $res;
+		unless ($res > 0) {
 			$sth->finish;
 			INFO "cash balance record ($contract_id, $stime) was created elsewhere, starting over";
             goto RESTART_BALANCE_CATCHUP;
