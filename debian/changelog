@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (12.5.1.6+0~mr12.5.1.6) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [5807d28] MT#64858 fix check balance record created by B node
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 May 2026 12:03:28 +0200
+
 ngcp-rate-o-mat (12.5.1.5+0~mr12.5.1.5) unstable; urgency=medium
 
   [ Rene Krenn ]
