@@ -292,9 +292,22 @@ sub connect_billdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($billdbh);
+
 	if ($multi_master) {
-		$billdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+		my ($current_format) = $billdbh->selectrow_array("SELECT LOWER(@@binlog_format)");
+		if (!defined $current_format) {
+			FATAL "Error getting DB binlog format: " . $billdbh->errstr;
+		} elsif ($current_format eq 'mixed') {
+			if ($billdbh->do("SET SESSION binlog_format = 'STATEMENT'")) {
+				INFO "DB change session binlog_format old=$current_format new=statement";
+			} else {
+				FATAL "Error setting session binlog_format = 'STATEMENT': " . $billdbh->errstr;
+			}
+		} elsif ($current_format ne 'statement') {
+			FATAL "mixed mode required, but DB binlog_format=$current_format";
+		}
 	}
+
 	$billdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to billing db...";
 
@@ -309,9 +322,22 @@ sub connect_acctdbh {
 
 	FATAL "Error connecting to db: ".$DBI::errstr
 		unless defined($acctdbh);
+
 	if ($multi_master) {
-		$acctdbh->do("SET SESSION binlog_format = 'STATEMENT'") or WARNING 'error setting session binlog_format';
+		my ($current_format) = $acctdbh->selectrow_array("SELECT LOWER(@@binlog_format)");
+		if (!defined $current_format) {
+			FATAL "Error getting DB binlog format: " . $acctdbh->errstr;
+		} elsif ($current_format eq 'mixed') {
+			if ($acctdbh->do("SET SESSION binlog_format = 'STATEMENT'")) {
+				INFO "DB change session binlog_format old=$current_format new=statement";
+			} else {
+				FATAL "Error setting session binlog_format = 'STATEMENT': " . $acctdbh->errstr;
+			}
+		} elsif ($current_format ne 'statement') {
+			FATAL "mixed mode required, but DB binlog_format=$current_format";
+		}
 	}
+
 	$acctdbh->do('SET time_zone = ?',undef,$connection_timezone) or FATAL 'error setting connection timezone' if $connection_timezone;
 	INFO "Successfully connected to accounting db...";
 
