@@ -294,7 +294,7 @@ sub connect_billdbh {
 		unless defined($billdbh);
 
 	if ($multi_master) {
-		my ($current_format) = $billdbh->selectrow_array("SELECT LOWER(@@binlog_format)");
+		my ($current_format) = $billdbh->selectrow_array('SELECT LOWER(@@binlog_format)');
 		if (!defined $current_format) {
 			FATAL "Error getting DB binlog format: " . $billdbh->errstr;
 		} elsif ($current_format eq 'mixed') {
@@ -324,7 +324,7 @@ sub connect_acctdbh {
 		unless defined($acctdbh);
 
 	if ($multi_master) {
-		my ($current_format) = $acctdbh->selectrow_array("SELECT LOWER(@@binlog_format)");
+		my ($current_format) = $acctdbh->selectrow_array('SELECT LOWER(@@binlog_format)');
 		if (!defined $current_format) {
 			FATAL "Error getting DB binlog format: " . $acctdbh->errstr;
 		} elsif ($current_format eq 'mixed') {
