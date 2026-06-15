@@ -1,3 +1,12 @@
+ngcp-rate-o-mat (26.2.0.0+0~mr26.2.0.0) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [ef1ffed] MT#64858 fix check balance record created by B node
+  * [0baa30f] MT#65078 switch session binlog_format only if possible
+  * [4e962af] MT#65078 fix @ interpolation
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 15 Jun 2026 15:33:18 +0200
+
 ngcp-rate-o-mat (26.1.0.0+0~mr26.1.0.0) unstable; urgency=medium
 
   * New release.
