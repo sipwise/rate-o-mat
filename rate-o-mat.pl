@@ -59,6 +59,10 @@ my $failed_cdr_max_retries = ((defined $ENV{RATEOMAT_MAX_RETRIES} && $ENV{RATEOM
 my $failed_cdr_retry_delay = ((defined $ENV{RATEOMAT_RETRY_DELAY} && $ENV{RATEOMAT_RETRY_DELAY} >= 0) ? int $ENV{RATEOMAT_RETRY_DELAY} : 30);
 # with 2 retries and 30sec delay, rato-o-mat tolerates a replication
 # lag of around 60secs until it terminates.
+# skip a reseller after missing-fee retries instead of exiting the process
+my $skip_failed_resellers = (defined $ENV{RATEOMAT_SKIP_FAILED_RESELLERS}
+	? int $ENV{RATEOMAT_SKIP_FAILED_RESELLERS}
+	: 1);
 
 # use source_user if number and source_cli =~ /anonymous/i:
 my $offnet_anonymous_source_cli_fallback = 1;
@@ -138,6 +142,7 @@ my $prepaid_costs_cache;
 my %cdr_col_models = ();
 my $rollback;
 my $log_fatal = 1;
+my $missing_billing_fee = 0;
 
 # load equalization using first or second order low pass filter:
 my $cps_info = {
@@ -2079,14 +2084,70 @@ sub check_shutdown {
 
 }
 
+sub is_local_user_id {
+	my $uid = shift;
+	return defined $uid && length($uid) && $uid ne '0' && lc($uid) ne '<null>';
+}
+
+sub local_source_reseller_id {
+	my $cdr = shift;
+	return unless is_local_user_id($cdr->{source_user_id});
+	my $id = $cdr->{source_provider_id};
+	return unless defined $id && length($id) && $id ne '0';
+	return $id;
+}
+
+sub local_reseller_provider_ids {
+	my $cdr = shift;
+	my @ids;
+	if (is_local_user_id($cdr->{source_user_id})
+		&& defined $cdr->{source_provider_id} && length($cdr->{source_provider_id})
+		&& $cdr->{source_provider_id} ne '0') {
+		push @ids, $cdr->{source_provider_id};
+	}
+	if (is_local_user_id($cdr->{destination_user_id})
+		&& defined $cdr->{destination_provider_id} && length($cdr->{destination_provider_id})
+		&& $cdr->{destination_provider_id} ne '0') {
+		push @ids, $cdr->{destination_provider_id};
+	}
+	return @ids;
+}
+
+sub cdr_skipped_reseller_id {
+	my $cdr = shift;
+	my $skipped = shift;
+	return unless $skipped && %$skipped;
+	foreach my $id (local_reseller_provider_ids($cdr)) {
+		return $id if exists $skipped->{$id};
+	}
+	return;
+}
+
+sub unrated_cdrs_sql {
+	my $skipped = shift;
+	my $sql = "SELECT * FROM accounting.cdr WHERE rating_status = 'unrated' AND id > ?";
+	if ($skipped && %$skipped) {
+		my $ids = join(',', map { int($_) } keys %$skipped);
+		$sql .= " AND NOT (source_user_id <> '0' AND source_user_id <> '<null>' AND source_provider_id IN ($ids))".
+			" AND NOT (destination_user_id <> '0' AND destination_user_id <> '<null>' AND destination_provider_id IN ($ids))";
+	}
+	$sql .= " ORDER BY start_time ASC LIMIT " . $batch_size;
+	return $sql;
+}
+
 sub get_unrated_cdrs {
 	my $r_cdrs = shift;
 	my $r_last_cdr_id = shift;
+	my $r_skipped_resellers = shift;
 
 	my @cdrs;
 	my $nodename;
 
 	my $sth = $sth_unrated_cdrs;
+	if ($r_skipped_resellers && %$r_skipped_resellers) {
+		$sth = $acctdbh->prepare(unrated_cdrs_sql($r_skipped_resellers))
+			or die("Error preparing unrated cdr statement: ".$acctdbh->errstr);
+	}
 
 FETCH_CDRS:	
 	$sth->execute($multi_master_stall ? 0 : $$r_last_cdr_id) or die("Error executing unrated cdr statement: ".$sth->errstr);
@@ -2410,10 +2471,13 @@ sub get_call_cost {
 		unless(get_profile_info($profile_id, $type, $direction, $src_user, $dst_user, undef,
 			$r_profile_info, $cdr->{start_time})) {
 			# we gracefully ignore missing profile infos for inbound direction
-			FATAL "No outbound fee info for profile $profile_id and ".
-			"source user '$src_user' or user/domain '$src_user_domain' and ".
-			"destination user '$dst_user' or user/domain '$dst_user_domain' ".
-			"found\n" if($direction eq "out");
+			if($direction eq "out") {
+				$missing_billing_fee = 1;
+				FATAL "No outbound fee info for profile $profile_id and ".
+				"source user '$src_user' or user/domain '$src_user_domain' and ".
+				"destination user '$dst_user' or user/domain '$dst_user_domain' ".
+				"found\n";
+			}
 			$$r_cost = 0;
 			$$r_free_time = 0;
 			return 1;
@@ -3677,6 +3741,8 @@ sub main {
 	my $rated = 0;
 	my $next_del = 10000;
 	my %failed_counter_map = ();
+	my %failed_reseller_map = ();
+	my %skipped_resellers = ();
 	my $init = 0;
 	my $last_cdr_id = 0;
 
@@ -3696,7 +3762,7 @@ sub main {
 		my @cdrs = ();
 		if ($billdbh && $acctdbh && $provdbh) {
 			eval {
-				get_unrated_cdrs(\@cdrs,\$last_cdr_id);
+				get_unrated_cdrs(\@cdrs,\$last_cdr_id,\%skipped_resellers);
 				INFO "Grabbed ".(scalar @cdrs)." CDRs" if (scalar @cdrs) > 0;
 			};
 			$error = $@;
@@ -3720,6 +3786,8 @@ sub main {
 		my $cdr_id;
 		my $info_prefix;
 		my $failed = 0;
+		my %reseller_failed_this_batch = ();
+		my $retrying_resellers = 0;
 
 		eval {
 			## no critic (TestingAndDebugging::ProhibitNoWarnings)
@@ -3727,10 +3795,23 @@ sub main {
 			CDR: foreach my $cdr (@cdrs) {
 				$rollback = 0;
 				$log_fatal = 0;
+				$missing_billing_fee = 0;
 				$info_prefix = ($rated_batch + 1) . "/" . (scalar @cdrs) . " - ";
+				$cdr_id = $cdr->{id};
+				if ($skip_failed_resellers) {
+					my $skipped_rid = cdr_skipped_reseller_id($cdr, \%skipped_resellers);
+					if ($skipped_rid) {
+						INFO $info_prefix."skipping CDR ID $cdr_id, reseller $skipped_rid is on skip list after missing billing fee";
+						next CDR;
+					}
+					my $src_rid = local_source_reseller_id($cdr);
+					if ($src_rid && $reseller_failed_this_batch{$src_rid}) {
+						DEBUG $info_prefix."deferring CDR ID $cdr_id for reseller $src_rid until next retry";
+						next CDR;
+					}
+				}
 				eval {
 					$t = Time::HiRes::time();
-					$cdr_id = $cdr->{id};
 					DEBUG "start rating CDR ID $cdr_id";
 					begin_transaction($acctdbh);
 					if ('unrated' ne lock_cdr($cdr)) {
@@ -3781,6 +3862,24 @@ sub main {
 						INFO $info_prefix."rolling back changes for CDR ID $cdr_id";
 						rollback_all();
 						next CDR; #move on to the next cdr of the batch
+					} elsif ($skip_failed_resellers && $missing_billing_fee && local_source_reseller_id($cdr)) {
+						my $rid = local_source_reseller_id($cdr);
+						rollback_all();
+						$reseller_failed_this_batch{$rid} = 1;
+						$failed_reseller_map{$rid} = 0 if !exists $failed_reseller_map{$rid};
+						if ($failed_reseller_map{$rid} < $failed_cdr_max_retries) {
+							$failed_reseller_map{$rid}++;
+							$failed += 1;
+							$retrying_resellers = 1;
+							WARNING $info_prefix."rating CDR ID $cdr_id aborted for reseller $rid" .
+								($failed_reseller_map{$rid} > 1 ? " (retry $failed_reseller_map{$rid})" : "") .
+								": " . $error;
+						} else {
+							$skipped_resellers{$rid} = 1;
+							WARNING $info_prefix."skipping reseller $rid after missing billing fee failed ".
+								($failed_cdr_max_retries + 1)." times, please fix it manually: " . $error;
+						}
+						next CDR;
 					} else {
 						$failed_counter_map{$cdr_id} = 0 if !exists $failed_counter_map{$cdr_id};
 						if ($failed_counter_map{$cdr_id} < $failed_cdr_max_retries && !defined $DBI::err) {
@@ -3853,6 +3952,7 @@ sub main {
 		if ($failed > 0) {
 			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
+			$last_cdr_id = 0 if $retrying_resellers;
 		}
 
 		close_db();
