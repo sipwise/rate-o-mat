@@ -72,8 +72,6 @@ my $connect_interval = 3;
 
 my $maintenance_mode = $ENV{RATEOMAT_MAINTENANCE} // 'no';
 
-my $lock_timeout = 5;
-
 my $hostname_filepath = '/etc/ngcp_hostname';
 $hostname_filepath = $ENV{RATEOMAT_HOSTNAME_FILEPATH} if exists $ENV{RATEOMAT_HOSTNAME_FILEPATH};
 
@@ -1092,17 +1090,40 @@ sub lock_contracts {
 		push(@cids,@pcids);
 		$lock_count = scalar @cids;
 		@cids = sort { $a <=> $b } @cids; #"Access your tables and rows in a fixed order."
+		# drop ids that are not contract rows (provider ids are added without a lookup).
+		# a missing id must not look like a busy row to SKIP LOCKED.
 		my $sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
-			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ") FOR UPDATE WAIT $lock_timeout")
+			"WHERE c.id IN (" . substr(',?' x $lock_count,1) . ")")
+			 or FATAL "Error preparing contract row lock selection statement: ".$billdbh->errstr;
+		$sth->execute(@cids)
+			 or FATAL "Error executing contract row lock selection statement: ".$sth->errstr;
+		my @existing;
+		while (my @res = $sth->fetchrow_array) {
+			push(@existing,$res[0]);
+		}
+		$sth->finish;
+		return () unless @existing;
+		@existing = sort { $a <=> $b } @existing;
+		my $existing_count = scalar @existing;
+		$sth = $billdbh->prepare("SELECT c.id from billing.contracts c ".
+			"WHERE c.id IN (" . substr(',?' x $existing_count,1) . ") FOR UPDATE SKIP LOCKED")
 			 or FATAL "Error preparing contract row lock statement: ".$billdbh->errstr;
 		#finally lock the contract rows at this point:
-		$sth->execute(@cids)
+		$sth->execute(@existing)
 			 or FATAL "Error executing contract row lock statement: ".$sth->errstr;
+		my %locked;
+		while (my @res = $sth->fetchrow_array) {
+			$locked{$res[0]} = 1;
+		}
 		$sth->finish;
-		DEBUG "$lock_count contract(s) locked: ".join(', ',@cids);
+		my @busy = grep { !exists $locked{$_} } @existing;
+		if (@busy) {
+			return @busy;
+		}
+		DEBUG "$existing_count contract(s) locked: ".join(', ',@existing);
 	}
 
-	return $lock_count;
+	return ();
 
 }
 
@@ -3786,6 +3807,7 @@ sub main {
 		my $cdr_id;
 		my $info_prefix;
 		my $failed = 0;
+		my $lock_deferred = 0;
 		my %reseller_failed_this_batch = ();
 		my $retrying_resellers = 0;
 
@@ -3829,10 +3851,12 @@ sub main {
 					# the whole transaction. thus locking contract rows for preventing
 					# concurrent catchups will be our very first SQL statement in the
 					# billingdb transaction:
-					eval { lock_contracts($cdr); };
-					if ($@) {
+					my @busy = lock_contracts($cdr);
+					if (@busy) {
+						WARNING $info_prefix."deferring CDR ID $cdr_id, contract row(s) busy: ".join(', ',@busy);
 						commit_transaction($acctdbh);
 						commit_transaction($billdbh);
+						$lock_deferred = 1;
 						check_shutdown() and last BATCH;
 						next CDR;
 					}
@@ -3949,10 +3973,16 @@ sub main {
 			}
 		}
 
+		if ($lock_deferred) {
+			$last_cdr_id = 0;
+		}
 		if ($failed > 0) {
 			INFO "There were $failed failed CDRs, sleep $failed_cdr_retry_delay";
 			sleep($failed_cdr_retry_delay);
 			$last_cdr_id = 0 if $retrying_resellers;
+		} elsif ($lock_deferred) {
+			INFO "Contract row locks were busy, sleep $failed_cdr_retry_delay";
+			sleep($failed_cdr_retry_delay);
 		}
 
 		close_db();
