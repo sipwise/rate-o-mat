@@ -1,3 +1,10 @@
+ngcp-rate-o-mat (26.2.1.2+0~mr26.2.1.2) unstable; urgency=medium
+
+  [ Rene Krenn ]
+  * [fbcc5dd] MT#66238 defer CDR when a contract row is busy
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 20 Oct 2026 13:21:57 +0200
+
 ngcp-rate-o-mat (26.2.1.1+0~mr26.2.1.1) unstable; urgency=medium
 
   * New release.
