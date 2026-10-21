@@ -55,4 +55,5 @@ WORKDIR /code
 #
 # Inside docker:
 #   cd /code && ./t/testrunner $IP_OF_NGCP_SYSTEM # IP_OF_NGCP_SYSTEM can be e.g. IP of a `vagrant up ce-trunk` system (eth1)
+#   RATEOMAT_MYSQL_SOCKET=/run/mysqld/mysqld.sock ./t/testrunner $IP_OF_NGCP_SYSTEM # PRO/Carrier: MySQL via socket (docker run ... -v /run/mysqld:/run/mysqld), API stays on $IP_OF_NGCP_SYSTEM
 ################################################################################

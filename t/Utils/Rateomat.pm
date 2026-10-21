@@ -62,12 +62,14 @@ my $rateomat_pl = $ENV{RATEOMAT_PL} // '../rate-o-mat.pl';
 my $accountingdb_name = $ENV{RATEOMAT_ACCOUNTING_DB_NAME} // 'accounting';
 my $accountingdb_host = $ENV{RATEOMAT_ACCOUNTING_DB_HOST} // 'localhost';
 my $accountingdb_port = $ENV{RATEOMAT_ACCOUNTING_DB_PORT} // '3306';
+my $accountingdb_socket = $ENV{RATEOMAT_ACCOUNTING_DB_SOCKET};
 my $accountingdb_user = $ENV{RATEOMAT_ACCOUNTING_DB_USER} or die('Missing accounting DB user setting.');
 my $accountingdb_pass = $ENV{RATEOMAT_ACCOUNTING_DB_PASS};
 
 my $provisioningdb_name = $ENV{RATEOMAT_PROVISIONING_DB_NAME} // 'accounting';
 my $provisioningdb_host = $ENV{RATEOMAT_PROVISIONING_DB_HOST} // 'localhost';
 my $provisioningdb_port = $ENV{RATEOMAT_PROVISIONING_DB_PORT} // '3306';
+my $provisioningdb_socket = $ENV{RATEOMAT_PROVISIONING_DB_SOCKET};
 my $provisioningdb_user = $ENV{RATEOMAT_PROVISIONING_DB_USER} or die('Missing provisioning DB user setting.');
 my $provisioningdb_pass = $ENV{RATEOMAT_PROVISIONING_DB_PASS};
 
@@ -1107,7 +1109,7 @@ sub get_usr_preferences {
 }
 
 sub _connect_accounting_db {
-	my $dbh = DBI->connect("dbi:mysql:database=$accountingdb_name;host=$accountingdb_host;port=$accountingdb_port",
+	my $dbh = DBI->connect("dbi:mysql:database=$accountingdb_name;host=$accountingdb_host;port=$accountingdb_port" . ($accountingdb_socket ? ";mysql_socket=$accountingdb_socket" : ''),
 		$accountingdb_user, $accountingdb_pass,
 		{AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
 	die("Error connecting to accounting db: ".$DBI::errstr."\n") unless defined($dbh);
@@ -1116,7 +1118,7 @@ sub _connect_accounting_db {
 }
 
 sub _connect_provisioning_db {
-	my $dbh = DBI->connect("dbi:mysql:database=$provisioningdb_name;host=$provisioningdb_host;port=$provisioningdb_port",
+	my $dbh = DBI->connect("dbi:mysql:database=$provisioningdb_name;host=$provisioningdb_host;port=$provisioningdb_port" . ($provisioningdb_socket ? ";mysql_socket=$provisioningdb_socket" : ''),
 		$provisioningdb_user, $provisioningdb_pass,
 		{AutoCommit => 1, mysql_auto_reconnect => 0, mysql_no_autocommit_cmd => 0, PrintError => 1, PrintWarn => 0});
 	die("Error connecting to provisioning db: ".$DBI::errstr."\n") unless defined($dbh);

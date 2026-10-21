@@ -12,6 +12,8 @@ if [ -z "${1:-}" ] ; then
   echo "Usage: $0 <testsystem>" >&2
   echo
   echo "Usage example: $0 192.168.88.162"
+  echo "PRO/Carrier MariaDB listens on lo and ha_int. Use the node's MySQL socket (mounted into docker):"
+  echo "  RATEOMAT_MYSQL_SOCKET=/run/mysqld/mysqld.sock $0 192.168.88.162"
   exit 1
 fi
 
@@ -25,6 +27,8 @@ if [ -z "${SERVER}" ] ; then
   echo
   echo "Usage example: $0 192.168.88.162"
   echo "Usage example: $0 192.168.88.162 fast /results/ junit"
+  echo "PRO/Carrier MariaDB listens on lo and ha_int. Use the node's MySQL socket (mounted into docker):"
+  echo "  RATEOMAT_MYSQL_SOCKET=/run/mysqld/mysqld.sock $0 192.168.88.162"
   echo "Possible test set: all, stable, fast, t/api-rest/api-root.t"
   echo "Default test set: all"
   exit 1
@@ -46,14 +50,32 @@ else
 fi
 
 
-MYSQL_SERVER="${SERVER}"
-MYSQL_PORT="3306"
+# API stays on SERVER. MySQL goes through RATEOMAT_MYSQL_SOCKET when set
+# (MariaDB no longer binds 0.0.0.0 on PRO/Carrier), otherwise TCP to SERVER.
+# The test helpers get the socket explicitly. rate-o-mat.pl is left as is,
+# its client library picks the socket up from MYSQL_UNIX_PORT for "localhost".
 MYSQL_USER="root"
-echo "Testing MySQL connection to ${MYSQL_SERVER}:${MYSQL_PORT} ..."
-if !  mysql -u "${MYSQL_USER}" -h "${SERVER}" -P "${MYSQL_PORT}" -e 'select now()' >/dev/null ; then
-  echo "ERROR: Cannot connect to MySQL on ${MYSQL_SERVER}:${MYSQL_PORT} using user '${MYSQL_USER}', cannot continue!" >&2
+if [ -n "${RATEOMAT_MYSQL_SOCKET:-}" ] ; then
+  export MYSQL_UNIX_PORT="${RATEOMAT_MYSQL_SOCKET}"
+  MYSQL_SERVER="localhost"
+  MYSQL_TARGET="socket ${RATEOMAT_MYSQL_SOCKET}"
+  MYSQL_ARGS=(-S "${RATEOMAT_MYSQL_SOCKET}")
+else
+  MYSQL_SERVER="${SERVER}"
+  MYSQL_PORT="3306"
+  MYSQL_TARGET="${MYSQL_SERVER}:${MYSQL_PORT}"
+  MYSQL_ARGS=(-h "${MYSQL_SERVER}" -P "${MYSQL_PORT}")
+fi
+echo "Testing MySQL connection to ${MYSQL_TARGET} ..."
+if !  mysql -u "${MYSQL_USER}" "${MYSQL_ARGS[@]}" -e 'select now()' >/dev/null ; then
+  echo "ERROR: Cannot connect to MySQL on ${MYSQL_TARGET} using user '${MYSQL_USER}', cannot continue!" >&2
   echo "Hint:"
   echo " [CE] remove 'bind-address = ...' from /etc/ngcp-config/templates/etc/mysql/inc/my.mysqld1.cnf.tt2 && ngcpcfg apply 'Allow TCP for MySQL'"
+  echo " [PRO/Carrier] MariaDB listens on lo and ha_int unless mariadb.bind_all_interfaces is yes."
+  echo "               Run the container on the node with the MySQL socket dir mounted, e.g.:"
+  echo "               docker run -v /run/mysqld:/run/mysqld ..."
+  echo "               RATEOMAT_MYSQL_SOCKET=/run/mysqld/mysqld.sock $0 ${SERVER}"
+  echo "               Or set mariadb.bind_all_interfaces: yes and ngcpcfg apply."
   echo " [CE/PRO] run: mysql -u root -e \"GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY PASSWORD ''; FLUSH PRIVILEGES;\""
   exit 1
 fi
@@ -73,6 +95,10 @@ export CATALYST_SERVER="https://${SERVER}:1443"
 export RATEOMAT_PROVISIONING_DB_HOST="${MYSQL_SERVER}"
 export RATEOMAT_BILLING_DB_HOST="${MYSQL_SERVER}"
 export RATEOMAT_ACCOUNTING_DB_HOST="${MYSQL_SERVER}"
+if [ -n "${RATEOMAT_MYSQL_SOCKET:-}" ] ; then
+  export RATEOMAT_PROVISIONING_DB_SOCKET="${RATEOMAT_MYSQL_SOCKET}"
+  export RATEOMAT_ACCOUNTING_DB_SOCKET="${RATEOMAT_MYSQL_SOCKET}"
+fi
 export RATEOMAT_PL="/code/rate-o-mat.pl"
 
 if [ "${FORMAT}" = "junit" ] ; then
